@@ -1,6 +1,5 @@
 const { google } = require('googleapis');
 require('dotenv').config();
-console.log("DEBUG - Credencial bruta:", process.env.GOOGLE_SERVICE_CREDENTIALS);
 
 const auth = new google.auth.GoogleAuth({
   credentials: JSON.parse(process.env.GOOGLE_SERVICE_CREDENTIALS),
