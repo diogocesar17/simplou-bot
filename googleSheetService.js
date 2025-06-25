@@ -4,7 +4,7 @@ const path = require('path');
 require('dotenv').config();
 
 const auth = new google.auth.GoogleAuth({
-  keyFile: path.join(__dirname, 'credentials', 'google-service-account.json'),
+  credentials: JSON.parse(process.env.GOOGLE_SERVICE_CREDENTIALS),
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
