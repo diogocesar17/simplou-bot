@@ -13,10 +13,12 @@ async function startBot() {
 
   sock.ev.on('creds.update', saveCreds);
 
+  
   // 🔹 Exibir QR Code se necessário
   sock.ev.on('connection.update', (update) => {
     const { qr } = update;
     if (qr) {
+      console.log('📲 QR Code para parear o bot:');
       qrcode.generate(qr, { small: true });
     }
   });
