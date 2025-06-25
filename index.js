@@ -17,10 +17,11 @@ async function startBot() {
   sock.ev.on('connection.update', (update) => {
     const { qr } = update;
     if (qr) {
-      console.log('📲 QR Code para parear o bot:');
-      qrcode.generate(qr, { small: true });
+      console.log('📲 Escaneie o QR Code com o WhatsApp neste link:');
+      console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
     }
   });
+  
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
