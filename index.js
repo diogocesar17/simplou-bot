@@ -8,13 +8,12 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth');
 
   const sock = makeWASocket({
-    auth: state,
+    auth: state
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  
-  // 🔹 Exibir QR Code se necessário
+  // 🔹 Exibir QR Code no terminal Railway
   sock.ev.on('connection.update', (update) => {
     const { qr } = update;
     if (qr) {
