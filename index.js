@@ -9,7 +9,6 @@ async function startBot() {
 
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: true // ou remova se quiser exibir manualmente
   });
 
   sock.ev.on('creds.update', saveCreds);
