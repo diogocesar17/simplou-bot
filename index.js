@@ -1,9 +1,10 @@
+require('dotenv').config();
 const { default: makeWASocket, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const { parseMessage } = require('./messageParser');
 const { appendRowToSheet } = require('./googleSheetService');
 const { getHybridAuthState } = require('./authRedisStorage');
-require('dotenv').config();
+
 
 async function startBot() {
   const { state, saveCreds } = await getHybridAuthState();
@@ -17,8 +18,8 @@ async function startBot() {
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
     if (qr) {
-      console.log('📲 Escaneie o QR Code abaixo:');
-      qrcode.generate(qr, { small: true });
+      console.log('📲 Escaneie o QR Code com o WhatsApp neste link:');
+      console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
     }
 
     if (connection === 'open') {
