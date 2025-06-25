@@ -1,29 +1,44 @@
-const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const makeWASocket = require('@whiskeysockets/baileys').default;
 const { parseMessage } = require('./messageParser');
 const { appendRowToSheet } = require('./googleSheetService');
+const { loadAuthState, saveAuthState } = require('./authRedisStorage');
+const qrcode = require('qrcode-terminal');
 require('dotenv').config();
 
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth');
+  let authState = await loadAuthState();
 
   const sock = makeWASocket({
-    auth: state,
-    printQRInTerminal: false // Desabilitado, pois não funciona no Railway
+    auth: authState || {},
+    printQRInTerminal: true,
   });
 
-  sock.ev.on('creds.update', saveCreds);
-
-  // 🔹 Exibir QR Code como link (Railway não suporta terminal interativo)
   sock.ev.on('connection.update', (update) => {
-    const { qr } = update;
+    const { qr, connection, lastDisconnect } = update;
+
     if (qr) {
-      console.log('📲 Escaneie o QR Code com o WhatsApp neste link:');
-      console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
+      console.log('[QR Code]');
+      qrcode.generate(qr, { small: true });
     }
+
+    if (connection === 'close') {
+      console.log('🛑 Conexão fechada:', lastDisconnect?.error?.message);
+      startBot(); // reconectar
+    }
+
+    if (connection === 'open') {
+      console.log('✅ Conectado ao WhatsApp!');
+    }
+  });
+
+  sock.ev.on('creds.update', async () => {
+    await saveAuthState(sock.authState.creds, sock.authState.keys);
+    console.log('🔐 Sessão salva no Redis');
   });
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
+
     const msg = messages[0];
     if (!msg.message || !msg.message.conversation) return;
 
@@ -40,11 +55,11 @@ async function startBot() {
         parsed.pagamento,
       ]);
       await sock.sendMessage(msg.key.remoteJid, {
-        text: `✅ ${parsed.tipo} de R$ ${parsed.valor.toFixed(2)} salvo com sucesso!\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento}`
+        text: `✅ ${parsed.tipo} de R$ ${parsed.valor.toFixed(2)} salvo com sucesso!\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento}`,
       });
     } else {
       await sock.sendMessage(msg.key.remoteJid, {
-        text: '❌ Não consegui entender o valor. Tente algo como:\n\n"gastei 45 reais no mercado com débito"'
+        text: '❌ Não consegui entender o valor. Tente algo como:\n\n"gastei 45 reais no mercado com débito"',
       });
     }
   });
