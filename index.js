@@ -1,5 +1,4 @@
 const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
 const { parseMessage } = require('./messageParser');
 const { appendRowToSheet } = require('./googleSheetService');
 require('dotenv').config();
@@ -8,12 +7,13 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('auth');
 
   const sock = makeWASocket({
-    auth: state
+    auth: state,
+    printQRInTerminal: false // Desabilitado, pois não funciona no Railway
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // 🔹 Exibir QR Code no terminal Railway
+  // 🔹 Exibir QR Code como link (Railway não suporta terminal interativo)
   sock.ev.on('connection.update', (update) => {
     const { qr } = update;
     if (qr) {
@@ -21,7 +21,6 @@ async function startBot() {
       console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
     }
   });
-  
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
