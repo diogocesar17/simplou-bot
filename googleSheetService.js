@@ -1,7 +1,6 @@
 const { google } = require('googleapis');
-const fs = require('fs');
-const path = require('path');
 require('dotenv').config();
+console.log("DEBUG - Credencial bruta:", process.env.GOOGLE_SERVICE_CREDENTIALS);
 
 const auth = new google.auth.GoogleAuth({
   credentials: JSON.parse(process.env.GOOGLE_SERVICE_CREDENTIALS),
@@ -15,9 +14,7 @@ async function appendRowToSheet(values) {
     spreadsheetId: process.env.SHEET_ID,
     range: 'Gastos!A1',
     valueInputOption: 'USER_ENTERED',
-    requestBody: {
-      values: [values],
-    },
+    requestBody: { values: [values] },
   });
 }
 
