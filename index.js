@@ -52,6 +52,7 @@ async function startBot() {
       await sock.sendMessage(msg.key.remoteJid, {
         text: `✅ ${parsed.tipo} de R$ ${parsed.valor.toFixed(2)} salvo com sucesso!\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento}`
       });
+      await sock.readMessages([msg.key]);
     } else {
       await sock.sendMessage(msg.key.remoteJid, {
         text: '❌ Não consegui entender o valor. Tente algo como:\n\n"gastei 45 reais no mercado com débito"'
