@@ -7,15 +7,27 @@ const AUTH_KEY_CRED = 'wa:auth:credentials';
 const AUTH_KEY_KEYS = 'wa:auth:keys';
 
 async function saveAuthState(creds, keys) {
-  await redis.set(AUTH_KEY_CRED, JSON.stringify(BufferJSON.replacer(creds)));
-  await redis.set(AUTH_KEY_KEYS, JSON.stringify(BufferJSON.replacer(keys)));
+  try {
+    await redis.set(AUTH_KEY_CRED, JSON.stringify(BufferJSON.replacer(creds)));
+    await redis.set(AUTH_KEY_KEYS, JSON.stringify(BufferJSON.replacer(keys)));
+    console.log('✅ Sessão salva no Redis');
+  } catch (err) {
+    console.error('❌ Erro ao salvar sessão no Redis:', err);
+  }
 }
 
 async function loadAuthState() {
   const credData = await redis.get(AUTH_KEY_CRED);
   const keyData = await redis.get(AUTH_KEY_KEYS);
 
-  if (!credData || !keyData) return null;
+  /**REMOVER */
+  if (!credData || !keyData) {
+    console.log('🚫 Sessão não encontrada no Redis');
+    return null;
+  }
+
+  console.log('📦 Sessão carregada do Redis');
+  /**REMOVER */
 
   return {
     creds: BufferJSON.reviver(JSON.parse(credData), ''), // revive buffers
