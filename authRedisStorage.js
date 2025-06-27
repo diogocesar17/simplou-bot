@@ -1,38 +1,63 @@
-const Redis = require('ioredis');
 const { BufferJSON, initAuthCreds, proto } = require('@whiskeysockets/baileys');
 
-const redis = new Redis(process.env.REDIS_URL);
+// Configuração do Redis (opcional)
+let redis = null;
+if (process.env.REDIS_URL) {
+  try {
+    const Redis = require('ioredis');
+    redis = new Redis(process.env.REDIS_URL);
+    
+    // Testar conexão
+    redis.on('error', (err) => {
+      console.warn('⚠️ Redis não disponível, usando armazenamento local:', err.message);
+      redis = null;
+    });
+    
+    console.log('🔌 Redis configurado');
+  } catch (err) {
+    console.warn('⚠️ Redis não disponível, usando armazenamento local:', err.message);
+    redis = null;
+  }
+}
 
 const AUTH_KEY_CRED = 'wa:auth:credentials';
 const AUTH_KEY_KEYS = 'wa:auth:keys';
 
 async function saveAuthState(creds, keys) {
-  try {
-    await redis.set(AUTH_KEY_CRED, JSON.stringify(BufferJSON.replacer(creds)));
-    await redis.set(AUTH_KEY_KEYS, JSON.stringify(BufferJSON.replacer(keys)));
-    console.log('✅ Sessão salva no Redis');
-  } catch (err) {
-    console.error('❌ Erro ao salvar sessão no Redis:', err);
+  if (redis) {
+    try {
+      await redis.set(AUTH_KEY_CRED, JSON.stringify(BufferJSON.replacer(creds)));
+      await redis.set(AUTH_KEY_KEYS, JSON.stringify(BufferJSON.replacer(keys)));
+      console.log('✅ Sessão salva no Redis');
+    } catch (err) {
+      console.warn('⚠️ Erro ao salvar no Redis, usando local:', err.message);
+    }
   }
 }
 
 async function loadAuthState() {
-  const credData = await redis.get(AUTH_KEY_CRED);
-  const keyData = await redis.get(AUTH_KEY_KEYS);
-
-  /**REMOVER */
-  if (!credData || !keyData) {
-    console.log('🚫 Sessão não encontrada no Redis');
+  if (!redis) {
     return null;
   }
+  
+  try {
+    const credData = await redis.get(AUTH_KEY_CRED);
+    const keyData = await redis.get(AUTH_KEY_KEYS);
 
-  console.log('📦 Sessão carregada do Redis');
-  /**REMOVER */
+    if (!credData || !keyData) {
+      console.log('🚫 Sessão não encontrada no Redis');
+      return null;
+    }
 
-  return {
-    creds: BufferJSON.reviver(JSON.parse(credData), ''), // revive buffers
-    keys: BufferJSON.reviver(JSON.parse(keyData), ''),
-  };
+    console.log('📦 Sessão carregada do Redis');
+    return {
+      creds: BufferJSON.reviver(JSON.parse(credData), ''),
+      keys: BufferJSON.reviver(JSON.parse(keyData), ''),
+    };
+  } catch (err) {
+    console.warn('⚠️ Erro ao carregar do Redis:', err.message);
+    return null;
+  }
 }
 
 async function getHybridAuthState() {

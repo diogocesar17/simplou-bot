@@ -9,7 +9,14 @@ const pool = new Pool({
 // Inicializar tabelas se não existirem
 async function initializeDatabase() {
   try {
+    console.log('🔌 Tentando conectar ao PostgreSQL...');
+    
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL não configurada. Verifique as variáveis de ambiente.');
+    }
+    
     const client = await pool.connect();
+    console.log('✅ Conectado ao PostgreSQL com sucesso');
     
     // Criar tabela de lançamentos
     await client.query(`
@@ -37,7 +44,11 @@ async function initializeDatabase() {
     client.release();
     console.log('✅ Banco de dados inicializado com sucesso');
   } catch (error) {
-    console.error('❌ Erro ao inicializar banco de dados:', error);
+    console.error('❌ Erro ao inicializar banco de dados:', error.message);
+    console.error('🔍 Verifique se:');
+    console.error('   - DATABASE_URL está configurada');
+    console.error('   - PostgreSQL está rodando');
+    console.error('   - Credenciais estão corretas');
     throw error;
   }
 }
