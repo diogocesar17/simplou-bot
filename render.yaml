@@ -11,13 +11,3 @@ services:
       - key: PORT
         value: 10000
     healthCheckPath: /
-    
-  - type: redis
-    name: financebot-redis
-    plan: free
-    maxmemoryPolicy: allkeys-lru
-    
-  - type: pserv
-    name: financebot-postgres
-    env: postgresql
-    plan: free 
