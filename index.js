@@ -43,8 +43,8 @@ async function startBot() {
         console.log('📲 Escaneie o QR Code abaixo:');
         qrcode.generate(qr, { small: true });
 
-        //console.log('📲 Escaneie o QR Code com o WhatsApp neste link:');
-        //console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
+        console.log('📲 Escaneie o QR Code com o WhatsApp neste link:');
+        console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
       }
 
       if (connection === 'open') {
@@ -550,7 +550,7 @@ async function startBot() {
         }
       }
 
-      // 📌 Se aguardando confirmação de exclusão
+      // �� Se aguardando confirmação de exclusão
       if (aguardandoExclusao[userId] && aguardandoExclusao[userId].id) {
         const resposta = texto.trim().toLowerCase();
         const { id, resumo } = aguardandoExclusao[userId];
