@@ -1,99 +1,55 @@
-# 🤖 FinanceBot - Bot de Controle Financeiro para WhatsApp
+# 🤖 FinanceBot
 
-Bot inteligente para controle de gastos e receitas via WhatsApp, com suporte a múltiplos usuários e banco de dados PostgreSQL.
+Chatbot financeiro para WhatsApp que registra gastos e receitas, salva em Google Sheets e gera resumos mensais.
 
-## ✨ Funcionalidades
-
-- 📊 **Resumos financeiros** por mês/ano
-- 📂 **Análise por categorias** com percentuais
-- 🔧 **Edição e exclusão** de lançamentos
-- 📜 **Histórico** com filtros por período
-- 💰 **Registro inteligente** de gastos e receitas
-- 🎯 **Categorização automática** com confirmação
-- 📅 **Suporte a datas específicas** (passadas/futuras)
-- 👥 **Multiusuário** - cada usuário tem seus dados isolados
-
-## 🚀 Deploy no Railway
+## 🚀 Deploy no Render (Gratuito)
 
 ### 1. Preparação
+- Crie uma conta no [Render](https://render.com)
+- Conecte seu repositório GitHub
 
-1. **Fork/Clone** este repositório
-2. **Configure as variáveis de ambiente** (veja seção abaixo)
-3. **Conecte ao Railway** via GitHub
+### 2. Configuração
+1. Clique em "New +" → "Blueprint"
+2. Conecte seu repositório
+3. Render detectará automaticamente o `render.yaml`
+4. Configure as variáveis de ambiente:
+   - `GOOGLE_SHEETS_CREDENTIALS` (JSON das credenciais Google)
+   - `GOOGLE_SHEETS_ID` (ID da planilha)
+   - `REDIS_URL` (URL do Redis - será gerada automaticamente)
+   - `DATABASE_URL` (URL do PostgreSQL - será gerada automaticamente)
 
-### 2. Configuração no Railway
+### 3. Deploy
+- Render criará automaticamente:
+  - Web Service (Node.js)
+  - Redis Database
+  - PostgreSQL Database
+- Aguarde o deploy completar (~5-10 minutos)
 
-1. Acesse [railway.app](https://railway.app)
-2. Clique em "New Project" → "Deploy from GitHub repo"
-3. Selecione seu repositório
-4. Adicione um **PostgreSQL Database**:
-   - Clique em "New" → "Database" → "PostgreSQL"
-   - Railway irá gerar automaticamente a variável `DATABASE_URL`
-
-### 3. Variáveis de Ambiente
-
-Configure estas variáveis no Railway:
-
-```env
-# Configurações do WhatsApp
-WHATSAPP_SESSION_NAME=financebot
-
-# Configurações do PostgreSQL (gerado automaticamente pelo Railway)
-DATABASE_URL=postgresql://username:password@host:port/database
-
-# Configurações do Redis (para sessão do WhatsApp)
-REDIS_URL=redis://localhost:6379
-
-# Configurações do ambiente
-NODE_ENV=production
-PORT=3000
-```
-
-### 4. Deploy
-
-1. **Commit e push** suas alterações para o GitHub
-2. O Railway fará **deploy automático**
-3. Acesse os **logs** para ver o QR Code do WhatsApp
-4. **Escaneie o QR Code** com seu WhatsApp
-
-## 🛠️ Desenvolvimento Local
+## 🔧 Configuração Local
 
 ### Pré-requisitos
-
 - Node.js 18+
+- Redis
 - PostgreSQL
-- Redis (opcional, para sessão)
+- Google Sheets API
 
 ### Instalação
-
 ```bash
-# Clone o repositório
-git clone <seu-repo>
-cd financebot
-
-# Instale as dependências
 npm install
+```
 
-# Configure as variáveis de ambiente
-cp env.example .env
-# Edite o arquivo .env com suas configurações
+### Variáveis de Ambiente
+Crie um arquivo `.env`:
+```env
+GOOGLE_SHEETS_CREDENTIALS={"type":"service_account",...}
+GOOGLE_SHEETS_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
+REDIS_URL=redis://localhost:6379
+DATABASE_URL=postgresql://user:pass@localhost:5432/financebot
+```
 
-# Inicie o bot
+### Execução
+```bash
 npm start
-```
-
-### Estrutura do Projeto
-
-```
-financebot/
-├── index.js              # Arquivo principal do bot
-├── databaseService.js    # Serviço de banco PostgreSQL
-├── messageParser.js      # Parser de mensagens
-├── authRedisStorage.js   # Autenticação WhatsApp
-├── googleSheetService.js # Serviço Google Sheets (legado)
-├── package.json
-├── Procfile             # Configuração Railway
-└── env.example          # Exemplo de variáveis
 ```
 
 ## 📱 Comandos Disponíveis
@@ -114,12 +70,29 @@ financebot/
 
 ### Histórico
 - `histórico` ou `ultimos 5` - Ver últimos lançamentos
-- `histórico junho 2024` - Histórico de mês específico
 
 ### Registrar Lançamentos
 - "gastei 50 no mercado com pix"
 - "recebi 1000 salário com crédito"
 - "paguei 120 aluguel com débito"
+
+## 🏗️ Arquitetura
+
+- **WhatsApp**: @whiskeysockets/baileys
+- **Banco de Dados**: Google Sheets + PostgreSQL
+- **Cache**: Redis
+- **Hospedagem**: Render (gratuito)
+
+## 📊 Funcionalidades
+
+- ✅ Registro de gastos e receitas
+- ✅ Categorização inteligente
+- ✅ Resumos mensais
+- ✅ Análise por categoria
+- ✅ Edição e exclusão de lançamentos
+- ✅ Histórico de lançamentos
+- ✅ Validação de valores
+- ✅ Confirmação de novas categorias
 
 ## 🗄️ Banco de Dados
 

@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { default: makeWASocket } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
+const http = require('http');
 const { parseMessage, categoriasCadastradas } = require('./messageParser');
 const { 
   initializeDatabase,
@@ -724,5 +725,16 @@ async function startBot() {
     console.error('Erro ao iniciar o bot:', error);
   }
 }
+
+// Servidor HTTP para health check (Render)
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('FinanceBot está funcionando! 🤖');
+});
+
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => {
+  console.log(`🚀 Servidor HTTP rodando na porta ${PORT}`);
+});
 
 startBot();
