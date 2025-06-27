@@ -20,5 +20,4 @@ services:
   - type: pserv
     name: financebot-postgres
     env: postgresql
-    plan: free
-    ipAllowList: [] 
+    plan: free 
