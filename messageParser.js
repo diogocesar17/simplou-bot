@@ -187,5 +187,21 @@ function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-module.exports = { parseMessage, categoriasCadastradas };
+// Verifica se a data está muito distante da data atual (ex: mais de 90 dias no passado ou futuro)
+function isDataMuitoDistante(dataStr) {
+  if (!dataStr) return false;
+  // Espera data no formato DD/MM/AAAA
+  const partes = dataStr.split('/');
+  if (partes.length !== 3) return false;
+  const dia = parseInt(partes[0]);
+  const mes = parseInt(partes[1]) - 1;
+  const ano = parseInt(partes[2]);
+  const data = new Date(ano, mes, dia);
+  if (isNaN(data.getTime())) return false;
+  const hoje = new Date();
+  const diffDias = Math.abs((data - hoje) / (1000 * 60 * 60 * 24));
+  return diffDias > 90;
+}
+
+module.exports = { parseMessage, categoriasCadastradas, isDataMuitoDistante };
   

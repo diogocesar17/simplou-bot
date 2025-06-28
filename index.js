@@ -1,8 +1,8 @@
 require('dotenv').config();
-const { default: makeWASocket } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const http = require('http');
-const { parseMessage, categoriasCadastradas } = require('./messageParser');
+const { parseMessage, categoriasCadastradas, isDataMuitoDistante } = require('./messageParser');
 const { 
   initializeDatabase,
   appendRowToDatabase, 
@@ -15,7 +15,6 @@ const {
   atualizarLancamentoPorId, 
   excluirLancamentoPorId 
 } = require('./databaseService');
-const { getHybridAuthState } = require('./authRedisStorage');
 
 // Controle de contexto simples em memória
 let aguardandoConfirmacaoCategoria = {};
@@ -28,8 +27,9 @@ async function startBot() {
     // Inicializar banco de dados
     await initializeDatabase();
     console.log('✅ Banco de dados inicializado');
-    
-    const { state, saveCreds } = await getHybridAuthState();
+
+    // Persistência local de sessão WhatsApp
+    const { state, saveCreds } = await useMultiFileAuthState('auth');
 
     const sock = makeWASocket({
       auth: state,
@@ -37,7 +37,7 @@ async function startBot() {
     });
 
     sock.ev.on('creds.update', saveCreds);
-
+        
     sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
       if (qr) {
         console.log('📲 Escaneie o QR Code abaixo:');
@@ -330,7 +330,7 @@ async function startBot() {
           aguardandoExclusao[userId].historico = ultimos.slice().reverse();
           let msgHist = `📜 *Lançamentos de ${resto}:*\n\n`;
           aguardandoEdicao[userId].historico.forEach((l, i) => {
-            msgHist += `${i + 1}. ${l.tipo === 'Receita' ? '🟢' : l.tipo === 'Gasto' ? '🔴' : '⚪️'} R$ ${l.valor.toFixed(2)}\n`;
+            msgHist += `${i + 1}. ${l.tipo === 'Receita' ? '🟢' : l.tipo === 'Gasto' ? '🔴' : '⚪️'} R$ ${parseFloat(l.valor).toFixed(2)}\n`;
             msgHist += `   📅 ${l.data} | 📂 ${l.categoria} | 💳 ${l.pagamento}\n`;
             msgHist += `   📝 ${l.descricao.substring(0, 40)}${l.descricao.length > 40 ? '...' : ''}\n\n`;
           });
@@ -367,7 +367,7 @@ async function startBot() {
           aguardandoExclusao[userId].historico = ultimos.slice().reverse();
           let msgHist = `📜 *Últimos ${ultimos.length} lançamentos:*\n\n`;
           aguardandoEdicao[userId].historico.forEach((l, i) => {
-            msgHist += `${i + 1}. ${l.tipo === 'Receita' ? '🟢' : l.tipo === 'Gasto' ? '🔴' : '⚪️'} R$ ${l.valor.toFixed(2)}\n`;
+            msgHist += `${i + 1}. ${l.tipo === 'Receita' ? '🟢' : l.tipo === 'Gasto' ? '🔴' : '⚪️'} R$ ${parseFloat(l.valor).toFixed(2)}\n`;
             msgHist += `   📅 ${l.data} | 📂 ${l.categoria} | 💳 ${l.pagamento}\n`;
             msgHist += `   📝 ${l.descricao.substring(0, 40)}${l.descricao.length > 40 ? '...' : ''}\n\n`;
           });
@@ -550,7 +550,7 @@ async function startBot() {
         }
       }
 
-      // �� Se aguardando confirmação de exclusão
+      // 📌 Se aguardando confirmação de exclusão
       if (aguardandoExclusao[userId] && aguardandoExclusao[userId].id) {
         const resposta = texto.trim().toLowerCase();
         const { id, resumo } = aguardandoExclusao[userId];

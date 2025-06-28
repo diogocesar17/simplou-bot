@@ -53,16 +53,22 @@ async function initializeDatabase() {
   }
 }
 
+function formatarDataParaISO(dataBR) {
+  if (!dataBR) return null;
+  const [dia, mes, ano] = dataBR.split('/');
+  return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+}
+
 // Funções para operações CRUD
 async function appendRowToDatabase(userId, values) {
-  const [data, tipo, descricao, valor, categoria, pagamento] = values;
-  
+  let [data, tipo, descricao, valor, categoria, pagamento] = values;
+  data = formatarDataParaISO(data);
+  tipo = tipo.toLowerCase();
   const query = `
     INSERT INTO lancamentos (user_id, data, tipo, descricao, valor, categoria, pagamento)
     VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING id
   `;
-  
   const result = await pool.query(query, [userId, data, tipo, descricao, valor, categoria, pagamento]);
   return result.rows[0].id;
 }
