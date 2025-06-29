@@ -78,6 +78,23 @@ function validarValor(valor, categoria, tipo, texto) {
 function parseMessage(msg) {
   const texto = msg.toLowerCase().trim();
 
+  // Detecta parcelamento
+  let parcelamento = false;
+  let numParcelas = 1;
+  const regexParcelamento = /em\s*(\d{1,2})\s*(x|vezes|parcelas)/i;
+  const matchParcelamento = texto.match(regexParcelamento);
+  if (matchParcelamento) {
+    parcelamento = true;
+    numParcelas = parseInt(matchParcelamento[1]);
+  }
+
+  // Detecta recorrente/fixo
+  let recorrente = false;
+  const regexFixo = /\b(fixo|recorrente|todo mês|mensal)\b/i;
+  if (regexFixo.test(texto)) {
+    recorrente = true;
+  }
+
   // Tipo
   const isIncome = /recebi|ganhei|entrou|salário|salario|pagamento|bonus|bônus|freela|freelance|venda|vendi/i.test(texto);
   const isExpense = /paguei|comprei|gastei|usei|debitou|saquei|transferi|pix|boleto|cartão|cartao/i.test(texto);
@@ -93,7 +110,12 @@ function parseMessage(msg) {
 
   // Pagamento
   const pagamentoMatch = texto.match(/(pix|cr[eé]dito|d[eé]bito|dinheiro|boleto|transferência|transferencia|cartão|cartao|nubank|inter|itau|bradesco|santander|caixa)/i);
-  const pagamento = pagamentoMatch ? pagamentoMatch[1].toUpperCase() : 'NÃO INFORMADO';
+  let pagamento = pagamentoMatch ? pagamentoMatch[1].toUpperCase() : 'NÃO INFORMADO';
+  
+  // Se é parcelamento e não especificou pagamento, assume CRÉDITO
+  if (parcelamento && pagamento === 'NÃO INFORMADO') {
+    pagamento = 'CRÉDITO';
+  }
 
   // Data (procura por formatos dd/mm/aaaa, d/m/aaaa, dd/mm, d/m, etc)
   let data = null;
@@ -179,7 +201,10 @@ function parseMessage(msg) {
     data,
     isNovaCategoria,
     categoriaDetectada,
-    validacoes: validacao.validacoes || []
+    validacoes: validacao.validacoes || [],
+    parcelamento,
+    numParcelas,
+    recorrente
   };
 }
 

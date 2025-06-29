@@ -61,15 +61,29 @@ function formatarDataParaISO(dataBR) {
 
 // Funções para operações CRUD
 async function appendRowToDatabase(userId, values) {
-  let [data, tipo, descricao, valor, categoria, pagamento] = values;
+  // Suporte a novos campos opcionais
+  let [data, tipo, descricao, valor, categoria, pagamento, parcelamento_id, parcela_atual, total_parcelas, recorrente, recorrente_fim, recorrente_id] = values;
   data = formatarDataParaISO(data);
   tipo = tipo.toLowerCase();
+
+  // Monta query dinâmica conforme os campos fornecidos
+  const campos = ['user_id', 'data', 'tipo', 'descricao', 'valor', 'categoria', 'pagamento'];
+  const params = [userId, data, tipo, descricao, valor, categoria, pagamento];
+
+  if (parcelamento_id !== undefined) { campos.push('parcelamento_id'); params.push(parcelamento_id); }
+  if (parcela_atual !== undefined) { campos.push('parcela_atual'); params.push(parcela_atual); }
+  if (total_parcelas !== undefined) { campos.push('total_parcelas'); params.push(total_parcelas); }
+  if (recorrente !== undefined) { campos.push('recorrente'); params.push(recorrente); }
+  if (recorrente_fim !== undefined) { campos.push('recorrente_fim'); params.push(recorrente_fim); }
+  if (recorrente_id !== undefined) { campos.push('recorrente_id'); params.push(recorrente_id); }
+
+  const placeholders = params.map((_, i) => `$${i + 1}`);
   const query = `
-    INSERT INTO lancamentos (user_id, data, tipo, descricao, valor, categoria, pagamento)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO lancamentos (${campos.join(', ')})
+    VALUES (${placeholders.join(', ')})
     RETURNING id
   `;
-  const result = await pool.query(query, [userId, data, tipo, descricao, valor, categoria, pagamento]);
+  const result = await pool.query(query, params);
   return result.rows[0].id;
 }
 
@@ -213,14 +227,14 @@ async function getGastosPorCategoria(userId, mes = null, ano = null) {
 
 async function getUltimosLancamentos(userId, n = 5) {
   const query = `
-    SELECT id, data, tipo, descricao, valor, categoria, pagamento
+    SELECT id, data, tipo, descricao, valor, categoria, pagamento, parcelamento_id, parcela_atual, total_parcelas
     FROM lancamentos 
     WHERE user_id = $1 
     ORDER BY data DESC, criado_em DESC 
     LIMIT $2
   `;
   
-  const result = await pool.query(query, [userId, n]);
+  const result = await pool.query(query, [userId, n * 5]); // Busca mais para garantir agrupamento
   return result.rows;
 }
 
@@ -282,6 +296,17 @@ async function getTotalGastosPorPagamento(userId, pagamento, mes = null, ano = n
   return result.rows[0].total ? parseFloat(result.rows[0].total) : 0;
 }
 
+// Excluir todas as parcelas de um parcelamento
+async function excluirParcelamentoPorId(userId, parcelamentoId) {
+  const query = `
+    DELETE FROM lancamentos
+    WHERE user_id = $1 AND parcelamento_id = $2
+    RETURNING id
+  `;
+  const result = await pool.query(query, [userId, parcelamentoId]);
+  return result.rowCount;
+}
+
 module.exports = {
   initializeDatabase,
   appendRowToDatabase,
@@ -294,5 +319,6 @@ module.exports = {
   atualizarLancamentoPorId,
   excluirLancamentoPorId,
   getTotalGastosPorPagamento,
-  pool
+  pool,
+  excluirParcelamentoPorId
 }; 
