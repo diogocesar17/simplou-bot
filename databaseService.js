@@ -260,6 +260,28 @@ async function excluirLancamentoPorId(userId, id) {
   return result.rows[0];
 }
 
+// Consulta total de gastos por tipo de pagamento
+async function getTotalGastosPorPagamento(userId, pagamento, mes = null, ano = null) {
+  let query = `
+    SELECT SUM(valor) as total
+    FROM lancamentos
+    WHERE user_id = $1 AND tipo = 'gasto' AND pagamento ILIKE $2
+  `;
+  
+  const params = [userId, `%${pagamento}%`];
+  let paramIndex = 3;
+  
+  if (mes !== null && ano !== null) {
+    query += ` AND EXTRACT(MONTH FROM data) = $${paramIndex} AND EXTRACT(YEAR FROM data) = $${paramIndex + 1}`;
+    params.push(mes + 1, ano); // +1 porque PostgreSQL usa 1-12
+  } else {
+    query += ` AND EXTRACT(MONTH FROM data) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM data) = EXTRACT(YEAR FROM CURRENT_DATE)`;
+  }
+  
+  const result = await pool.query(query, params);
+  return result.rows[0].total ? parseFloat(result.rows[0].total) : 0;
+}
+
 module.exports = {
   initializeDatabase,
   appendRowToDatabase,
@@ -271,5 +293,6 @@ module.exports = {
   getLancamentoPorId,
   atualizarLancamentoPorId,
   excluirLancamentoPorId,
+  getTotalGastosPorPagamento,
   pool
 }; 

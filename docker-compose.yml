@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  financebot:
+    build: .
+    container_name: financebot
+    restart: always  # Reinicia automaticamente se parar
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgresql://financebot:financebot123@postgres:5432/financebot
+      # - DATABASE_URL=postgresql://financebot_postgres_user:ZN833FaUZViY4c4FVFo6JmpistWbazVx@dpg-d1f2noadbo4c739h4dj0-a.oregon-postgres.render.com/financebot_postgres?ssl=true
+      - GOOGLE_SHEETS_CREDENTIALS={"type":"service_account","project_id":"controlefinanceirobot-464002","private_key_id":"3a487d8cef811775b36aec12e60e9c2315d431c1","private_key":"-----BEGIN PRIVATE KEY-----\nMIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAQCzgD2osL8KtYLe\nhFlQGDjvDWCGfFqpwtbDyGp+bspEv7PY52XqnsRfbZjpGKchR1COu1SWyzhCOoZK\n9RqRisB2Ue85ZC29/IV9XK+RcbnRUSNMHnVkMhge8LV/7IOQDEpRn9ddfPBu5TNj\nhSN7SjUCdssGwW9jW/RYvfcP4HSwzbTTqRo5s30Q0ufE60qLrAMqNzlbZ8ZXLqD/\nP1UqrtO/Qt03AcH7Ab/397ljq5EDZdVxebXQEOL6dSCPTjtuJjjlnEDIDGKKflR+\nS4NHKm/jiRwq9HTKZhAkNJ7DKIp8oUle3YMQtcgchaxzOPs9h6LVFor4T6eMy7MP\n/IY6spkNAgMBAAECggEALxZtFluHQh/rfMPrSf+Qr+UqdR0aC355KFLi3NfjZ7WC\nUFwjeDC+AuqVOlClRy2WDFtIDWayE22W3QL/PT7QzjkgMEX/Wd9shT5TMCxNOoO2\nZrl2whoCCdvLQQuiV59hv5fWv0ePKwglOu4qKKWG0manS9ZiigYNS1pJ/Xg8JETg\nVXX97ZdgiULmH+xbacBiO0AC4ytPudA+zrR/tXyhKIy/CYckLXBe2rZiYoTs+qhR\ns7021LJzSFgh9bx261yVAPPMdTaZ9Q02Jhsgs1fl9kxtN1G/3kV5zN3idy+imcGl\nadQLzpjJOgVLhgVfvgxSbAC/VYOOlbVin3T4cNhhYQKBgQD66MNQ3LrP0a2oR3hR\n91Kc5GNMsCOqG/l4E8wrz7VOw0giad3mDS8c3T02RFpv67qBAId1jpwWsabxIATU\n8f3zspzQMBCAf+PgrtUYQjvEXt3Spt8wYLRrTbriikvVrX7tthOMxlgihRWMK2ON\n9qcaTQj+jD8PZzJLom4pdE11CwKBgQC3JJRBJlVDz7ZaA08QjUOoz0PPjhtyC1Hc\nGYCG9Uva6mFNeFmeZGdcTFNknOKWrNqtP4aGCNpK/fGmePWWBL3i1qnyTlGqWwZz\nhdL+/tkWwfuk8sQJNRSESCApveTHurNYgqWqAtKC4mPGDa/vjIE552zMiZCXxUl3\nUZFXkOVJRwKBgQCRHLNxfedxL/R+ga89wIt//7rKbIiD5p/2aYTIxd03S0vZ016p\noXBhAjdXvlqLpkr8NuEhBTSTD3XcuMbynW5hVijJYzL4Dn8twA+wcwX8AV3LagVl\nBljyQkdWo+NOFoR1WLufzErG1C9tHN78CO4GEQ2lolkKQIXfJncN9JyjlwJ/PYYM\nR9aYzi75E0QJS4YpNIxsO02B6s3isg3fH3dIBEK4bU4AzTTthBQf76zEcdmfnJO6\nnUxcCNVGWKZJ2hu9rnZuoPeud4wcnrJWL1NtmjeQUdk8AdvTCJ0yMNOaB36wwQsi\nm/pWvaFP4zi14cNRpiIYap3L9TBRfcPpD4GdhQKBgATbyJMJageb4PGpaWmRSm9f\nWV4uajdopB4j6iyj1HEKksLDGzlxlrfxnXTOrVu0IQDvQ7jkkNtd7/gfwwLXO09u\nbic/HHNTH0QOkWGB4TwEkpmLgmthxTRt9i14gudg7KofmSy22Khhytp3zacqg+Af\nCd2VE2e+oh95VJxk1pEv\n-----END PRIVATE KEY-----\n","client_email":"finance-bot@controlefinanceirobot-464002.iam.gserviceaccount.com","client_id":"107103314806511129473","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/finance-bot%40controlefinanceirobot-464002.iam.gserviceaccount.com","universe_domain":"googleapis.com"}
+      - GOOGLE_SHEETS_ID=1svocg5238PqvobwBbTmEca0ACHsspqKbCyG8gg3nKN0
+    volumes:
+      # Persistir dados de autenticação do WhatsApp
+      - ./auth:/app/auth
+      # Persistir logs (opcional)
+      - ./logs:/app/logs
+    networks:
+      - financebot-network
+    # Configurações de saúde e recursos
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Limites de recursos (opcional)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    depends_on:
+      - postgres
+
+  # PostgreSQL (opcional - se quiser rodar localmente)
+  postgres:
+    image: postgres:15-alpine
+    container_name: financebot-postgres
+    restart: always
+    environment:
+      - POSTGRES_DB=financebot
+      - POSTGRES_USER=financebot
+      - POSTGRES_PASSWORD=financebot123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - financebot-network
+
+  # Redis (opcional - se quiser rodar localmente)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: financebot-redis
+  #   restart: always
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - financebot-network
+
+volumes:
+  postgres_data:
+  # redis_data:
+
+networks:
+  financebot-network:
+    driver: bridge 

@@ -100,10 +100,11 @@ async function getResumoDoMesAtual() {
 }
 
 function parseMonthYear(input) {
+  console.log('DEBUG: [parseMonthYear] Entrada recebida:', input);
   const meses = {
     'janeiro': 0, 'jan': 0, '1': 0,
     'fevereiro': 1, 'fev': 1, '2': 1,
-    'março': 2, 'mar': 2, '3': 2,
+    'marco': 2, 'março': 2, 'mar': 2, '3': 2,
     'abril': 3, 'abr': 3, '4': 3,
     'maio': 4, '5': 4,
     'junho': 5, 'jun': 5, '6': 5,
@@ -114,9 +115,8 @@ function parseMonthYear(input) {
     'novembro': 10, 'nov': 10, '11': 10,
     'dezembro': 11, 'dez': 11, '12': 11
   };
-
-  const inputLower = input.toLowerCase().trim();
-  
+  const inputLower = input.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('ç','c');
+  console.log('DEBUG: [parseMonthYear] Entrada normalizada:', inputLower);
   // Padrões: "janeiro 2024", "jan 2024", "1 2024", "2024"
   const patterns = [
     /^(\w+)\s+(\d{4})$/, // "janeiro 2024"
@@ -128,6 +128,7 @@ function parseMonthYear(input) {
 
   for (const pattern of patterns) {
     const match = inputLower.match(pattern);
+    console.log('DEBUG: [parseMonthYear] Testando pattern:', pattern, 'Match:', match);
     if (match) {
       const now = new Date();
       let mes, ano;
@@ -156,10 +157,12 @@ function parseMonthYear(input) {
         }
       }
 
+      console.log('DEBUG: [parseMonthYear] Resultado final:', { mes, ano });
       return { mes, ano };
     }
   }
 
+  console.log('DEBUG: [parseMonthYear] Nenhum padrão bateu, retornando null');
   return null;
 }
 
@@ -515,4 +518,6 @@ module.exports = {
   getLancamentoPorId,
   atualizarLancamentoPorId,
   excluirLancamentoPorId,
+  parseMonthYear,
+  getNomeMes,
 };

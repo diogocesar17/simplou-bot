@@ -13,8 +13,45 @@ const {
   getUltimosLancamentos, 
   getLancamentoPorId, 
   atualizarLancamentoPorId, 
-  excluirLancamentoPorId 
+  excluirLancamentoPorId,
+  getTotalGastosPorPagamento
 } = require('./databaseService');
+const { getGastosCategoriaEspecifica, parseMonthYear, getNomeMes } = require('./googleSheetService');
+
+// Função utilitária para formatar valores de forma segura
+function formatarValor(valor, casasDecimais = 2) {
+  if (valor === null || valor === undefined) return '0.00';
+  const valorNumerico = Number(valor);
+  if (isNaN(valorNumerico)) return '0.00';
+  return valorNumerico.toFixed(casasDecimais);
+}
+
+// Função para parsear mês/ano
+const meses = ['janeiro','fevereiro','março','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function parseMesAno(input) {
+  if (!input) return null;
+  input = input.trim().toLowerCase();
+  let mes = null, ano = null;
+  const match = input.match(/^(\d{1,2})[\/\-\s]?(\d{2,4})?$/);
+  if (match) {
+    mes = parseInt(match[1]);
+    ano = match[2] ? parseInt(match[2]) : (new Date()).getFullYear();
+  } else {
+    const partes = input.split(/\s+/);
+    let nomeMes = partes[0].normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('ç','c');
+    let idx = meses.findIndex(m => m.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('ç','c') === nomeMes);
+    if (idx === -1 && nomeMes === 'marco') idx = 2; // Aceita 'marco' como 'março'
+    if (idx !== -1) {
+      mes = idx + 1;
+      ano = partes[1] ? parseInt(partes[1]) : (new Date()).getFullYear();
+    }
+  }
+  if (mes && mes >= 1 && mes <= 12) {
+    if (!ano || ano < 100) ano = 2000 + (ano || 0);
+    return { mes, ano };
+  }
+  return null;
+}
 
 // Controle de contexto simples em memória
 let aguardandoConfirmacaoCategoria = {};
@@ -63,11 +100,63 @@ async function startBot() {
       if (!msg.message || !msg.message.conversation) return;
 
       const texto = msg.message.conversation.trim();
+      const textoLower = texto.toLowerCase().normalize('NFD').replace(/[\u0000-\u001f\u007f-\u009f]/g, '').replace(/[\u0300-\u036f]/g, '').replace(/ +/g, ' ').trim();
       const userId = msg.key.remoteJid; // Identificador único do usuário
 
+      // 📌 Comando: total no crédito/débito/pix (super flexível)
+      if (/^total( no)? (credito|debito|pix)$/.test(textoLower)) {
+        const total = await getTotalGastosPorPagamento(userId, tipoPagamento);
+        const now = new Date();
+        const nomeMes = now.toLocaleString('pt-BR', { month: 'long' });
+        const ano = now.getFullYear();
+        await sock.sendMessage(userId, {
+          text: `💳 Total de gastos no ${tipoPagamento.charAt(0) + tipoPagamento.slice(1).toLowerCase()} em ${nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)}/${ano}: R$ ${formatarValor(total)}`
+        });
+        await sock.readMessages([msg.key]);
+        return;
+      }
+
+      // 📌 Comando: total no crédito/débito/pix por mês específico
+      if (/^total( no)? (credito|debito|pix)( em| de)? (.+)$/i.test(texto)) {
+        const match = texto.match(/^total( no)? (credito|debito|pix)( em| de)? (.+)$/i);
+        if (match) {
+          const tipoPagamento = match[2].toUpperCase();
+          const mesInput = match[4].trim();
+          
+          let tipoPagamentoFormatado = '';
+          if (tipoPagamento === 'CREDITO') tipoPagamentoFormatado = 'CRÉDITO';
+          else if (tipoPagamento === 'DEBITO') tipoPagamentoFormatado = 'DÉBITO';
+          else if (tipoPagamento === 'PIX') tipoPagamentoFormatado = 'PIX';
+          
+          const mesInputPadronizado = mesInput.replace(/[\/-]/g, ' ');
+          const parsed = parseMonthYear(mesInputPadronizado);
+          if (!parsed) {
+            await sock.sendMessage(userId, { 
+              text: `❌ Formato de mês inválido. Use: "total no crédito janeiro 2024", "total no pix jan 2024", "total no débito 1 2024"` 
+            });
+            await sock.readMessages([msg.key]);
+            return;
+          }
+          
+          try {
+            const total = await getTotalGastosPorPagamento(userId, tipoPagamentoFormatado, parsed.mes, parsed.ano);
+            const nomeMes = getNomeMes(parsed.mes);
+            await sock.sendMessage(userId, {
+              text: `💳 Total de gastos no ${tipoPagamentoFormatado.charAt(0) + tipoPagamentoFormatado.slice(1).toLowerCase()} em ${nomeMes}/${parsed.ano}: R$ ${formatarValor(total)}`
+            });
+          } catch (error) {
+            await sock.sendMessage(userId, { 
+              text: `❌ Erro ao buscar total: ${error.message}` 
+            });
+          }
+          await sock.readMessages([msg.key]);
+          return;
+        }
+      }
+
       // 📌 Comando especial: resumo por mês específico
-      if (texto.toLowerCase().startsWith('resumo ')) {
-        const mesInput = texto.substring(7).trim(); // Remove "resumo " do início
+      if (textoLower.startsWith('resumo ')) {
+        const mesInput = textoLower.substring(7).trim(); // Remove "resumo " do início
         
         if (mesInput === '') {
           // Resumo do mês atual
@@ -78,9 +167,9 @@ async function startBot() {
 
           const msgResumo =
             `📊 *Resumo de ${mes.charAt(0).toUpperCase() + mes.slice(1)}/${ano}*\n\n` +
-            `• Receitas: R$ ${resumo.totalReceitas.toFixed(2)}\n` +
-            `• Despesas: R$ ${resumo.totalDespesas.toFixed(2)}\n` +
-            `• Saldo: R$ ${resumo.saldo.toFixed(2)}\n` +
+            `• Receitas: R$ ${formatarValor(resumo.totalReceitas)}\n` +
+            `• Despesas: R$ ${formatarValor(resumo.totalDespesas)}\n` +
+            `• Saldo: R$ ${formatarValor(resumo.saldo)}\n` +
             `• Lançamentos: ${resumo.totalLancamentos}`;
 
           await sock.sendMessage(userId, { text: msgResumo });
@@ -97,9 +186,9 @@ async function startBot() {
             
             const msgResumo =
               `📊 *Resumo de ${nomeMes}/${parsed.ano}*\n\n` +
-              `• Receitas: R$ ${resumo.totalReceitas.toFixed(2)}\n` +
-              `• Despesas: R$ ${resumo.totalDespesas.toFixed(2)}\n` +
-              `• Saldo: R$ ${resumo.saldo.toFixed(2)}\n` +
+              `• Receitas: R$ ${formatarValor(resumo.totalReceitas)}\n` +
+              `• Despesas: R$ ${formatarValor(resumo.totalDespesas)}\n` +
+              `• Saldo: R$ ${formatarValor(resumo.saldo)}\n` +
               `• Lançamentos: ${resumo.totalLancamentos}`;
 
             await sock.sendMessage(userId, { text: msgResumo });
@@ -111,7 +200,7 @@ async function startBot() {
       }
 
       // 📌 Comando especial: resumo (mantido para compatibilidade)
-      if (texto.toLowerCase() === 'resumo') {
+      if (textoLower === 'resumo') {
         const resumo = await getResumoDoMesAtual(userId);
         const now = new Date();
         const mes = now.toLocaleString('pt-BR', { month: 'long' });
@@ -119,9 +208,9 @@ async function startBot() {
 
         const msgResumo =
           `📊 *Resumo de ${mes.charAt(0).toUpperCase() + mes.slice(1)}/${ano}*\n\n` +
-          `• Receitas: R$ ${resumo.totalReceitas.toFixed(2)}\n` +
-          `• Despesas: R$ ${resumo.totalDespesas.toFixed(2)}\n` +
-          `• Saldo: R$ ${resumo.saldo.toFixed(2)}\n` +
+          `• Receitas: R$ ${formatarValor(resumo.totalReceitas)}\n` +
+          `• Despesas: R$ ${formatarValor(resumo.totalDespesas)}\n` +
+          `• Saldo: R$ ${formatarValor(resumo.saldo)}\n` +
           `• Lançamentos: ${resumo.totalLancamentos}`;
 
         await sock.sendMessage(userId, { text: msgResumo });
@@ -130,7 +219,7 @@ async function startBot() {
       }
 
       // 📌 Comando de ajuda
-      if (texto.toLowerCase() === 'ajuda' || texto.toLowerCase() === 'help') {
+      if (textoLower === 'ajuda' || textoLower === 'help') {
         const msgAjuda = 
           `🤖 *FinanceBot - Comandos Disponíveis*\n\n` +
           `📊 *Resumos:*\n` +
@@ -140,6 +229,13 @@ async function startBot() {
           `• \`resumo 1 2024\` - Resumo com número do mês\n` +
           `• \`resumo 2024\` - Resumo do ano (mês atual)\n` +
           `• \`resumo janeiro\` - Resumo do mês no ano atual\n\n` +
+          `💳 *Total por Pagamento:*\n` +
+          `• \`total no crédito\` - Total no crédito (mês atual)\n` +
+          `• \`total no débito\` - Total no débito (mês atual)\n` +
+          `• \`total no pix\` - Total no PIX (mês atual)\n` +
+          `• \`total no crédito janeiro 2024\` - Total por mês específico\n` +
+          `• \`total no pix jan 2024\` - Total com abreviação\n` +
+          `• \`total no débito 1 2024\` - Total com número do mês\n\n` +
           `📂 *Análise por Categoria:*\n` +
           `• \`categorias\` - Gastos por categoria (mês atual)\n` +
           `• \`categorias janeiro 2024\` - Categorias de mês específico\n` +
@@ -155,6 +251,8 @@ async function startBot() {
           `• "recebi 1000 salário com crédito"\n` +
           `• "paguei 120 aluguel com débito"\n\n` +
           `💡 *Exemplos:*\n` +
+          `• total no crédito janeiro 2024\n` +
+          `• total no pix junho 2025\n` +
           `• categorias junho 2025\n` +
           `• categoria alimentação\n` +
           `• categoria transporte janeiro 2024\n` +
@@ -168,8 +266,8 @@ async function startBot() {
       }
 
       // 📌 Comando: categorias (análise geral por categoria)
-      if (texto.toLowerCase().startsWith('categorias')) {
-        const mesInput = texto.substring(10).trim(); // Remove "categorias " do início
+      if (textoLower.startsWith('categorias')) {
+        const mesInput = textoLower.substring(10).trim(); // Remove "categorias " do início
         
         try {
           let resultado;
@@ -195,14 +293,14 @@ async function startBot() {
             let msgCategorias = `📂 *Análise por Categoria*\n\n`;
             
             resultado.categorias.forEach((cat, index) => {
-              const percentual = ((cat.total / resultado.totalGeral) * 100).toFixed(1);
+              const percentual = formatarValor((cat.total / resultado.totalGeral) * 100, 1);
               msgCategorias += `${index + 1}. *${cat.nome}*\n`;
-              msgCategorias += `   💰 R$ ${cat.total.toFixed(2)} (${percentual}%)\n`;
+              msgCategorias += `   💰 R$ ${formatarValor(cat.total)} (${percentual}%)\n`;
               msgCategorias += `   📊 ${cat.lancamentos} lançamentos\n`;
-              msgCategorias += `   📈 Média: R$ ${cat.media.toFixed(2)}\n\n`;
+              msgCategorias += `   📈 Média: R$ ${formatarValor(cat.media)}\n\n`;
             });
             
-            msgCategorias += `💰 *Total Geral: R$ ${resultado.totalGeral.toFixed(2)}*\n`;
+            msgCategorias += `💰 *Total Geral: R$ ${formatarValor(resultado.totalGeral)}*\n`;
             msgCategorias += `📊 *Total de Lançamentos: ${resultado.totalLancamentos}*`;
             
             await sock.sendMessage(userId, { text: msgCategorias });
@@ -218,8 +316,8 @@ async function startBot() {
       }
 
       // 📌 Comando: categoria específica
-      if (texto.toLowerCase().startsWith('categoria ')) {
-        const resto = texto.substring(10).trim(); // Remove "categoria " do início
+      if (textoLower.startsWith('categoria ')) {
+        const resto = textoLower.substring(10).trim(); // Remove "categoria " do início
         
         // Extrai categoria e período (se houver)
         const partes = resto.split(' ');
@@ -267,13 +365,13 @@ async function startBot() {
             });
           } else {
             let msgCategoria = `📂 *Categoria: ${resultado.categoria} - ${resultado.periodo}*\n\n`;
-            msgCategoria += `💰 *Total: R$ ${resultado.totalCategoria.toFixed(2)}*\n`;
+            msgCategoria += `💰 *Total: R$ ${formatarValor(resultado.totalCategoria)}*\n`;
             msgCategoria += `📊 *Lançamentos: ${resultado.totalLancamentos}*\n`;
-            msgCategoria += `📈 *Média: R$ ${resultado.media.toFixed(2)}*\n\n`;
+            msgCategoria += `📈 *Média: R$ ${formatarValor(resultado.media)}*\n\n`;
             msgCategoria += `🔝 *Top ${resultado.gastos.length} Maiores Gastos:*\n\n`;
             
             resultado.gastos.forEach((gasto, index) => {
-              msgCategoria += `${index + 1}. R$ ${gasto.valor.toFixed(2)}\n`;
+              msgCategoria += `${index + 1}. R$ ${formatarValor(gasto.valor)}\n`;
               msgCategoria += `   📅 ${gasto.data}\n`;
               msgCategoria += `   💳 ${gasto.pagamento}\n`;
               msgCategoria += `   📝 ${gasto.descricao.substring(0, 50)}${gasto.descricao.length > 50 ? '...' : ''}\n\n`;
@@ -291,10 +389,39 @@ async function startBot() {
         return;
       }
 
-      // 📌 Comando: histórico por mês específico (deve vir antes do bloco padrão)
-      if (/^hist[oó]rico\s+/.test(texto.toLowerCase())) {
-        const resto = texto.trim().substring(9).trim();
-        const filtro = parseMesAno(resto);
+      // 📌 Comando: histórico por mês específico OU últimos lançamentos
+      if (/^hist[oó]rico(\b|\s)/.test(textoLower)) {
+        const resto = textoLower.replace(/^hist[oó]rico(\b|\s)/, '').trim();
+        if (!resto) {
+          // Só 'histórico' - mostrar últimos lançamentos
+          const ultimos = await getUltimosLancamentos(userId, 5);
+          if (!ultimos || ultimos.length === 0) {
+            await sock.sendMessage(userId, { text: '❌ Nenhum lançamento encontrado.' });
+            await sock.readMessages([msg.key]);
+            return;
+          }
+          let msgHist = `📜 *Últimos ${ultimos.length} lançamentos:*\n\n`;
+          ultimos.forEach((l, i) => {
+            // Exibir data em dd/mm/yyyy
+            let dataFormatada = l.data;
+            if (l.data instanceof Date) {
+              const d = l.data;
+              dataFormatada = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}`;
+            } else if (typeof l.data === 'string' && l.data.includes('-')) {
+              const [ano, mes, dia] = l.data.split('-');
+              dataFormatada = `${dia}/${mes}/${ano}`;
+            }
+            msgHist += `${i + 1}. ${l.tipo === 'Receita' ? '🟢' : l.tipo === 'Gasto' ? '🔴' : '⚪️'} R$ ${formatarValor(parseFloat(l.valor))}\n`;
+            msgHist += `   📅 ${dataFormatada} | 📂 ${l.categoria} | 💳 ${l.pagamento}\n`;
+            msgHist += `   📝 ${l.descricao.substring(0, 40)}${l.descricao.length > 40 ? '...' : ''}\n\n`;
+          });
+          msgHist += `\n💡 Para editar ou excluir, use: editar <N> ou excluir <N> (ex: editar 2)`;
+          await sock.sendMessage(userId, { text: msgHist });
+          await sock.readMessages([msg.key]);
+          return;
+        }
+        // Se tem texto após histórico, tenta filtrar por mês/ano
+        const filtro = parseMonthYear(resto.replace(/[\/\-]/g, ' '));
         if (!filtro) {
           await sock.sendMessage(userId, { text: '❌ Não entendi o mês/ano. Exemplos: histórico junho, histórico dezembro 2024, histórico 01/2024' });
           await sock.readMessages([msg.key]);
@@ -315,26 +442,42 @@ async function startBot() {
               pagamento: linha[6 + offset]
             };
           }).filter(l => {
-            const [dia, mes, ano] = l.data.split('/').map(Number);
-            return mes === filtro.mes && ano === filtro.ano;
+            let dia, mes, ano;
+            let dataStr = l.data;
+            if (l.data instanceof Date) {
+              dataStr = l.data.toISOString().slice(0, 10);
+            }
+            if (typeof dataStr === 'string' && dataStr.includes('/')) {
+              [dia, mes, ano] = dataStr.split('/').map(Number);
+              mes = mes - 1; // Ajusta para zero-based
+            } else if (typeof dataStr === 'string' && dataStr.includes('-')) {
+              [ano, mes, dia] = dataStr.split('-').map(Number);
+              mes = mes - 1; // Ajusta para zero-based
+            } else {
+              return false;
+            }
+            return Number(mes) === Number(filtro.mes) && Number(ano) === Number(filtro.ano);
           });
           if (ultimos.length === 0) {
             await sock.sendMessage(userId, { text: `❌ Nenhum lançamento encontrado para ${resto}.` });
             await sock.readMessages([msg.key]);
             return;
           }
-          // Salva o histórico exibido em memória para referência dos índices
-          aguardandoEdicao[userId] = aguardandoEdicao[userId] || {};
-          aguardandoEdicao[userId].historico = ultimos.slice().reverse();
-          aguardandoExclusao[userId] = aguardandoExclusao[userId] || {};
-          aguardandoExclusao[userId].historico = ultimos.slice().reverse();
           let msgHist = `📜 *Lançamentos de ${resto}:*\n\n`;
-          aguardandoEdicao[userId].historico.forEach((l, i) => {
-            msgHist += `${i + 1}. ${l.tipo === 'Receita' ? '🟢' : l.tipo === 'Gasto' ? '🔴' : '⚪️'} R$ ${parseFloat(l.valor).toFixed(2)}\n`;
-            msgHist += `   📅 ${l.data} | 📂 ${l.categoria} | 💳 ${l.pagamento}\n`;
+          ultimos.forEach((l, i) => {
+            // Exibir data em dd/mm/yyyy
+            let dataFormatada = l.data;
+            if (l.data instanceof Date) {
+              const d = l.data;
+              dataFormatada = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth()+1).padStart(2, '0')}/${d.getFullYear()}`;
+            } else if (typeof l.data === 'string' && l.data.includes('-')) {
+              const [ano, mes, dia] = l.data.split('-');
+              dataFormatada = `${dia}/${mes}/${ano}`;
+            }
+            msgHist += `${i + 1}. ${l.tipo === 'Receita' ? '🟢' : l.tipo === 'Gasto' ? '🔴' : '⚪️'} R$ ${formatarValor(parseFloat(l.valor))}\n`;
+            msgHist += `   📅 ${dataFormatada} | 📂 ${l.categoria} | 💳 ${l.pagamento}\n`;
             msgHist += `   📝 ${l.descricao.substring(0, 40)}${l.descricao.length > 40 ? '...' : ''}\n\n`;
           });
-          msgHist += `\n💡 Para editar ou excluir, use: editar <N> ou excluir <N> (ex: editar 2)`;
           await sock.sendMessage(userId, { text: msgHist });
           await sock.readMessages([msg.key]);
           return;
@@ -343,107 +486,6 @@ async function startBot() {
           await sock.readMessages([msg.key]);
           return;
         }
-      }
-
-      // 📌 Comando: histórico ou ultimos N lançamentos (apenas se for exatamente 'histórico' ou 'ultimos N')
-      if (/^hist[oó]rico\s*$/i.test(texto.toLowerCase()) || texto.toLowerCase().startsWith('ultimos')) {
-        let n = 5;
-        const match = texto.match(/ultimos\s*(\d+)/i);
-        if (match) {
-          n = parseInt(match[1]);
-          if (isNaN(n) || n < 1) n = 5;
-        }
-        try {
-          const ultimos = await getUltimosLancamentos(userId, n);
-          if (ultimos.length === 0) {
-            await sock.sendMessage(userId, { text: '❌ Nenhum lançamento encontrado.' });
-            await sock.readMessages([msg.key]);
-            return;
-          }
-          // Salva o histórico exibido em memória para referência dos índices
-          aguardandoEdicao[userId] = aguardandoEdicao[userId] || {};
-          aguardandoEdicao[userId].historico = ultimos.slice().reverse(); // do mais recente para o mais antigo
-          aguardandoExclusao[userId] = aguardandoExclusao[userId] || {};
-          aguardandoExclusao[userId].historico = ultimos.slice().reverse();
-          let msgHist = `📜 *Últimos ${ultimos.length} lançamentos:*\n\n`;
-          aguardandoEdicao[userId].historico.forEach((l, i) => {
-            msgHist += `${i + 1}. ${l.tipo === 'Receita' ? '🟢' : l.tipo === 'Gasto' ? '🔴' : '⚪️'} R$ ${parseFloat(l.valor).toFixed(2)}\n`;
-            msgHist += `   📅 ${l.data} | 📂 ${l.categoria} | 💳 ${l.pagamento}\n`;
-            msgHist += `   📝 ${l.descricao.substring(0, 40)}${l.descricao.length > 40 ? '...' : ''}\n\n`;
-          });
-          msgHist += `\n💡 Para editar ou excluir, use: editar <N> ou excluir <N> (ex: editar 2)`;
-          await sock.sendMessage(userId, { text: msgHist });
-          await sock.readMessages([msg.key]);
-          return;
-        } catch (error) {
-          await sock.sendMessage(userId, { text: `❌ Erro ao buscar lançamentos: ${error.message}` });
-          await sock.readMessages([msg.key]);
-          return;
-        }
-      }
-
-      // Função utilitária para limpar histórico após 2 minutos
-      function limparHistoricoAposTimeout(jid) {
-        setTimeout(() => {
-          if (aguardandoEdicao[jid]) delete aguardandoEdicao[jid].historico;
-          if (aguardandoExclusao[jid]) delete aguardandoExclusao[jid].historico;
-        }, 2 * 60 * 1000); // 2 minutos
-      }
-
-      // 📌 Comando: editar N
-      if (/^editar\s+\d+$/i.test(texto)) {
-        const match = texto.match(/^editar\s+(\d+)$/i);
-        const n = match ? parseInt(match[1]) : null;
-        const historico = aguardandoEdicao[userId]?.historico;
-        if (!n || n < 1 || !historico || n > historico.length) {
-          await sock.sendMessage(userId, { text: '❌ Para editar um lançamento, primeiro digite "histórico" para ver a lista numerada. Depois use: editar <N>' });
-          await sock.readMessages([msg.key]);
-          return;
-        }
-        const lancamento = historico[n - 1];
-        aguardandoEdicao[userId] = aguardandoEdicao[userId] || {};
-        aguardandoEdicao[userId].lancamento = lancamento;
-        aguardandoEdicao[userId].campo = null;
-        limparHistoricoAposTimeout(userId);
-        const msgEdicao =
-          `📝 *Lançamento #${n}:*\n\n` +
-          `📅 Data: ${lancamento.data}\n` +
-          `💰 Valor: R$ ${lancamento.valor.toFixed(2)}\n` +
-          `📂 Categoria: ${lancamento.categoria}\n` +
-          `💳 Pagamento: ${lancamento.pagamento}\n` +
-          `📄 Descrição: ${lancamento.descricao}\n\n` +
-          `🔧 *O que deseja editar?*\n` +
-          `• "valor" - Alterar valor\n` +
-          `• "categoria" - Alterar categoria\n` +
-          `• "pagamento" - Alterar forma de pagamento\n` +
-          `• "descrição" - Alterar descrição\n` +
-          `• "cancelar" - Cancelar edição`;
-        await sock.sendMessage(userId, { text: msgEdicao });
-        await sock.readMessages([msg.key]);
-        return;
-      }
-
-      // 📌 Comando: excluir N
-      if (/^excluir\s+\d+$/i.test(texto)) {
-        const match = texto.match(/^excluir\s+(\d+)$/i);
-        const n = match ? parseInt(match[1]) : null;
-        const historico = aguardandoExclusao[userId]?.historico;
-        if (!n || n < 1 || !historico || n > historico.length) {
-          await sock.sendMessage(userId, { text: '❌ Para excluir um lançamento, primeiro digite "histórico" para ver a lista numerada. Depois use: excluir <N>' });
-          await sock.readMessages([msg.key]);
-          return;
-        }
-        const lancamento = historico[n - 1];
-        aguardandoExclusao[userId] = aguardandoExclusao[userId] || {};
-        aguardandoExclusao[userId].id = lancamento.id;
-        aguardandoExclusao[userId].resumo = lancamento;
-        limparHistoricoAposTimeout(userId);
-        let msgConf = `⚠️ *Confirma a exclusão do lançamento #${n}?*\n\n`;
-        msgConf += `📅 ${lancamento.data}\n💰 R$ ${lancamento.valor.toFixed(2)}\n📂 ${lancamento.categoria}\n💳 ${lancamento.pagamento}\n📝 ${lancamento.descricao.substring(0, 40)}${lancamento.descricao.length > 40 ? '...' : ''}\n\n`;
-        msgConf += `Responda "sim" para confirmar ou "não" para cancelar.`;
-        await sock.sendMessage(userId, { text: msgConf });
-        await sock.readMessages([msg.key]);
-        return;
       }
 
       // 📌 Se aguardando edição
@@ -452,7 +494,7 @@ async function startBot() {
 
         if (!campo) {
           // Aguardando escolha do campo
-          const escolha = texto.toLowerCase().trim();
+          const escolha = textoLower.trim();
 
           if (escolha === 'cancelar') {
             delete aguardandoEdicao[userId];
@@ -493,7 +535,7 @@ async function startBot() {
           }
         } else {
           // Aguardando novo valor para o campo
-          const novoValor = texto.trim();
+          const novoValor = textoLower.trim();
 
           try {
             const lancamentoAtualizado = { ...lancamento };
@@ -529,7 +571,7 @@ async function startBot() {
             await sock.sendMessage(userId, {
               text: `✅ Lançamento atualizado com sucesso!\n\n` +
                 `📅 Data: ${lancamentoAtualizado.data}\n` +
-                `💰 Valor: R$ ${lancamentoAtualizado.valor.toFixed(2)}\n` +
+                `💰 Valor: R$ ${formatarValor(lancamentoAtualizado.valor)}\n` +
                 `📂 Categoria: ${lancamentoAtualizado.categoria}\n` +
                 `💳 Pagamento: ${lancamentoAtualizado.pagamento}\n` +
                 `📝 Descrição: ${lancamentoAtualizado.descricao}`
@@ -552,7 +594,7 @@ async function startBot() {
 
       // 📌 Se aguardando confirmação de exclusão
       if (aguardandoExclusao[userId] && aguardandoExclusao[userId].id) {
-        const resposta = texto.trim().toLowerCase();
+        const resposta = textoLower.trim().toLowerCase();
         const { id, resumo } = aguardandoExclusao[userId];
         if (resposta === 'sim' || resposta === 's') {
           try {
@@ -577,7 +619,7 @@ async function startBot() {
 
       // 📌 Se aguardando confirmação de categoria
       if (aguardandoConfirmacaoCategoria[userId]) {
-        const resposta = texto.trim().toLowerCase();
+        const resposta = textoLower.trim().toLowerCase();
         const { parsedLancamento } = aguardandoConfirmacaoCategoria[userId];
         if (resposta === 'sim' || resposta === 's') {
           // Adiciona categoria à lista
@@ -607,134 +649,17 @@ async function startBot() {
           return;
         } else {
           await sock.sendMessage(userId, {
-            text: `❓ Responda "sim" para criar a categoria "${parsedLancamento.categoria}" ou "não" para descartar.`
+            text: `❌ Formato de mês inválido. Use: "total no crédito janeiro 2024", "total no pix jan 2024", "total no débito 1 2024"` 
           });
-          return;
-        }
-      }
-
-      // Se aguardando confirmação de valor alto ou data distante
-      if (aguardandoConfirmacaoValor[userId]) {
-        const resposta = texto.trim().toLowerCase();
-        const { parsedLancamento, alertaDataDistante } = aguardandoConfirmacaoValor[userId];
-        if (resposta === 'sim' || resposta === 's') {
-          await appendRowToDatabase(userId, [
-            parsedLancamento.data,
-            parsedLancamento.tipo,
-            parsedLancamento.descricao,
-            parsedLancamento.valor,
-            parsedLancamento.categoria,
-            parsedLancamento.pagamento,
-          ]);
-          await sock.sendMessage(userId, {
-            text: `✅ ${parsedLancamento.tipo} de R$ ${parsedLancamento.valor.toFixed(2)} salvo com sucesso!\n📂 Categoria: ${parsedLancamento.categoria}\n💳 Pagamento: ${parsedLancamento.pagamento}\n📅 Data: ${parsedLancamento.data}`
-          });
-          delete aguardandoConfirmacaoValor[userId];
+          delete aguardandoConfirmacaoCategoria[userId];
           await sock.readMessages([msg.key]);
           return;
-        } else if (resposta === 'não' || resposta === 'nao' || resposta === 'n') {
-          await sock.sendMessage(userId, {
-            text: '❌ Lançamento cancelado. Você pode tentar novamente com uma data diferente.'
-          });
-          delete aguardandoConfirmacaoValor[userId];
-          await sock.readMessages([msg.key]);
-          return;
-        } else {
-          await sock.sendMessage(userId, {
-            text: '❓ Responda "sim" para confirmar o lançamento ou "não" para cancelar.'
-          });
-          return;
         }
-      }
-
-      // Mensagem comum para registro de gasto/receita
-      const parsed = parseMessage(texto.toLowerCase());
-
-      // Se parser retornar erro
-      if (parsed.error) {
-        await sock.sendMessage(userId, { text: `❌ ${parsed.error}` });
-        await sock.readMessages([msg.key]);
-        return;
-      }
-
-      // Se for nova categoria, pedir confirmação
-      if (parsed.isNovaCategoria) {
-        aguardandoConfirmacaoCategoria[userId] = { parsedLancamento: parsed };
-        await sock.sendMessage(userId, {
-          text: `⚠️ Categoria "${parsed.categoria}" não existe. Deseja criar? (sim/não)`
-        });
-        return;
-      }
-
-      // Se houver validações (alertas), mostrar e perguntar se confirma
-      if (parsed.validacoes && parsed.validacoes.length > 0) {
-        let msgValidacoes = `⚠️ *Alertas detectados:*\n\n`;
-        parsed.validacoes.forEach(validacao => {
-          msgValidacoes += `${validacao}\n`;
-        });
-        // Validação de data muito distante
-        if (isDataMuitoDistante(parsed.data)) {
-          msgValidacoes += `\n⚠️ A data informada (${parsed.data}) está muito distante da data atual. Tem certeza que deseja registrar este lançamento para essa data? (sim/não)\n`;
-          aguardandoConfirmacaoValor[userId] = { parsedLancamento: parsed, alertaDataDistante: true };
-          await sock.sendMessage(userId, { text: msgValidacoes });
-          return;
-        }
-        msgValidacoes += `\n📝 *Resumo do lançamento:*\n`;
-        msgValidacoes += `💰 Valor: R$ ${parsed.valor.toFixed(2)}\n`;
-        msgValidacoes += `📂 Categoria: ${parsed.categoria}\n`;
-        msgValidacoes += `💳 Pagamento: ${parsed.pagamento}\n`;
-        msgValidacoes += `📅 Data: ${parsed.data}\n\n`;
-        msgValidacoes += `❓ Deseja confirmar este lançamento? (sim/não)`;
-        
-        aguardandoConfirmacaoValor[userId] = { parsedLancamento: parsed };
-        await sock.sendMessage(userId, { text: msgValidacoes });
-        return;
-      }
-
-      // Validação de data muito distante (caso não haja outros alertas)
-      if (isDataMuitoDistante(parsed.data)) {
-        let msgDataDistante = `⚠️ A data informada (${parsed.data}) está muito distante da data atual. Tem certeza que deseja registrar este lançamento para essa data? (sim/não)`;
-        aguardandoConfirmacaoValor[userId] = { parsedLancamento: parsed, alertaDataDistante: true };
-        await sock.sendMessage(userId, { text: msgDataDistante });
-        return;
-      }
-
-      // Registro normal (sem alertas)
-      if (parsed.valor) {
-        await appendRowToDatabase(userId, [
-          parsed.data,
-          parsed.tipo,
-          parsed.descricao,
-          parsed.valor,
-          parsed.categoria,
-          parsed.pagamento,
-        ]);
-
-        await sock.sendMessage(userId, {
-          text: `✅ ${parsed.tipo} de R$ ${parsed.valor.toFixed(2)} salvo com sucesso!\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento}`
-        });
-
-        await sock.readMessages([msg.key]);
-      } else {
-        await sock.sendMessage(userId, {
-          text: '❌ Não consegui entender o valor. Tente algo como:\n\n"gastei 45 reais no mercado com débito"'
-        });
       }
     });
   } catch (error) {
     console.error('Erro ao iniciar o bot:', error);
   }
 }
-
-// Servidor HTTP para health check (Render)
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('FinanceBot está funcionando! 🤖');
-});
-
-const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => {
-  console.log(`🚀 Servidor HTTP rodando na porta ${PORT}`);
-});
 
 startBot();

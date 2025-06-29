@@ -1,18 +1,23 @@
-FROM node:18-alpine
+# Usar Node.js 20 como base
+FROM node:20-alpine
 
+# Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar arquivos de dependências
+# Copiar package.json e package-lock.json primeiro (para cache de dependências)
 COPY package*.json ./
 
 # Instalar dependências
 RUN npm ci --only=production
 
-# Copiar código fonte
+# Copiar código da aplicação
 COPY . .
 
-# Expor porta
-EXPOSE 8080
+# Criar diretório para autenticação do WhatsApp
+RUN mkdir -p auth
 
-# Comando para iniciar
-CMD ["npm", "start"] 
+# Expor porta (será definida via variável de ambiente)
+EXPOSE 3000
+
+# Comando para iniciar a aplicação
+CMD ["npm","-u", "start"] 
