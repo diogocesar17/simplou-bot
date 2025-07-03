@@ -88,11 +88,18 @@ function parseMessage(msg) {
     numParcelas = parseInt(matchParcelamento[1]);
   }
 
-  // Detecta recorrente/fixo
+  // Detecta recorrente/fixo e quantidade de meses
   let recorrente = false;
+  let recorrenteMeses = 12; // padrão
   const regexFixo = /\b(fixo|recorrente|todo mês|mensal)\b/i;
   if (regexFixo.test(texto)) {
     recorrente = true;
+    // Detecta "por N meses"
+    const matchMeses = texto.match(/por\s*(\d{1,2})\s*mes(es)?/i);
+    if (matchMeses) {
+      recorrenteMeses = parseInt(matchMeses[1]);
+      if (isNaN(recorrenteMeses) || recorrenteMeses < 1) recorrenteMeses = 12;
+    }
   }
 
   // Tipo
@@ -204,7 +211,8 @@ function parseMessage(msg) {
     validacoes: validacao.validacoes || [],
     parcelamento,
     numParcelas,
-    recorrente
+    recorrente,
+    recorrenteMeses
   };
 }
 
