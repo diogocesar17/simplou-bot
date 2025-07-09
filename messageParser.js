@@ -38,6 +38,21 @@ const categoriasPrincipais = {
   ]
 };
 
+// Formas de pagamento válidas
+const formasPagamento = [
+  'PIX', 'CRÉDITO', 'DÉBITO', 'DINHEIRO', 'BOLETO', 'TRANSFERÊNCIA', 'TRANSFERENCIA'
+];
+
+// Mapeamento de números para formas de pagamento
+const mapeamentoFormasPagamento = {
+  1: 'PIX',
+  2: 'CRÉDITO', 
+  3: 'DÉBITO',
+  4: 'DINHEIRO',
+  5: 'BOLETO',
+  6: 'TRANSFERÊNCIA'
+};
+
 // Limites de valores por categoria (em reais)
 const limitesCategoria = {
   'Alimentação': { min: 0.50, max: 500, alerta: 200 },
@@ -245,6 +260,9 @@ function parseMessage(msg) {
   if (parcelamento && pagamento === 'NÃO INFORMADO') {
     pagamento = 'CRÉDITO';
   }
+  
+  // Verificar se falta forma de pagamento (apenas para gastos)
+  const faltaFormaPagamento = tipo === 'Gasto' && pagamento === 'NÃO INFORMADO';
 
   // Data (procura por formatos dd/mm/aaaa, d/m/aaaa, dd/mm, d/m, etc)
   let data = null;
@@ -322,7 +340,8 @@ function parseMessage(msg) {
       recorrente,
       recorrenteMeses,
       categoriaDetectada,
-      confiancaCategoria
+      confiancaCategoria,
+      faltaFormaPagamento
     };
   }
 
@@ -348,7 +367,8 @@ function parseMessage(msg) {
     parcelamento,
     numParcelas,
     recorrente,
-    recorrenteMeses
+    recorrenteMeses,
+    faltaFormaPagamento
   };
 }
 
@@ -372,5 +392,11 @@ function isDataMuitoDistante(dataStr) {
   return diffDias > 90;
 }
 
-module.exports = { parseMessage, categoriasCadastradas, isDataMuitoDistante };
+module.exports = { 
+  parseMessage, 
+  categoriasCadastradas, 
+  isDataMuitoDistante,
+  formasPagamento,
+  mapeamentoFormasPagamento
+};
   

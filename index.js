@@ -2,7 +2,7 @@ require('dotenv').config();
 const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const http = require('http');
-const { parseMessage, categoriasCadastradas, isDataMuitoDistante } = require('./messageParser');
+const { parseMessage, categoriasCadastradas, isDataMuitoDistante, formasPagamento, mapeamentoFormasPagamento } = require('./messageParser');
 const { 
   initializeDatabase,
   appendRowToDatabase, 
@@ -182,6 +182,350 @@ async function criarRecorrente(userId, parsed, cartaoInfo = null) {
   return { recorrenteId, lancamentosCriados };
 }
 
+// Função para processar lançamento (usada após escolha de forma de pagamento)
+async function processarLancamento(userId, parsed, sock) {
+  console.log('[DEBUG] processarLancamento iniciado com:', parsed);
+  
+  // --- DETECÇÃO DE GASTOS NO CARTÃO DE CRÉDITO (PRIORITÁRIO) ---
+  const pagamentoNormalizado = (parsed.pagamento || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  console.log('[DEBUG] pagamentoNormalizado:', pagamentoNormalizado);
+  
+  if (
+    parsed &&
+    parsed.tipo &&
+    parsed.tipo.toLowerCase() === 'gasto' &&
+    pagamentoNormalizado.includes('credito')
+  ) {
+    console.log('[DEBUG] Detecção de gasto no crédito');
+    const cartoes = await listarCartoesConfigurados(userId);
+    console.log('[DEBUG] Cartões encontrados:', cartoes.length, cartoes);
+    
+    if (cartoes.length === 0) {
+      console.log('[DEBUG] Nenhum cartão configurado, registrando como gasto comum');
+      try {
+        const tipoNormalizado = (parsed.tipo || '').toLowerCase();
+        await appendRowToDatabase(userId, [
+          parsed.data,
+          tipoNormalizado,
+          parsed.descricao,
+          parsed.valor,
+          parsed.categoria,
+          parsed.pagamento
+        ]);
+        await sock.sendMessage(userId, {
+          text: `✅ Gasto registrado com sucesso!\n\n` +
+            `📅 Data: ${parsed.data}\n` +
+            `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+            `📂 Categoria: ${parsed.categoria}\n` +
+            `💳 Pagamento: ${parsed.pagamento}\n` +
+            `📝 Descrição: ${parsed.descricao}\n\n` +
+            `💡 *Dica:* Para controlar faturas e ter resumos por cartão, use o comando "configurar cartao"!`
+        });
+        return;
+      } catch (error) {
+        await sock.sendMessage(userId, { 
+          text: `❌ Erro ao registrar gasto: ${error.message}` 
+        });
+        return;
+      }
+    }
+    
+    if (cartoes.length === 1) {
+      console.log('[DEBUG] Apenas um cartão configurado, vinculando automaticamente:', cartoes[0]);
+      const cartao = cartoes[0];
+      const dataLancamento = new Date();
+      const dataContabilizacaoInfo = calcularDataContabilizacao(dataLancamento, cartao.dia_vencimento, cartao.dia_fechamento);
+      const dataContabilizacao = dataContabilizacaoInfo.dataContabilizacao;
+      const mesFatura = dataContabilizacaoInfo.mesFatura;
+      const anoFatura = dataContabilizacaoInfo.anoFatura;
+      
+      try {
+        // Verificar se é parcelamento
+        if (parsed.parcelamento && parsed.numParcelas > 1) {
+          console.log('[DEBUG] Criando parcelamento no cartão:', parsed.numParcelas, 'parcelas');
+          const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed, cartao);
+          // Calcular datas de contabilização das parcelas
+          const datasFatura = [];
+          for (let i = 0; i < parsed.numParcelas; i++) {
+            const dataParcela = new Date();
+            dataParcela.setMonth(dataParcela.getMonth() + i);
+            const infoFatura = calcularDataContabilizacao(dataParcela, cartao.dia_vencimento, cartao.dia_fechamento);
+            datasFatura.push(infoFatura.dataContabilizacao.toLocaleDateString('pt-BR'));
+          }
+          let msgParcelamento = `✅ Parcelamento registrado no cartão ${cartao.nome_cartao}!\n\n`;
+          msgParcelamento += `💰 Valor total: R$ ${formatarValor(parsed.valor)}\n`;
+          msgParcelamento += `📦 ${parsed.numParcelas}x de R$ ${formatarValor(parsed.valor / parsed.numParcelas)}\n`;
+          msgParcelamento += `📅 Primeira parcela na fatura: ${datasFatura[0]}\n`;
+          msgParcelamento += `📅 Última parcela na fatura: ${datasFatura[datasFatura.length - 1]}\n`;
+          msgParcelamento += `📂 Categoria: ${parsed.categoria}\n`;
+          msgParcelamento += `💳 Pagamento: ${parsed.pagamento}\n`;
+          msgParcelamento += `📝 Descrição: ${parsed.descricao}\n`;
+          msgParcelamento += `Contabiliza: ${datasFatura[0]} (fatura inicial)`;
+          await sock.sendMessage(userId, { text: msgParcelamento });
+          return;
+        }
+        
+        // Verificar se é recorrente
+        if (parsed.recorrente && parsed.recorrenteMeses > 1) {
+          console.log('[DEBUG] Criando recorrente no cartão:', parsed.recorrenteMeses, 'meses');
+          const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed, cartao);
+          
+          let msgRecorrente = `✅ Lançamento recorrente registrado no cartão ${cartao.nome_cartao}!\n\n`;
+          msgRecorrente += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+          msgRecorrente += `🔄 ${parsed.recorrenteMeses} meses (${parsed.recorrenteMeses}x)\n`;
+          msgRecorrente += `📅 Primeiro: ${lancamentosCriados[0].data}\n`;
+          msgRecorrente += `📅 Último: ${lancamentosCriados[lancamentosCriados.length - 1].data}\n`;
+          // Adicionar informação de confiança da categoria para recorrente
+          let msgCategoriaRecorrente = `📂 Categoria: ${parsed.categoria}`;
+          if (parsed.confiancaCategoria) {
+            const iconesConfianca = {
+              'alta': '🟢',
+              'media': '🟡', 
+              'baixa': '🟠',
+              'nenhuma': '🔴'
+            };
+            const icone = iconesConfianca[parsed.confiancaCategoria] || '⚪';
+            msgCategoriaRecorrente += ` ${icone} (${parsed.confiancaCategoria})`;
+          }
+          msgRecorrente += `${msgCategoriaRecorrente}\n`;
+          msgRecorrente += `💳 Pagamento: ${parsed.pagamento}\n`;
+          msgRecorrente += `📝 Descrição: ${parsed.descricao}`;
+          
+          await sock.sendMessage(userId, { text: msgRecorrente });
+          return;
+        }
+        
+        // Gasto normal no cartão (não parcelado, não recorrente)
+        console.log('[DEBUG] Criando gasto normal no cartão');
+        await appendRowToDatabase(userId, [
+          parsed.data,
+          parsed.tipo,
+          parsed.descricao,
+          parsed.valor,
+          parsed.categoria,
+          parsed.pagamento,
+          null, // parcelamento_id
+          null, // parcela_atual
+          null, // total_parcelas
+          null, // recorrente
+          null, // recorrente_fim
+          null, // recorrente_id
+          cartao.nome_cartao, // cartao_nome
+          dataLancamento.toISOString().split('T')[0], // data_lancamento
+          dataContabilizacao.toISOString().split('T')[0], // data_contabilizacao
+          mesFatura, // mes_fatura
+          anoFatura, // ano_fatura
+          cartao.dia_vencimento, // dia_vencimento
+          'pendente' // status_fatura
+        ]);
+        const dataContabilizacaoBR = dataContabilizacao.toLocaleDateString('pt-BR');
+        const nomeMes = getNomeMes(mesFatura - 1);
+        await sock.sendMessage(userId, {
+          text: `✅ Gasto registrado no cartão ${cartao.nome_cartao}!\n\n` +
+            `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+            `📅 Lançamento: ${parsed.data}\n` +
+            `📂 Categoria: ${parsed.categoria}\n` +
+            `💳 Pagamento: ${parsed.pagamento}\n` +
+            `📝 Descrição: ${parsed.descricao}\n` +
+            `Contabiliza: ${dataContabilizacaoBR} (fatura ${nomeMes}/${anoFatura})`
+        });
+        return;
+      } catch (error) {
+        console.log('[DEBUG] Erro ao registrar gasto no cartão:', error);
+        await sock.sendMessage(userId, { 
+          text: `❌ Erro ao registrar gasto no cartão: ${error.message}` 
+        });
+        return;
+      }
+    } else if (cartoes.length > 1) {
+      console.log('[DEBUG] Múltiplos cartões configurados, solicitando escolha do usuário');
+      let msgCartoes = `💳 Qual cartão você usou?\n\n`;
+      cartoes.forEach((cartao, index) => {
+        msgCartoes += `${index + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento})\n`;
+      });
+      msgCartoes += `\nDigite o número do cartão ou "cancelar"`;
+      aguardandoConfiguracaoCartao[userId] = { 
+        parsed: parsed, 
+        cartoes,
+        aguardandoEscolha: true 
+      };
+      await sock.sendMessage(userId, { text: msgCartoes });
+      return;
+    }
+  }
+
+  // --- PARSER DE LANÇAMENTO NORMAL ---
+  console.log('[DEBUG] Processando lançamento normal');
+  
+  // Verificar se há erro de validação mas ainda temos os dados necessários
+  if (parsed && parsed.error && parsed.valorExtraido) {
+    // Tentar processar mesmo com erro de validação, usando o valor extraído
+    const parsedComValor = {
+      ...parsed,
+      valor: Number(parsed.valorExtraido) || 0,
+      tipo: parsed.tipo || 'gasto',
+      categoria: parsed.categoria || 'Outros',
+      pagamento: parsed.pagamento || 'NÃO INFORMADO',
+      data: parsed.data || new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+      descricao: parsed.descricao || 'Lançamento'
+    };
+    
+    // Processar o lançamento com aviso sobre o valor alto
+    try {
+      const tipoNormalizado = (parsedComValor.tipo || '').toLowerCase();
+      
+      // Verificar se é parcelamento
+      if (parsedComValor.parcelamento && parsedComValor.numParcelas > 1) {
+        console.log('[DEBUG] Criando parcelamento com aviso de valor alto:', parsedComValor.numParcelas, 'parcelas');
+        const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsedComValor);
+        
+        let msgParcelamento = `⚠️ ${parsed.error}\n\n✅ Parcelamento registrado com sucesso!\n\n`;
+        msgParcelamento += `💰 Valor total: R$ ${formatarValor(parsedComValor.valor)}\n`;
+        msgParcelamento += `📦 ${parsedComValor.numParcelas}x de R$ ${formatarValor(parsedComValor.valor / parsedComValor.numParcelas)}\n`;
+        msgParcelamento += `📅 Primeira parcela: ${lancamentosCriados[0].data}\n`;
+        msgParcelamento += `📅 Última parcela: ${lancamentosCriados[lancamentosCriados.length - 1].data}\n`;
+        msgParcelamento += `📂 Categoria: ${parsedComValor.categoria}\n`;
+        msgParcelamento += `💳 Pagamento: ${parsedComValor.pagamento}\n`;
+        msgParcelamento += `📝 Descrição: ${parsedComValor.descricao}`;
+        
+        await sock.sendMessage(userId, { text: msgParcelamento });
+        return;
+      }
+      
+      // Verificar se é recorrente
+      if (parsedComValor.recorrente && parsedComValor.recorrenteMeses > 1) {
+        console.log('[DEBUG] Criando recorrente com aviso de valor alto:', parsedComValor.recorrenteMeses, 'meses');
+        const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsedComValor);
+        
+        let msgRecorrente = `⚠️ ${parsed.error}\n\n✅ Lançamento recorrente registrado com sucesso!\n\n`;
+        msgRecorrente += `💰 Valor: R$ ${formatarValor(parsedComValor.valor)}\n`;
+        msgRecorrente += `🔄 ${parsedComValor.recorrenteMeses} meses (${parsedComValor.recorrenteMeses}x)\n`;
+        msgRecorrente += `📅 Primeiro: ${lancamentosCriados[0].data}\n`;
+        msgRecorrente += `📅 Último: ${lancamentosCriados[lancamentosCriados.length - 1].data}\n`;
+        msgRecorrente += `📂 Categoria: ${parsedComValor.categoria}\n`;
+        msgRecorrente += `💳 Pagamento: ${parsedComValor.pagamento}\n`;
+        msgRecorrente += `📝 Descrição: ${parsedComValor.descricao}`;
+        
+        await sock.sendMessage(userId, { text: msgRecorrente });
+        return;
+      }
+      
+      // Lançamento normal com aviso
+      await appendRowToDatabase(userId, [
+        parsedComValor.data,
+        tipoNormalizado,
+        parsedComValor.descricao,
+        parsedComValor.valor,
+        parsedComValor.categoria,
+        parsedComValor.pagamento
+      ]);
+      
+      let msg = `⚠️ ${parsed.error}\n\n✅ Lançamento registrado com sucesso!\n\n`;
+      msg += `📅 Data: ${parsedComValor.data}\n`;
+      msg += `💰 Valor: R$ ${formatarValor(parsedComValor.valor)}\n`;
+      msg += `📂 Categoria: ${parsedComValor.categoria}\n`;
+      msg += `💳 Pagamento: ${parsedComValor.pagamento}\n`;
+      msg += `📝 Descrição: ${parsedComValor.descricao}`;
+      
+      await sock.sendMessage(userId, { text: msg });
+      return;
+    } catch (error) {
+      await sock.sendMessage(userId, { 
+        text: `❌ Erro ao registrar lançamento: ${error.message}` 
+      });
+      return;
+    }
+  }
+
+  // --- LANÇAMENTO NORMAL SEM ERROS ---
+  if (parsed && !parsed.error) {
+    try {
+      const tipoNormalizado = (parsed.tipo || '').toLowerCase();
+      
+      // Verificar se é parcelamento
+      if (parsed.parcelamento && parsed.numParcelas > 1) {
+        console.log('[DEBUG] Criando parcelamento normal:', parsed.numParcelas, 'parcelas');
+        const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed);
+        
+        let msgParcelamento = `✅ Parcelamento registrado com sucesso!\n\n`;
+        msgParcelamento += `💰 Valor total: R$ ${formatarValor(parsed.valor)}\n`;
+        msgParcelamento += `📦 ${parsed.numParcelas}x de R$ ${formatarValor(parsed.valor / parsed.numParcelas)}\n`;
+        msgParcelamento += `📅 Primeira parcela: ${lancamentosCriados[0].data}\n`;
+        msgParcelamento += `📅 Última parcela: ${lancamentosCriados[lancamentosCriados.length - 1].data}\n`;
+        msgParcelamento += `📂 Categoria: ${parsed.categoria}\n`;
+        msgParcelamento += `💳 Pagamento: ${parsed.pagamento}\n`;
+        msgParcelamento += `📝 Descrição: ${parsed.descricao}`;
+        
+        // Adicionar validações se houver
+        if (parsed.validacoes && parsed.validacoes.length > 0) {
+          msgParcelamento += `\n\n⚠️ *Avisos:*\n${parsed.validacoes.join('\n')}`;
+        }
+        
+        await sock.sendMessage(userId, { text: msgParcelamento });
+        return;
+      }
+      
+      // Verificar se é recorrente
+      if (parsed.recorrente && parsed.recorrenteMeses > 1) {
+        console.log('[DEBUG] Criando recorrente normal:', parsed.recorrenteMeses, 'meses');
+        const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed);
+        
+        let msgRecorrente = `✅ Lançamento recorrente registrado com sucesso!\n\n`;
+        msgRecorrente += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+        msgRecorrente += `🔄 ${parsed.recorrenteMeses} meses (${parsed.recorrenteMeses}x)\n`;
+        msgRecorrente += `📅 Primeiro: ${lancamentosCriados[0].data}\n`;
+        msgRecorrente += `📅 Último: ${lancamentosCriados[lancamentosCriados.length - 1].data}\n`;
+        msgRecorrente += `📂 Categoria: ${parsed.categoria}\n`;
+        msgRecorrente += `💳 Pagamento: ${parsed.pagamento}\n`;
+        msgRecorrente += `📝 Descrição: ${parsed.descricao}`;
+        
+        // Adicionar validações se houver
+        if (parsed.validacoes && parsed.validacoes.length > 0) {
+          msgRecorrente += `\n\n⚠️ *Avisos:*\n${parsed.validacoes.join('\n')}`;
+        }
+        
+        await sock.sendMessage(userId, { text: msgRecorrente });
+        return;
+      }
+      
+      // Lançamento normal
+      await appendRowToDatabase(userId, [
+        parsed.data,
+        tipoNormalizado,
+        parsed.descricao,
+        parsed.valor,
+        parsed.categoria,
+        parsed.pagamento
+      ]);
+      
+      let msg = `✅ Lançamento registrado com sucesso!\n\n`;
+      msg += `📅 Data: ${parsed.data}\n`;
+      msg += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+      msg += `📂 Categoria: ${parsed.categoria}\n`;
+      msg += `💳 Pagamento: ${parsed.pagamento}\n`;
+      msg += `📝 Descrição: ${parsed.descricao}`;
+      
+      // Adicionar validações se houver
+      if (parsed.validacoes && parsed.validacoes.length > 0) {
+        msg += `\n\n⚠️ *Avisos:*\n${parsed.validacoes.join('\n')}`;
+      }
+      
+      await sock.sendMessage(userId, { text: msg });
+      return;
+    } catch (error) {
+      await sock.sendMessage(userId, { 
+        text: `❌ Erro ao registrar lançamento: ${error.message}` 
+      });
+      return;
+    }
+  }
+
+  // Se chegou até aqui, não conseguiu processar
+  await sock.sendMessage(userId, { 
+    text: `❌ Não foi possível processar o lançamento. Verifique o formato da mensagem.` 
+  });
+}
+
 // Controle de contexto simples em memória
 let aguardandoConfirmacaoCategoria = {};
 let aguardandoEdicao = {};
@@ -191,6 +535,7 @@ let aguardandoConfirmacaoRecorrente = {};
 let aguardandoConfiguracaoCartao = {};
 let aguardandoDiaVencimento = {};
 let aguardandoEdicaoCartao = {};
+let aguardandoFormaPagamento = {};
 
 async function startBot() {
   try {
@@ -240,6 +585,47 @@ async function startBot() {
       console.log('[DEBUG] Mensagem recebida de userId:', userId);
       console.log('[DEBUG] aguardandoDiaVencimento:', JSON.stringify(aguardandoDiaVencimento));
       console.log('[DEBUG] aguardandoConfiguracaoCartao:', JSON.stringify(aguardandoConfiguracaoCartao));
+
+      // --- TRATAMENTO DE RESPOSTA DE FORMA DE PAGAMENTO ---
+      if (aguardandoFormaPagamento[userId]) {
+        console.log('[DEBUG] Processando resposta de forma de pagamento');
+        const contexto = aguardandoFormaPagamento[userId];
+        
+        if (textoLower === 'cancelar') {
+          delete aguardandoFormaPagamento[userId];
+          await sock.sendMessage(userId, { text: '❌ Operação cancelada.' });
+          return;
+        }
+        
+        const numeroEscolhido = parseInt(texto.trim());
+        if (isNaN(numeroEscolhido) || numeroEscolhido < 1 || numeroEscolhido > formasPagamento.length) {
+          await sock.sendMessage(userId, { 
+            text: `❌ Opção inválida. Digite um número de 1 a ${formasPagamento.length} ou "cancelar".` 
+          });
+          return;
+        }
+        
+        const formaPagamentoEscolhida = mapeamentoFormasPagamento[numeroEscolhido];
+        console.log('[DEBUG] Forma de pagamento escolhida:', formaPagamentoEscolhida);
+        
+        // Atualizar o parsed com a forma de pagamento escolhida
+        const parsedComPagamento = {
+          ...contexto.parsed,
+          pagamento: formaPagamentoEscolhida,
+          faltaFormaPagamento: false
+        };
+        
+        // Limpar o contexto
+        delete aguardandoFormaPagamento[userId];
+        
+        // Reprocessar o lançamento com a forma de pagamento
+        console.log('[DEBUG] Reprocessando lançamento com forma de pagamento:', formaPagamentoEscolhida);
+        
+        // Continuar com o processamento normal usando parsedComPagamento
+        // Vou criar uma função auxiliar para processar o lançamento
+        await processarLancamento(userId, parsedComPagamento, sock);
+        return;
+      }
 
       // --- TRATAMENTO DE COMANDOS GLOBAIS ---
       if (["ajuda", "menu", "help"].includes(textoLower)) {
@@ -808,6 +1194,20 @@ async function startBot() {
     const parsed = parseMessage(texto);
       console.log('[DEBUG] parsed após parseMessage:', parsed);
 
+      // --- VERIFICAÇÃO DE FORMA DE PAGAMENTO ---
+      if (parsed && parsed.faltaFormaPagamento) {
+        console.log('[DEBUG] Falta forma de pagamento, solicitando ao usuário');
+        let msgFormaPagamento = `💳 *Qual forma de pagamento você usou?*\n\n`;
+        formasPagamento.forEach((forma, index) => {
+          msgFormaPagamento += `${index + 1}. ${forma}\n`;
+        });
+        msgFormaPagamento += `\nDigite o número da opção ou "cancelar"`;
+        
+        aguardandoFormaPagamento[userId] = { parsed: parsed };
+        await sock.sendMessage(userId, { text: msgFormaPagamento });
+        return;
+      }
+
       // --- DETECÇÃO DE GASTOS NO CARTÃO DE CRÉDITO (PRIORITÁRIO) ---
       const pagamentoNormalizado = (parsed.pagamento || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
       console.log('[DEBUG] pagamentoNormalizado:', pagamentoNormalizado);
@@ -820,6 +1220,7 @@ async function startBot() {
         console.log('[DEBUG] Detecção de gasto no crédito');
         const cartoes = await listarCartoesConfigurados(userId);
         console.log('[DEBUG] Cartões encontrados:', cartoes.length, cartoes);
+        
         if (cartoes.length === 0) {
           console.log('[DEBUG] Nenhum cartão configurado, registrando como gasto comum');
           try {
@@ -849,6 +1250,7 @@ async function startBot() {
             return;
           }
         }
+        
         if (cartoes.length === 1) {
           console.log('[DEBUG] Apenas um cartão configurado, vinculando automaticamente:', cartoes[0]);
           const cartao = cartoes[0];
@@ -857,6 +1259,7 @@ async function startBot() {
           const dataContabilizacao = dataContabilizacaoInfo.dataContabilizacao;
           const mesFatura = dataContabilizacaoInfo.mesFatura;
           const anoFatura = dataContabilizacaoInfo.anoFatura;
+          
           try {
             // Verificar se é parcelamento
             if (parsed.parcelamento && parsed.numParcelas > 1) {
@@ -916,12 +1319,12 @@ async function startBot() {
             // Gasto normal no cartão (não parcelado, não recorrente)
             console.log('[DEBUG] Criando gasto normal no cartão');
             await appendRowToDatabase(userId, [
-        parsed.data,
-        parsed.tipo,
-        parsed.descricao,
-        parsed.valor,
-        parsed.categoria,
-        parsed.pagamento,
+              parsed.data,
+              parsed.tipo,
+              parsed.descricao,
+              parsed.valor,
+              parsed.categoria,
+              parsed.pagamento,
               null, // parcelamento_id
               null, // parcela_atual
               null, // total_parcelas
@@ -973,9 +1376,7 @@ async function startBot() {
       }
 
       // --- PARSER DE LANÇAMENTO NORMAL ---
-      console.log('[DEBUG] Antes do parser de lançamento normal');
-      console.log('[DEBUG] Checando parser de lançamento para:', textoLower);
-      console.log('[DEBUG] Resultado do parseMessage:', parsed);
+      console.log('[DEBUG] Processando lançamento normal');
       
       // Verificar se há erro de validação mas ainda temos os dados necessários
       if (parsed && parsed.error && parsed.valorExtraido) {
@@ -987,7 +1388,7 @@ async function startBot() {
           categoria: parsed.categoria || 'Outros',
           pagamento: parsed.pagamento || 'NÃO INFORMADO',
           data: parsed.data || new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
-          descricao: parsed.descricao || texto
+          descricao: parsed.descricao || 'Lançamento'
         };
         
         // Processar o lançamento com aviso sobre o valor alto
@@ -1030,8 +1431,7 @@ async function startBot() {
             return;
           }
           
-          // Lançamento normal (não parcelado, não recorrente)
-          console.log('[DEBUG] Criando lançamento normal com aviso de valor alto');
+          // Lançamento normal com aviso
           await appendRowToDatabase(userId, [
             parsedComValor.data,
             tipoNormalizado,
@@ -1041,14 +1441,14 @@ async function startBot() {
             parsedComValor.pagamento
           ]);
           
-          await sock.sendMessage(userId, {
-            text: `⚠️ ${parsed.error}\n\n✅ Lançamento registrado com sucesso!\n\n` +
-              `📅 Data: ${parsedComValor.data}\n` +
-              `💰 Valor: R$ ${formatarValor(parsedComValor.valor)}\n` +
-              `📂 Categoria: ${parsedComValor.categoria}\n` +
-              `💳 Pagamento: ${parsedComValor.pagamento}\n` +
-              `📝 Descrição: ${parsedComValor.descricao}`
-          });
+          let msg = `⚠️ ${parsed.error}\n\n✅ Lançamento registrado com sucesso!\n\n`;
+          msg += `📅 Data: ${parsedComValor.data}\n`;
+          msg += `💰 Valor: R$ ${formatarValor(parsedComValor.valor)}\n`;
+          msg += `📂 Categoria: ${parsedComValor.categoria}\n`;
+          msg += `💳 Pagamento: ${parsedComValor.pagamento}\n`;
+          msg += `📝 Descrição: ${parsedComValor.descricao}`;
+          
+          await sock.sendMessage(userId, { text: msg });
           return;
         } catch (error) {
           await sock.sendMessage(userId, { 
@@ -1057,22 +1457,15 @@ async function startBot() {
           return;
         }
       }
-      
-      if (
-        parsed &&
-        parsed.valor &&
-        parsed.tipo &&
-        ['gasto', 'receita'].includes((parsed.tipo || '').toLowerCase()) &&
-        parsed.categoria &&
-        parsed.pagamento &&
-        parsed.data
-      ) {
+
+      // --- LANÇAMENTO NORMAL SEM ERROS ---
+      if (parsed && !parsed.error) {
         try {
           const tipoNormalizado = (parsed.tipo || '').toLowerCase();
           
           // Verificar se é parcelamento
           if (parsed.parcelamento && parsed.numParcelas > 1) {
-            console.log('[DEBUG] Criando parcelamento:', parsed.numParcelas, 'parcelas');
+            console.log('[DEBUG] Criando parcelamento normal:', parsed.numParcelas, 'parcelas');
             const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed);
             
             let msgParcelamento = `✅ Parcelamento registrado com sucesso!\n\n`;
@@ -1080,21 +1473,14 @@ async function startBot() {
             msgParcelamento += `📦 ${parsed.numParcelas}x de R$ ${formatarValor(parsed.valor / parsed.numParcelas)}\n`;
             msgParcelamento += `📅 Primeira parcela: ${lancamentosCriados[0].data}\n`;
             msgParcelamento += `📅 Última parcela: ${lancamentosCriados[lancamentosCriados.length - 1].data}\n`;
-            // Adicionar informação de confiança da categoria para parcelamento
-            let msgCategoriaParcelamento = `📂 Categoria: ${parsed.categoria}`;
-            if (parsed.confiancaCategoria) {
-              const iconesConfianca = {
-                'alta': '🟢',
-                'media': '🟡', 
-                'baixa': '🟠',
-                'nenhuma': '🔴'
-              };
-              const icone = iconesConfianca[parsed.confiancaCategoria] || '⚪';
-              msgCategoriaParcelamento += ` ${icone} (${parsed.confiancaCategoria})`;
-            }
-            msgParcelamento += `${msgCategoriaParcelamento}\n`;
+            msgParcelamento += `📂 Categoria: ${parsed.categoria}\n`;
             msgParcelamento += `💳 Pagamento: ${parsed.pagamento}\n`;
             msgParcelamento += `📝 Descrição: ${parsed.descricao}`;
+            
+            // Adicionar validações se houver
+            if (parsed.validacoes && parsed.validacoes.length > 0) {
+              msgParcelamento += `\n\n⚠️ *Avisos:*\n${parsed.validacoes.join('\n')}`;
+            }
             
             await sock.sendMessage(userId, { text: msgParcelamento });
             return;
@@ -1102,7 +1488,7 @@ async function startBot() {
           
           // Verificar se é recorrente
           if (parsed.recorrente && parsed.recorrenteMeses > 1) {
-            console.log('[DEBUG] Criando recorrente:', parsed.recorrenteMeses, 'meses');
+            console.log('[DEBUG] Criando recorrente normal:', parsed.recorrenteMeses, 'meses');
             const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed);
             
             let msgRecorrente = `✅ Lançamento recorrente registrado com sucesso!\n\n`;
@@ -1110,28 +1496,20 @@ async function startBot() {
             msgRecorrente += `🔄 ${parsed.recorrenteMeses} meses (${parsed.recorrenteMeses}x)\n`;
             msgRecorrente += `📅 Primeiro: ${lancamentosCriados[0].data}\n`;
             msgRecorrente += `📅 Último: ${lancamentosCriados[lancamentosCriados.length - 1].data}\n`;
-            // Adicionar informação de confiança da categoria para recorrente
-            let msgCategoriaRecorrente = `📂 Categoria: ${parsed.categoria}`;
-            if (parsed.confiancaCategoria) {
-              const iconesConfianca = {
-                'alta': '🟢',
-                'media': '🟡', 
-                'baixa': '🟠',
-                'nenhuma': '🔴'
-              };
-              const icone = iconesConfianca[parsed.confiancaCategoria] || '⚪';
-              msgCategoriaRecorrente += ` ${icone} (${parsed.confiancaCategoria})`;
-            }
-            msgRecorrente += `${msgCategoriaRecorrente}\n`;
+            msgRecorrente += `📂 Categoria: ${parsed.categoria}\n`;
             msgRecorrente += `💳 Pagamento: ${parsed.pagamento}\n`;
             msgRecorrente += `📝 Descrição: ${parsed.descricao}`;
+            
+            // Adicionar validações se houver
+            if (parsed.validacoes && parsed.validacoes.length > 0) {
+              msgRecorrente += `\n\n⚠️ *Avisos:*\n${parsed.validacoes.join('\n')}`;
+            }
             
             await sock.sendMessage(userId, { text: msgRecorrente });
             return;
           }
           
-          // Lançamento normal (não parcelado, não recorrente)
-          console.log('[DEBUG] Criando lançamento normal');
+          // Lançamento normal
           await appendRowToDatabase(userId, [
             parsed.data,
             tipoNormalizado,
@@ -1140,31 +1518,24 @@ async function startBot() {
             parsed.categoria,
             parsed.pagamento
           ]);
-          // Criar mensagem com informação sobre a categoria detectada
-          let msgCategoria = `📂 Categoria: ${parsed.categoria}`;
-          if (parsed.confiancaCategoria) {
-            const iconesConfianca = {
-              'alta': '🟢',
-              'media': '🟡', 
-              'baixa': '🟠',
-              'nenhuma': '🔴'
-            };
-            const icone = iconesConfianca[parsed.confiancaCategoria] || '⚪';
-            msgCategoria += ` ${icone} (${parsed.confiancaCategoria})`;
+          
+          let msg = `✅ Lançamento registrado com sucesso!\n\n`;
+          msg += `📅 Data: ${parsed.data}\n`;
+          msg += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+          msg += `📂 Categoria: ${parsed.categoria}\n`;
+          msg += `💳 Pagamento: ${parsed.pagamento}\n`;
+          msg += `📝 Descrição: ${parsed.descricao}`;
+          
+          // Adicionar validações se houver
+          if (parsed.validacoes && parsed.validacoes.length > 0) {
+            msg += `\n\n⚠️ *Avisos:*\n${parsed.validacoes.join('\n')}`;
           }
           
-          await sock.sendMessage(userId, {
-            text: `✅ Lançamento registrado com sucesso!\n\n` +
-              `📅 Data: ${parsed.data}\n` +
-              `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
-              `${msgCategoria}\n` +
-              `💳 Pagamento: ${parsed.pagamento}\n` +
-              `📝 Descrição: ${parsed.descricao}`
-          });
+          await sock.sendMessage(userId, { text: msg });
           return;
         } catch (error) {
           await sock.sendMessage(userId, { 
-            text: `❌ Erro ao registrar gasto: ${error.message}` 
+            text: `❌ Erro ao registrar lançamento: ${error.message}` 
           });
           return;
         }
