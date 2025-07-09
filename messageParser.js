@@ -1,15 +1,40 @@
+// Categorias principais fixas com palavras-chave expandidas
 const categoriasPrincipais = {
   'Alimentação': [
-    'mercado', 'supermercado', 'padaria', 'restaurante', 'ifood', 'rappi', 'lanche', 'almoço', 'jantar', 'pizza', 'hamburguer', 'comida', 'bebida', 'bar', 'café', 'cafe', 'lanchonete', 'delivery'
+    'mercado', 'supermercado', 'padaria', 'restaurante', 'ifood', 'rappi', 'lanche', 'almoço', 'jantar', 'pizza', 'hamburguer', 'comida', 'bebida', 'bar', 'café', 'cafe', 'lanchonete', 'delivery',
+    'pizzaria', 'fast food', 'fastfood', 'sorvete', 'doces', 'chocolate', 'refrigerante', 'suco', 'água', 'agua', 'cerveja', 'vinho', 'whisky', 'vodka', 'gin', 'tequila',
+    'feira', 'hortifruti', 'açougue', 'acougue', 'peixaria', 'queijaria', 'doceria', 'confeitaria', 'panificadora', 'salgados', 'bolos', 'tortas', 'sanduíches', 'sanduiches', 'cafeteria', 'cafeteria'
   ],
   'Saúde': [
-    'farmácia', 'remédio', 'remedio', 'dentista', 'médico', 'medico', 'consulta', 'exame', 'hospital', 'clínica', 'clinica', 'psicólogo', 'psicologo', 'plano de saúde', 'vacina'
+    'farmácia', 'remédio', 'remedio', 'dentista', 'médico', 'medico', 'consulta', 'exame', 'hospital', 'clínica', 'clinica', 'psicólogo', 'psicologo', 'plano de saúde', 'vacina',
+    'fisioterapeuta', 'nutricionista', 'personal trainer', 'academia', 'ginásio', 'ginasio', 'suplemento', 'vitamina', 'medicamento', 'antibiótico', 'antibiotico', 'analgésico', 'analgesico',
+    'laboratório', 'laboratorio', 'raio x', 'ultrassom', 'resonância', 'resonancia', 'cardiologista', 'dermatologista', 'oftalmologista', 'ortopedista', 'ginecologista', 'urologista'
   ],
   'Moradia': [
-    'aluguel', 'energia', 'água', 'agua', 'internet', 'condomínio', 'condominio', 'gás', 'gas', 'luz', 'telefone', 'imóvel', 'imovel', 'iptu', 'ipva'
+    'aluguel', 'energia', 'água', 'agua', 'internet', 'condomínio', 'condominio', 'gás', 'gas', 'luz', 'telefone', 'imóvel', 'imovel', 'iptu', 'ipva',
+    'reforma', 'manutenção', 'manutencao', 'limpeza', 'faxina', 'empregada', 'segurança', 'seguranca', 'portaria', 'elevador', 'piscina', 'academia', 'salao', 'salão',
+    'móveis', 'moveis', 'eletrodomésticos', 'eletrodomesticos', 'geladeira', 'fogão', 'fogao', 'microondas', 'lavadora', 'secadora', 'ar condicionado', 'ventilador', 'lâmpada', 'lampada'
   ],
   'Transporte': [
-    'uber', '99', 'ônibus', 'onibus', 'metrô', 'metro', 'combustível', 'combustivel', 'gasolina', 'etanol', 'diesel', 'passagem', 'carro', 'moto', 'bicicleta', 'bike', 'trem', 'taxi', 'estacionamento'
+    'uber', '99', 'ônibus', 'onibus', 'metrô', 'metro', 'combustível', 'combustivel', 'gasolina', 'etanol', 'diesel', 'passagem', 'carro', 'moto', 'bicicleta', 'bike', 'trem', 'taxi', 'estacionamento',
+    'pedágio', 'pedagio', 'multa', 'ipva', 'seguro', 'manutenção', 'manutencao', 'oficina', 'pneu', 'óleo', 'oleo', 'filtro', 'freio', 'bateria', 'correia', 'vela', 'radiador',
+    'lavagem', 'polimento', 'cambio', 'câmbio', 'embreagem', 'suspensão', 'suspensao', 'direção', 'direcao', 'ar condicionado', 'som', 'alarme', 'ronda', 'rastreador'
+  ],
+  'Lazer': [
+    'cinema', 'teatro', 'show', 'concerto', 'festival', 'balada', 'boate', 'disco', 'pub', 'bar', 'restaurante', 'pizzaria', 'pizza', 'hamburguer', 'fast food', 'fastfood',
+    'shopping', 'loja', 'roupa', 'sapato', 'bolsa', 'acessório', 'acessorio', 'perfume', 'cosmético', 'cosmetico', 'maquiagem', 'cabelo', 'unha', 'spa', 'massagem',
+    'viagem', 'hotel', 'pousada', 'airbnb', 'passagem', 'avião', 'aviao', 'ônibus', 'onibus', 'trem', 'navio', 'cruzeiro', 'passeio', 'turismo', 'museu', 'parque', 'zoológico', 'zoologico',
+    'jogos', 'video game', 'videogame', 'console', 'revista', 'jornal', 'netflix', 'spotify', 'youtube', 'streaming', 'assinatura', 'hobby', 'esporte', 'futebol', 'basquete', 'tênis', 'tenis'
+  ],
+  'Educação': [
+    'escola', 'faculdade', 'universidade', 'curso', 'aula', 'professor', 'professora', 'tutor', 'mentor', 'coaching', 'workshop', 'seminário', 'seminario', 'palestra', 'conferência', 'conferencia',
+    'material escolar', 'apostila', 'caderno', 'caneta', 'lápis', 'lapis', 'mochila', 'uniforme', 'mensalidade', 'matrícula', 'matricula', 'inscrição', 'inscricao', 'vestibular', 'enem',
+    'idioma', 'inglês', 'ingles', 'espanhol', 'francês', 'frances', 'alemão', 'alemao', 'italiano', 'português', 'portugues', 'chinês', 'chines', 'japonês', 'japones', 'livro'
+  ],
+  'Trabalho': [
+    'escritório', 'escritorio', 'equipamento', 'computador', 'notebook', 'tablet', 'celular', 'smartphone', 'impressora', 'scanner', 'webcam', 'microfone', 'headset', 'fone', 'mouse', 'teclado',
+    'software', 'licença', 'licenca', 'assinatura', 'assinatura', 'domínio', 'dominio', 'hosting', 'servidor', 'cloud', 'backup', 'antivírus', 'antivirus', 'office', 'adobe', 'autocad',
+    'freelance', 'freela', 'projeto', 'cliente', 'reunião', 'reuniao', 'apresentação', 'apresentacao', 'relatório', 'relatorio', 'proposta', 'contrato', 'nota fiscal', 'recibo'
   ]
 };
 
@@ -19,10 +44,80 @@ const limitesCategoria = {
   'Saúde': { min: 1.00, max: 2000, alerta: 1000 },
   'Moradia': { min: 10.00, max: 10000, alerta: 5000 },
   'Transporte': { min: 1.00, max: 1000, alerta: 500 },
+  'Lazer': { min: 1.00, max: 2000, alerta: 500 },
+  'Educação': { min: 5.00, max: 5000, alerta: 1000 },
+  'Trabalho': { min: 1.00, max: 3000, alerta: 1000 },
   'Outros': { min: 0.01, max: 2500, alerta: 1000 }
 };
 
+// Categorias cadastradas (incluindo as fixas)
 let categoriasCadastradas = Object.keys(categoriasPrincipais);
+
+// Função para detectar categoria com base no texto
+function detectarCategoria(texto) {
+  texto = texto.toLowerCase();
+  
+  // Primeiro, tenta encontrar correspondência exata nas categorias principais
+  for (const [categoria, palavras] of Object.entries(categoriasPrincipais)) {
+    for (const palavra of palavras) {
+      // Verifica se a palavra está isolada (não é parte de outra palavra)
+      const regex = new RegExp(`\\b${palavra}\\b`, 'i');
+      if (regex.test(texto)) {
+        return { categoria, confianca: 'alta' };
+      }
+    }
+  }
+  
+  // Se não encontrou, tenta correspondência parcial
+  for (const [categoria, palavras] of Object.entries(categoriasPrincipais)) {
+    for (const palavra of palavras) {
+      if (texto.includes(palavra.toLowerCase())) {
+        return { categoria, confianca: 'media' };
+      }
+    }
+  }
+  
+  // Se ainda não encontrou, tenta extrair categoria do contexto
+  const formasPagamento = [
+    'pix', 'crédito', 'credito', 'débito', 'debito', 'dinheiro', 'boleto', 'transferência', 'transferencia', 'cartão', 'cartao',
+    'nubank', 'inter', 'itau', 'bradesco', 'santander', 'caixa'
+  ];
+  
+  // Palavras genéricas que devem ser categorizadas como "Outros"
+  const palavrasGenericas = [
+    'loja', 'estabelecimento', 'local', 'lugar', 'coisa', 'item', 'produto', 'serviço', 'servico', 'algo', 'coisa', 'objeto'
+  ];
+  
+  // Regex para pegar a palavra após 'com', 'em', 'para', 'pro', 'pra', 'no', 'na', 'nos', 'nas'
+  const padroes = [
+    /(?:com|em|para|pro|pra)\s+([a-zçãáéíóúâêôõü ]{3,})/i,
+    /(?:no|na|nos|nas)\s+([a-zçãáéíóúâêôõü ]{3,})/i
+  ];
+  
+  for (const padrao of padroes) {
+    const match = texto.match(padrao);
+    if (match) {
+      let palavraExtraida = match[1].trim().split(' ')[0];
+      palavraExtraida = palavraExtraida.toLowerCase();
+      
+      // Se for palavra genérica, retorna "Outros"
+      if (palavrasGenericas.includes(palavraExtraida)) {
+        return { categoria: 'Outros', confianca: 'nenhuma' };
+      }
+      
+      // Se não for forma de pagamento, verifica se está nas categorias principais
+      if (!formasPagamento.includes(palavraExtraida)) {
+        for (const [categoria, palavras] of Object.entries(categoriasPrincipais)) {
+          if (palavras.some(p => p.toLowerCase().includes(palavraExtraida) || palavraExtraida.includes(p.toLowerCase()))) {
+            return { categoria, confianca: 'baixa' };
+          }
+        }
+      }
+    }
+  }
+  
+  return { categoria: 'Outros', confianca: 'nenhuma' };
+}
 
 function validarValor(valor, categoria, tipo, texto) {
   const validacoes = [];
@@ -40,8 +135,8 @@ function validarValor(valor, categoria, tipo, texto) {
     validacoes.push(`⚠️ Valor baixo para ${categoria}: R$ ${valor.toFixed(2)} (mínimo: R$ ${limites.min.toFixed(2)})`);
   }
   
-  // Validação de valor máximo por categoria
-  if (valor > limites.max) {
+  // Validação de valor máximo por categoria (não aplicar para receitas)
+  if (valor > limites.max && tipo !== 'Receita') {
     return { error: `Valor muito alto para ${categoria}: R$ ${valor.toFixed(2)} (máximo: R$ ${limites.max.toFixed(2)})` };
   }
   
@@ -92,12 +187,22 @@ function parseMessage(msg) {
   let recorrente = false;
   let recorrenteMeses = 12; // padrão
   const regexFixo = /\b(fixo|recorrente|todo mês|mensal)\b/i;
-  if (regexFixo.test(texto)) {
+  const regexPorMeses = /por\s*(\d{1,2})\s*mes(es)?/i;
+  
+  // Detecta "por N meses" primeiro
+  const matchMeses = texto.match(regexPorMeses);
+  if (matchMeses) {
     recorrente = true;
-    // Detecta "por N meses"
-    const matchMeses = texto.match(/por\s*(\d{1,2})\s*mes(es)?/i);
-    if (matchMeses) {
-      recorrenteMeses = parseInt(matchMeses[1]);
+    recorrenteMeses = parseInt(matchMeses[1]);
+    if (isNaN(recorrenteMeses) || recorrenteMeses < 1) recorrenteMeses = 12;
+  }
+  // Se não detectou "por N meses", verifica outras palavras
+  else if (regexFixo.test(texto)) {
+    recorrente = true;
+    // Detecta "por N meses" mesmo com outras palavras
+    const matchMeses2 = texto.match(regexPorMeses);
+    if (matchMeses2) {
+      recorrenteMeses = parseInt(matchMeses2[1]);
       if (isNaN(recorrenteMeses) || recorrenteMeses < 1) recorrenteMeses = 12;
     }
   }
@@ -108,11 +213,28 @@ function parseMessage(msg) {
   const tipo = isIncome ? 'Receita' : isExpense ? 'Gasto' : 'Outro';
 
   // Valor
-  const valorMatch = texto.match(/(\d+[.,]?\d*)\s*(reais?|r\$|rs?)?/i);
-  const valor = valorMatch ? parseFloat(valorMatch[1].replace(',', '.')) : null;
+  // Novo: aceita formatos 10.631,80 ou 10631,80 ou 10631.80
+  let valor = null;
+  const valorMatch = texto.match(/(\d{1,3}(?:[.\s]\d{3})*(?:[.,]\d{2})|\d+[.,]?\d*)\s*(reais?|r\$|rs?)?/i);
+  if (valorMatch) {
+    let valorStr = valorMatch[1].replace(/\s/g, '');
+    // Se tem vírgula e ponto, assume ponto milhar e vírgula decimal
+    if (/\d+\.\d{3},\d{2}/.test(valorStr)) {
+      valorStr = valorStr.replace(/\./g, '').replace(',', '.');
+    } else if (/\d+,\d{2}$/.test(valorStr)) {
+      // Só vírgula decimal
+      valorStr = valorStr.replace('.', '').replace(',', '.');
+    } else if (/\d+\.\d{2}$/.test(valorStr)) {
+      // Só ponto decimal
+      valorStr = valorStr.replace(',', '');
+    } else {
+      valorStr = valorStr.replace(',', '.');
+    }
+    valor = parseFloat(valorStr);
+  }
   
-  if (valor === null) {
-    return { error: 'Valor não encontrado na mensagem' };
+  if (valor === null || isNaN(valor)) {
+    return { error: 'Valor não encontrado ou inválido na mensagem' };
   }
 
   // Pagamento
@@ -139,47 +261,45 @@ function parseMessage(msg) {
     }
   }
   if (!data) {
-    data = new Date().toLocaleDateString('pt-BR');
+    // Corrigir: sempre usar timezone do Brasil
+    data = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   }
 
-  // Categoria inteligente
-  let categoria = 'Outros';
-  let categoriaDetectada = null;
-  for (const [cat, palavras] of Object.entries(categoriasPrincipais)) {
-    if (palavras.some(p => {
-      // Verifica se a palavra está isolada (não é parte de outra palavra)
-      const regex = new RegExp(`\\b${p}\\b`, 'i');
-      return regex.test(texto);
-    })) {
-      categoria = cat;
-      categoriaDetectada = cat;
-      break;
-    }
-  }
-  // Se não encontrou, tenta sugerir nova categoria baseada em palavra após 'com', 'em', 'para', etc.
-  if (categoria === 'Outros') {
-    // Lista de formas de pagamento para não considerar como categoria
+  // Categoria inteligente usando o novo sistema
+  const resultadoCategoria = detectarCategoria(texto);
+  let categoria = resultadoCategoria.categoria;
+  let categoriaDetectada = resultadoCategoria.categoria;
+  let confiancaCategoria = resultadoCategoria.confianca;
+  
+  // Se a confiança for baixa ou nenhuma, tenta extrair categoria do contexto como fallback
+  if (confiancaCategoria === 'baixa' || confiancaCategoria === 'nenhuma') {
     const formasPagamento = [
       'pix', 'crédito', 'credito', 'débito', 'debito', 'dinheiro', 'boleto', 'transferência', 'transferencia', 'cartão', 'cartao',
       'nubank', 'inter', 'itau', 'bradesco', 'santander', 'caixa'
     ];
-    // Regex para pegar a palavra após 'com', 'em', 'para', 'pro', 'pra'
-    const novaCatMatch = texto.match(/(?:com|em|para|pro|pra)\s+([a-zçãáéíóúâêôõü ]{3,})/i);
-    if (novaCatMatch) {
-      let novaCat = capitalize(novaCatMatch[1].trim().split(' ')[0]);
-      // Se não for forma de pagamento, sugere como categoria
-      if (!formasPagamento.includes(novaCat.toLowerCase())) {
-        categoria = novaCat;
-        categoriaDetectada = categoria;
-      }
-    } else {
-      // Regex para pegar a palavra após 'no', 'na', 'nos', 'nas'
-      const novaCatMatch2 = texto.match(/(?:no|na|nos|nas)\s+([a-zçãáéíóúâêôõü ]{3,})/i);
-      if (novaCatMatch2) {
-        let novaCat = capitalize(novaCatMatch2[1].trim().split(' ')[0]);
-        if (!formasPagamento.includes(novaCat.toLowerCase())) {
-          categoria = novaCat;
-          categoriaDetectada = categoria;
+    
+    // Regex para pegar a palavra após 'com', 'em', 'para', 'pro', 'pra', 'no', 'na', 'nos', 'nas'
+    const padroes = [
+      /(?:com|em|para|pro|pra)\s+([a-zçãáéíóúâêôõü ]{3,})/i,
+      /(?:no|na|nos|nas)\s+([a-zçãáéíóúâêôõü ]{3,})/i
+    ];
+    
+    for (const padrao of padroes) {
+      const match = texto.match(padrao);
+      if (match) {
+        let palavraExtraida = match[1].trim().split(' ')[0];
+        palavraExtraida = palavraExtraida.toLowerCase();
+        
+        // Se não for forma de pagamento, verifica se está nas categorias principais
+        if (!formasPagamento.includes(palavraExtraida)) {
+          for (const [cat, palavras] of Object.entries(categoriasPrincipais)) {
+            if (palavras.some(p => p.toLowerCase().includes(palavraExtraida) || palavraExtraida.includes(p.toLowerCase()))) {
+              categoria = cat;
+              categoriaDetectada = cat;
+              confiancaCategoria = 'media';
+              break;
+            }
+          }
         }
       }
     }
@@ -188,7 +308,22 @@ function parseMessage(msg) {
   // Validação de valor
   const validacao = validarValor(valor, categoria, tipo, texto);
   if (validacao.error) {
-    return validacao;
+    // Retorna o erro, mas inclui todas as informações necessárias para processar o lançamento
+    return { 
+      error: validacao.error, 
+      valorExtraido: valor,
+      tipo,
+      categoria,
+      pagamento,
+      data,
+      descricao: msg,
+      parcelamento,
+      numParcelas,
+      recorrente,
+      recorrenteMeses,
+      categoriaDetectada,
+      confiancaCategoria
+    };
   }
 
   // Para receitas, não aplicar alertas de valor alto
@@ -208,6 +343,7 @@ function parseMessage(msg) {
     data,
     isNovaCategoria,
     categoriaDetectada,
+    confiancaCategoria,
     validacoes: validacao.validacoes || [],
     parcelamento,
     numParcelas,

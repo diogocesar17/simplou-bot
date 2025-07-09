@@ -63,6 +63,9 @@ async function initializeDatabase() {
     // Migração: Adicionar colunas de cartão se não existirem
     await migrateCartaoColumns(client);
     
+    // Migração: Adicionar colunas de parcelamento e recorrente se não existirem
+    await migrateParcelamentoRecorrenteColumns(client);
+    
     // Migração: Adicionar coluna dia_fechamento na tabela cartoes_config
     await migrateCartoesConfigTable(client);
 
@@ -157,6 +160,70 @@ async function migrateCartaoColumns(client) {
   }
 }
 
+async function migrateParcelamentoRecorrenteColumns(client) {
+  try {
+    // Verificar se as colunas já existem
+    const checkColumns = await client.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'lancamentos' 
+      AND column_name IN ('parcelamento_id', 'parcela_atual', 'total_parcelas', 'recorrente', 'recorrente_fim', 'recorrente_id')
+    `);
+    
+    const existingColumns = checkColumns.rows.map(row => row.column_name);
+    const newColumns = [
+      'parcelamento_id',
+      'parcela_atual',
+      'total_parcelas',
+      'recorrente',
+      'recorrente_fim',
+      'recorrente_id'
+    ];
+    
+    const columnsToAdd = newColumns.filter(col => !existingColumns.includes(col));
+    
+    if (columnsToAdd.length > 0) {
+      console.log('🔄 Migrando colunas de parcelamento e recorrente...');
+      
+      for (const column of columnsToAdd) {
+        let columnDefinition = '';
+        switch (column) {
+          case 'parcelamento_id':
+            columnDefinition = 'ADD COLUMN parcelamento_id VARCHAR(100)';
+            break;
+          case 'parcela_atual':
+            columnDefinition = 'ADD COLUMN parcela_atual INTEGER';
+            break;
+          case 'total_parcelas':
+            columnDefinition = 'ADD COLUMN total_parcelas INTEGER';
+            break;
+          case 'recorrente':
+            columnDefinition = 'ADD COLUMN recorrente BOOLEAN DEFAULT FALSE';
+            break;
+          case 'recorrente_fim':
+            columnDefinition = 'ADD COLUMN recorrente_fim DATE';
+            break;
+          case 'recorrente_id':
+            columnDefinition = 'ADD COLUMN recorrente_id VARCHAR(100)';
+            break;
+        }
+        
+        if (columnDefinition) {
+          await client.query(`ALTER TABLE lancamentos ${columnDefinition}`);
+          console.log(`✅ Coluna ${column} adicionada`);
+        }
+      }
+      
+      console.log('✅ Migração de colunas de parcelamento e recorrente concluída');
+    } else {
+      console.log('✅ Colunas de parcelamento e recorrente já existem');
+    }
+  } catch (error) {
+    console.error('❌ Erro na migração de parcelamento e recorrente:', error.message);
+    throw error;
+  }
+}
+
 async function migrateCartoesConfigTable(client) {
   try {
     // Verificar se a coluna dia_fechamento existe na tabela cartoes_config
@@ -182,10 +249,22 @@ async function migrateCartoesConfigTable(client) {
 
 function formatarDataParaISO(dataBR) {
   if (!dataBR) return null;
+  // Se for um objeto Date, converter para string ISO considerando o timezone do Brasil
+  if (dataBR instanceof Date) {
+    // Corrigir: garantir que a data seja do Brasil
+    const ano = dataBR.getFullYear();
+    const mes = (dataBR.getMonth() + 1).toString().padStart(2, '0');
+    const dia = dataBR.getDate().toString().padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  }
   // Se já estiver no formato ISO, retorna direto
   if (/^\d{4}-\d{2}-\d{2}$/.test(dataBR)) return dataBR;
-  const [dia, mes, ano] = dataBR.split('/');
-  return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+  // Se for string no formato DD/MM/AAAA
+  if (typeof dataBR === 'string' && dataBR.includes('/')) {
+    const [dia, mes, ano] = dataBR.split('/');
+    return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+  }
+  return dataBR;
 }
 
 // Funções para gerenciar cartões de crédito
@@ -370,7 +449,8 @@ async function getResumoDoMesAtual(userId) {
   };
 }
 
-async function getResumoPorMes(userId, mes, ano) {
+// Resumo do dia atual
+async function getResumoDoDia(userId) {
   const query = `
     SELECT 
       tipo,
@@ -378,12 +458,13 @@ async function getResumoPorMes(userId, mes, ano) {
       COUNT(*) as quantidade
     FROM lancamentos 
     WHERE user_id = $1 
-      AND EXTRACT(MONTH FROM data) = $2
-      AND EXTRACT(YEAR FROM data) = $3
+      AND EXTRACT(DAY FROM data) = EXTRACT(DAY FROM CURRENT_DATE AT TIME ZONE 'America/Sao_Paulo')
+      AND EXTRACT(MONTH FROM data) = EXTRACT(MONTH FROM CURRENT_DATE AT TIME ZONE 'America/Sao_Paulo')
+      AND EXTRACT(YEAR FROM data) = EXTRACT(YEAR FROM CURRENT_DATE AT TIME ZONE 'America/Sao_Paulo')
     GROUP BY tipo
   `;
   
-  const result = await pool.query(query, [userId, mes + 1, ano]); // +1 porque PostgreSQL usa 1-12
+  const result = await pool.query(query, [userId]);
   
   let totalReceitas = 0;
   let totalDespesas = 0;
@@ -399,6 +480,54 @@ async function getResumoPorMes(userId, mes, ano) {
   });
   
   const saldo = totalReceitas - totalDespesas;
+  
+  return {
+    totalReceitas,
+    totalDespesas,
+    saldo,
+    totalLancamentos,
+  };
+}
+
+async function getResumoPorMes(userId, mes, ano) {
+  console.log('[DEBUG] getResumoPorMes chamada com:', { userId, mes, ano });
+  
+  const query = `
+    SELECT 
+      tipo,
+      SUM(valor) as total,
+      COUNT(*) as quantidade
+    FROM lancamentos 
+    WHERE user_id = $1 
+      AND EXTRACT(MONTH FROM data) = $2
+      AND EXTRACT(YEAR FROM data) = $3
+    GROUP BY tipo
+  `;
+  
+  const params = [userId, mes, ano]; // Removido o +1, pois parseMesAno já retorna 1-12
+  console.log('[DEBUG] Query params:', params);
+  console.log('[DEBUG] Query SQL:', query);
+  
+  const result = await pool.query(query, params);
+  console.log('[DEBUG] Resultado da query:', result.rows);
+  
+  let totalReceitas = 0;
+  let totalDespesas = 0;
+  let totalLancamentos = 0;
+  
+  result.rows.forEach(row => {
+    console.log('[DEBUG] Processando row:', row);
+    if (row.tipo === 'receita') {
+      totalReceitas = parseFloat(row.total);
+    } else if (row.tipo === 'gasto') {
+      totalDespesas = parseFloat(row.total);
+    }
+    totalLancamentos += parseInt(row.quantidade);
+  });
+  
+  const saldo = totalReceitas - totalDespesas;
+  
+  console.log('[DEBUG] Totais calculados:', { totalReceitas, totalDespesas, saldo, totalLancamentos });
   
   return {
     totalReceitas,
@@ -456,7 +585,8 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
     SELECT id, data, tipo, descricao, valor, categoria, pagamento, 
            parcelamento_id, parcela_atual, total_parcelas,
            recorrente, recorrente_fim, recorrente_id,
-           cartao_nome, data_lancamento, data_contabilizacao, mes_fatura, ano_fatura, dia_vencimento
+           cartao_nome, data_lancamento, data_contabilizacao, mes_fatura, ano_fatura, dia_vencimento,
+           criado_em
     FROM lancamentos 
     WHERE user_id = $1
   `;
@@ -465,12 +595,19 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
   let paramIndex = 2;
   
   if (mes !== null && ano !== null) {
-    query += ` AND EXTRACT(MONTH FROM data) = $${paramIndex} AND EXTRACT(YEAR FROM data) = $${paramIndex + 1}`;
-    params.push(mes + 1, ano); // +1 porque PostgreSQL usa 1-12
+    // Histórico por período: filtra por data do gasto (data ou data_lancamento)
+    query += ` AND (
+      (EXTRACT(MONTH FROM data) = $${paramIndex} AND EXTRACT(YEAR FROM data) = $${paramIndex + 1}) OR
+      (data_lancamento IS NOT NULL AND EXTRACT(MONTH FROM data_lancamento) = $${paramIndex} AND EXTRACT(YEAR FROM data_lancamento) = $${paramIndex + 1})
+    )`;
+    params.push(mes, ano);
+    query += ` ORDER BY COALESCE(data_lancamento, data) DESC LIMIT $${paramIndex + 2}`;
+    params.push(limite * 5); // Busca mais para garantir agrupamento
+  } else {
+    // Histórico simples: ordena por criado_em (últimos lançamentos)
+    query += ` ORDER BY criado_em DESC LIMIT $${paramIndex}`;
+    params.push(limite * 5);
   }
-  
-  query += ` ORDER BY data DESC, criado_em DESC LIMIT $${paramIndex + (mes !== null && ano !== null ? 2 : 0)}`;
-  params.push(limite * 3); // Busca mais para garantir agrupamento
   
   const result = await pool.query(query, params);
   const lancamentos = result.rows;
@@ -489,13 +626,15 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
     if (l.parcelamento_id) {
       // Agrupa parcelamentos
       const grupo = lancamentos.filter(x => x.parcelamento_id === l.parcelamento_id);
-      const valorTotal = grupo.reduce((soma, x) => soma + parseFloat(x.valor), 0);
-      const primeiraParcela = grupo[0];
-      
+      // Ordena o grupo por criado_em para pegar o mais recente como representante
+      grupo.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+      const representante = grupo[0]; // Pega o mais recente
+      // Valor total = valor da parcela * total de parcelas
+      const valorTotal = parseFloat(representante.valor) * parseInt(representante.total_parcelas);
       lancamentosAgrupados.push({
-        ...primeiraParcela,
+        ...representante,
         valor: valorTotal,
-        descricao: `${primeiraParcela.descricao.replace(/\(1\/\d+\)/, '').trim()} (${l.total_parcelas}x de R$ ${formatarValor(primeiraParcela.valor)})`,
+        descricao: `${representante.descricao.replace(/\(1\/\d+\)/, '').trim()} (${representante.total_parcelas}x de R$ ${formatarValor(representante.valor)})`,
         agrupado: true,
         tipoAgrupamento: 'parcelado',
         grupo: grupo
@@ -504,13 +643,15 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
     } else if (l.recorrente) {
       // Agrupa recorrentes
       const grupo = lancamentos.filter(x => x.recorrente_id === l.recorrente_id);
-      const valorTotal = grupo.reduce((soma, x) => soma + parseFloat(x.valor), 0);
-      const primeiroRecorrente = grupo[0];
-      
+      // Ordena o grupo por criado_em para pegar o mais recente como representante
+      grupo.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+      const representante = grupo[0]; // Pega o mais recente
+      // Valor de uma recorrência (não somar todas)
+      const valorRecorrente = parseFloat(representante.valor);
       lancamentosAgrupados.push({
-        ...primeiroRecorrente,
-        valor: valorTotal,
-        descricao: `${primeiroRecorrente.descricao} (Fixo: ${grupo.length}x)`,
+        ...representante,
+        valor: valorRecorrente,
+        descricao: `${representante.descricao} (Fixo: ${grupo.length}x)`,
         agrupado: true,
         tipoAgrupamento: 'recorrente',
         grupo: grupo
@@ -563,16 +704,64 @@ async function getLancamentoPorId(userId, id) {
 }
 
 async function atualizarLancamentoPorId(userId, id, novosDados) {
-  const { data, tipo, descricao, valor, categoria, pagamento } = novosDados;
-  
+  // Verifica se novosDados existe e tem conteúdo
+  if (!novosDados || Object.keys(novosDados).length === 0) {
+    throw new Error('Dados de atualização não fornecidos');
+  }
+
+  // Constrói a query dinamicamente baseada nos campos fornecidos
+  const campos = [];
+  const valores = [];
+  let paramIndex = 1;
+
+  if (novosDados.data !== undefined) {
+    campos.push(`data = $${paramIndex}`);
+    valores.push(novosDados.data);
+    paramIndex++;
+  }
+  if (novosDados.tipo !== undefined) {
+    campos.push(`tipo = $${paramIndex}`);
+    valores.push(novosDados.tipo);
+    paramIndex++;
+  }
+  if (novosDados.descricao !== undefined) {
+    campos.push(`descricao = $${paramIndex}`);
+    valores.push(novosDados.descricao);
+    paramIndex++;
+  }
+  if (novosDados.valor !== undefined) {
+    campos.push(`valor = $${paramIndex}`);
+    valores.push(novosDados.valor);
+    paramIndex++;
+  }
+  if (novosDados.categoria !== undefined) {
+    campos.push(`categoria = $${paramIndex}`);
+    valores.push(novosDados.categoria);
+    paramIndex++;
+  }
+  if (novosDados.pagamento !== undefined) {
+    campos.push(`pagamento = $${paramIndex}`);
+    valores.push(novosDados.pagamento);
+    paramIndex++;
+  }
+
+  // Adiciona sempre o campo atualizado_em
+  campos.push(`atualizado_em = CURRENT_TIMESTAMP`);
+
+  // Adiciona os parâmetros de WHERE
+  valores.push(userId, id);
+
   const query = `
     UPDATE lancamentos 
-    SET data = $1, tipo = $2, descricao = $3, valor = $4, categoria = $5, pagamento = $6, atualizado_em = CURRENT_TIMESTAMP
-    WHERE user_id = $7 AND id = $8
+    SET ${campos.join(', ')}
+    WHERE user_id = $${paramIndex} AND id = $${paramIndex + 1}
     RETURNING id
   `;
   
-  const result = await pool.query(query, [data, tipo, descricao, valor, categoria, pagamento, userId, id]);
+  console.log('[DEBUG] Query de atualização:', query);
+  console.log('[DEBUG] Valores:', valores);
+  
+  const result = await pool.query(query, valores);
   return result.rows[0];
 }
 
@@ -800,6 +989,7 @@ module.exports = {
   appendRowToDatabase,
   getDatabaseData,
   getResumoDoMesAtual,
+  getResumoDoDia,
   getResumoPorMes,
   getGastosPorCategoria,
   getUltimosLancamentos,
@@ -817,5 +1007,6 @@ module.exports = {
   listarCartoesConfigurados,
   calcularDataContabilizacao,
   buscarFaturaCartao,
-  getResumoReal
+  getResumoReal,
+  formatarDataParaISO
 }; 

@@ -36,7 +36,7 @@ async function getSheetData() {
 
 function isSameMonth(dateString) {
   try {
-    const now = new Date();
+  const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     
