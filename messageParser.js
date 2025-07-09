@@ -40,7 +40,7 @@ const categoriasPrincipais = {
 
 // Formas de pagamento válidas
 const formasPagamento = [
-  'PIX', 'CRÉDITO', 'DÉBITO', 'DINHEIRO', 'BOLETO', 'TRANSFERÊNCIA', 'TRANSFERENCIA'
+  'PIX', 'CRÉDITO', 'DÉBITO', 'DINHEIRO', 'BOLETO', 'TRANSFERÊNCIA'
 ];
 
 // Mapeamento de números para formas de pagamento
@@ -283,6 +283,25 @@ function parseMessage(msg) {
     data = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   }
 
+  // Data de vencimento para boletos (procura por "vencimento", "vence", "venc", "para o dia", "para", etc)
+  let dataVencimento = null;
+  const regexVencimento = /(?:vencimento|vence|venc|para\s+(?:o\s+)?dia?)\s*(?:em\s*)?(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/i;
+  const matchVencimento = texto.match(regexVencimento);
+  if (matchVencimento) {
+    let partes = matchVencimento[1].replace(/-/g, '/').split('/');
+    let dia = parseInt(partes[0]);
+    let mes = parseInt(partes[1]) - 1; // JS: 0-based
+    let ano = (partes[2]) ? parseInt(partes[2]) : (new Date()).getFullYear();
+    if (ano < 100) ano += 2000; // Suporte para ano 2 dígitos
+    const dataVencimentoObj = new Date(ano, mes, dia);
+    if (!isNaN(dataVencimentoObj.getTime())) {
+      dataVencimento = dataVencimentoObj.toISOString().split('T')[0]; // Formato YYYY-MM-DD para o banco
+    }
+  }
+
+  // Verificar se falta data de vencimento para boletos
+  const faltaDataVencimento = tipo === 'Gasto' && pagamento === 'BOLETO' && !dataVencimento;
+
   // Categoria inteligente usando o novo sistema
   const resultadoCategoria = detectarCategoria(texto);
   let categoria = resultadoCategoria.categoria;
@@ -334,6 +353,7 @@ function parseMessage(msg) {
       categoria,
       pagamento,
       data,
+      dataVencimento,
       descricao: msg,
       parcelamento,
       numParcelas,
@@ -341,7 +361,8 @@ function parseMessage(msg) {
       recorrenteMeses,
       categoriaDetectada,
       confiancaCategoria,
-      faltaFormaPagamento
+      faltaFormaPagamento,
+      faltaDataVencimento
     };
   }
 
@@ -360,6 +381,7 @@ function parseMessage(msg) {
     categoria,
     pagamento,
     data,
+    dataVencimento,
     isNovaCategoria,
     categoriaDetectada,
     confiancaCategoria,
@@ -368,7 +390,8 @@ function parseMessage(msg) {
     numParcelas,
     recorrente,
     recorrenteMeses,
-    faltaFormaPagamento
+    faltaFormaPagamento,
+    faltaDataVencimento
   };
 }
 

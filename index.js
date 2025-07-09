@@ -27,7 +27,9 @@ const {
   buscarFaturaCartao,
   getResumoReal,
   atualizarCartaoConfigurado,
-  formatarDataParaISO
+  formatarDataParaISO,
+  buscarAlertasDoDia,
+  gerarMensagemAlertas
 } = require('./databaseService');
 const { getGastosCategoriaEspecifica, parseMonthYear, getNomeMes } = require('./googleSheetService');
 
@@ -118,10 +120,11 @@ async function criarParcelamento(userId, parsed, cartaoInfo = null) {
         dataContabilizacaoInfo.mesFatura,
         dataContabilizacaoInfo.anoFatura,
         cartaoInfo.dia_vencimento,
-        'pendente'
+        'pendente',
+        parsed.dataVencimento // data_vencimento
       ]);
     } else {
-      valores = valores.concat([null, null, null, null, null, null, null, null, null, null]);
+      valores = valores.concat([null, null, null, null, null, null, null, null, null, null, parsed.dataVencimento]);
     }
     
     await appendRowToDatabase(userId, valores);
@@ -169,10 +172,11 @@ async function criarRecorrente(userId, parsed, cartaoInfo = null) {
         dataContabilizacaoInfo.mesFatura,
         dataContabilizacaoInfo.anoFatura,
         cartaoInfo.dia_vencimento,
-        'pendente'
+        'pendente',
+        parsed.dataVencimento // data_vencimento
       ]);
     } else {
-      valores = valores.concat([null, null, null, null, null, null, null]);
+      valores = valores.concat([null, null, null, null, null, null, null, parsed.dataVencimento]);
     }
     
     await appendRowToDatabase(userId, valores);
@@ -185,6 +189,38 @@ async function criarRecorrente(userId, parsed, cartaoInfo = null) {
 // Função para processar lançamento (usada após escolha de forma de pagamento)
 async function processarLancamento(userId, parsed, sock) {
   console.log('[DEBUG] processarLancamento iniciado com:', parsed);
+  
+  // --- VERIFICAÇÃO DE FALTA DE DATA DE VENCIMENTO PARA BOLETOS ---
+  if (parsed && parsed.faltaDataVencimento) {
+    console.log('[DEBUG] Falta data de vencimento para boleto, solicitando ao usuário');
+    aguardandoDataVencimento[userId] = { parsed: parsed };
+    await sock.sendMessage(userId, {
+      text: `📄 *Boleto detectado*\n\n` +
+        `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+        `📂 Categoria: ${parsed.categoria}\n` +
+        `📝 Descrição: ${parsed.descricao}\n\n` +
+        `❓ *Qual é a data de vencimento do boleto?*\n` +
+        `Digite no formato dd/mm/aaaa (ex: 25/10/2025) ou "cancelar"`
+    });
+    return;
+  }
+  
+  // --- VERIFICAÇÃO DE FALTA DE FORMA DE PAGAMENTO ---
+  if (parsed && parsed.faltaFormaPagamento) {
+    console.log('[DEBUG] Falta forma de pagamento, solicitando ao usuário');
+    aguardandoFormaPagamento[userId] = { parsed: parsed };
+    let msgFormaPagamento = `💳 *Forma de pagamento não informada*\n\n`;
+    msgFormaPagamento += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+    msgFormaPagamento += `📂 Categoria: ${parsed.categoria}\n`;
+    msgFormaPagamento += `📝 Descrição: ${parsed.descricao}\n\n`;
+    msgFormaPagamento += `❓ *Qual forma de pagamento você usou?*\n\n`;
+    formasPagamento.forEach((forma, index) => {
+      msgFormaPagamento += `${index + 1}. ${forma}\n`;
+    });
+    msgFormaPagamento += `\nDigite o número da opção ou "cancelar"`;
+    await sock.sendMessage(userId, { text: msgFormaPagamento });
+    return;
+  }
   
   // --- DETECÇÃO DE GASTOS NO CARTÃO DE CRÉDITO (PRIORITÁRIO) ---
   const pagamentoNormalizado = (parsed.pagamento || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -316,7 +352,8 @@ async function processarLancamento(userId, parsed, sock) {
           mesFatura, // mes_fatura
           anoFatura, // ano_fatura
           cartao.dia_vencimento, // dia_vencimento
-          'pendente' // status_fatura
+          'pendente', // status_fatura
+          parsed.dataVencimento // data_vencimento
         ]);
         const dataContabilizacaoBR = dataContabilizacao.toLocaleDateString('pt-BR');
         const nomeMes = getNomeMes(mesFatura - 1);
@@ -417,7 +454,21 @@ async function processarLancamento(userId, parsed, sock) {
         parsedComValor.descricao,
         parsedComValor.valor,
         parsedComValor.categoria,
-        parsedComValor.pagamento
+        parsedComValor.pagamento,
+        null, // parcelamento_id
+        null, // parcela_atual
+        null, // total_parcelas
+        null, // recorrente
+        null, // recorrente_fim
+        null, // recorrente_id
+        null, // cartao_nome
+        null, // data_lancamento
+        null, // data_contabilizacao
+        null, // mes_fatura
+        null, // ano_fatura
+        null, // dia_vencimento
+        null, // status_fatura
+        parsedComValor.dataVencimento // data_vencimento
       ]);
       
       let msg = `⚠️ ${parsed.error}\n\n✅ Lançamento registrado com sucesso!\n\n`;
@@ -439,6 +490,21 @@ async function processarLancamento(userId, parsed, sock) {
 
   // --- LANÇAMENTO NORMAL SEM ERROS ---
   if (parsed && !parsed.error) {
+    // --- VERIFICAÇÃO DE FALTA DE DATA DE VENCIMENTO PARA BOLETOS ---
+    if (parsed.faltaDataVencimento) {
+      console.log('[DEBUG] Falta data de vencimento para boleto, solicitando ao usuário');
+      aguardandoDataVencimento[userId] = { parsed: parsed };
+      await sock.sendMessage(userId, {
+        text: `📄 *Boleto detectado*\n\n` +
+          `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+          `📂 Categoria: ${parsed.categoria}\n` +
+          `📝 Descrição: ${parsed.descricao}\n\n` +
+          `❓ *Qual é a data de vencimento do boleto?*\n` +
+          `Digite no formato dd/mm/aaaa (ex: 25/10/2025) ou "cancelar"`
+      });
+      return;
+    }
+
     try {
       const tipoNormalizado = (parsed.tipo || '').toLowerCase();
       
@@ -495,7 +561,21 @@ async function processarLancamento(userId, parsed, sock) {
         parsed.descricao,
         parsed.valor,
         parsed.categoria,
-        parsed.pagamento
+        parsed.pagamento,
+        null, // parcelamento_id
+        null, // parcela_atual
+        null, // total_parcelas
+        null, // recorrente
+        null, // recorrente_fim
+        null, // recorrente_id
+        null, // cartao_nome
+        null, // data_lancamento
+        null, // data_contabilizacao
+        null, // mes_fatura
+        null, // ano_fatura
+        null, // dia_vencimento
+        null, // status_fatura
+        parsed.dataVencimento // data_vencimento
       ]);
       
       let msg = `✅ Lançamento registrado com sucesso!\n\n`;
@@ -520,10 +600,108 @@ async function processarLancamento(userId, parsed, sock) {
     }
   }
 
-  // Se chegou até aqui, não conseguiu processar
-  await sock.sendMessage(userId, { 
-    text: `❌ Não foi possível processar o lançamento. Verifique o formato da mensagem.` 
+  // Comando para iniciar edição de cartão
+  if (/^editar cartao$/i.test(textoLower)) {
+    const cartoes = await listarCartoesConfigurados(userId);
+    if (!cartoes || cartoes.length === 0) {
+      await sock.sendMessage(userId, { text: '❌ Nenhum cartão configurado para editar.' });
+      return;
+    }
+    let msgCartoes = 'Qual cartão deseja editar?\n';
+    cartoes.forEach((cartao, idx) => {
+      msgCartoes += `${idx + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento}, fecha dia ${cartao.dia_fechamento || 'NÃO INFORMADO'})\n`;
+    });
+    msgCartoes += '\nDigite o número do cartão ou "cancelar"';
+    aguardandoEdicaoCartao[userId] = { cartoes };
+    await sock.sendMessage(userId, { text: msgCartoes });
+    return;
+  }
+
+  // Fluxo aguardando escolha do cartão para editar
+  if (aguardandoEdicaoCartao[userId] && !aguardandoEdicaoCartao[userId].cartaoEscolhido) {
+    const escolha = textoLower.trim();
+    if (escolha === 'cancelar') {
+      delete aguardandoEdicaoCartao[userId];
+      await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
+      return;
+    }
+    const idx = parseInt(escolha);
+    const cartoes = aguardandoEdicaoCartao[userId].cartoes;
+    if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
+      await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${cartoes.length} ou "cancelar".` });
+      return;
+    }
+    aguardandoEdicaoCartao[userId].cartaoEscolhido = cartoes[idx - 1];
+    await sock.sendMessage(userId, { text: 'Qual campo deseja editar?\n1. vencimento\n2. fechamento\n3. cancelar' });
+    return;
+  }
+
+  // Fluxo aguardando escolha do campo para editar
+  if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].cartaoEscolhido && !aguardandoEdicaoCartao[userId].campoEscolhido) {
+    const campo = textoLower.trim();
+    let campoEscolhido = campo;
+    if (["1", "2", "3"].includes(campo)) {
+      if (campo === "1") campoEscolhido = "vencimento";
+      else if (campo === "2") campoEscolhido = "fechamento";
+      else if (campo === "3") campoEscolhido = "cancelar";
+    }
+    if (campoEscolhido === 'cancelar') {
+      delete aguardandoEdicaoCartao[userId];
+      await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
+      return;
+    }
+    if (!['vencimento', 'fechamento'].includes(campoEscolhido)) {
+      await sock.sendMessage(userId, { text: '❌ Campo inválido. Digite: 1, 2, 3 ou o nome do campo.' });
+      return;
+    }
+    aguardandoEdicaoCartao[userId].campoEscolhido = campoEscolhido;
+    if (campoEscolhido === 'vencimento') {
+      await sock.sendMessage(userId, { text: 'Digite o novo dia de vencimento (1-31):' });
+    } else if (campoEscolhido === 'fechamento') {
+      await sock.sendMessage(userId, { text: 'Digite o novo dia de fechamento (1-31):' });
+    }
+    return;
+  }
+
+  // Fluxo aguardando novo valor de vencimento/fechamento
+  if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].campoEscolhido) {
+    const campo = aguardandoEdicaoCartao[userId].campoEscolhido;
+    const cartao = aguardandoEdicaoCartao[userId].cartaoEscolhido;
+    const valor = textoLower.trim();
+    if (campo === 'vencimento') {
+      const dia = parseInt(valor);
+      if (isNaN(dia) || dia < 1 || dia > 31) {
+        await sock.sendMessage(userId, { text: '❌ Dia de vencimento inválido. Digite um número entre 1 e 31.' });
+        return;
+      }
+      aguardandoEdicaoCartao[userId].novoVencimento = dia;
+      // Atualizar só vencimento
+      await atualizarCartaoConfigurado(userId, cartao.nome_cartao, dia, cartao.dia_fechamento);
+      await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nNovo vencimento: dia ${dia}\nFechamento: dia ${cartao.dia_fechamento || 'NÃO INFORMADO'}` });
+      delete aguardandoEdicaoCartao[userId];
+      return;
+    }
+    if (campo === 'fechamento') {
+      const dia = parseInt(valor);
+      if (isNaN(dia) || dia < 1 || dia > 31) {
+        await sock.sendMessage(userId, { text: '❌ Dia de fechamento inválido. Digite um número entre 1 e 31.' });
+        return;
+      }
+      aguardandoEdicaoCartao[userId].novoFechamento = dia;
+      // Atualizar só fechamento
+      await atualizarCartaoConfigurado(userId, cartao.nome_cartao, cartao.dia_vencimento, dia);
+      await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nVencimento: dia ${cartao.dia_vencimento}\nNovo fechamento: dia ${dia}` });
+      delete aguardandoEdicaoCartao[userId];
+      return;
+    }
+  }
+
+  // Dentro do bloco de resposta padrão (mensagem não reconhecida):
+  console.log('[DEBUG] Nenhum comando reconhecido, enviando resposta padrão.');
+  await sock.sendMessage(userId, {
+    text: '❌ Comando não reconhecido ou valor não encontrado na mensagem.\nDigite *ajuda* para ver a lista de comandos disponíveis.'
   });
+  return;
 }
 
 // Controle de contexto simples em memória
@@ -536,6 +714,7 @@ let aguardandoConfiguracaoCartao = {};
 let aguardandoDiaVencimento = {};
 let aguardandoEdicaoCartao = {};
 let aguardandoFormaPagamento = {};
+let aguardandoDataVencimento = {};
 
 async function startBot() {
   try {
@@ -618,12 +797,80 @@ async function startBot() {
         // Limpar o contexto
         delete aguardandoFormaPagamento[userId];
         
+        // Verificar se agora é um boleto e se falta data de vencimento
+        const pagamentoNormalizado = formaPagamentoEscolhida.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        if (pagamentoNormalizado.includes('boleto') && !parsedComPagamento.dataVencimento) {
+          console.log('[DEBUG] Boleto selecionado sem data de vencimento, solicitando ao usuário');
+          parsedComPagamento.faltaDataVencimento = true;
+          aguardandoDataVencimento[userId] = { parsed: parsedComPagamento };
+          await sock.sendMessage(userId, {
+            text: `📄 *Boleto detectado*\n\n` +
+              `💰 Valor: R$ ${formatarValor(parsedComPagamento.valor)}\n` +
+              `📂 Categoria: ${parsedComPagamento.categoria}\n` +
+              `📝 Descrição: ${parsedComPagamento.descricao}\n\n` +
+              `❓ *Qual é a data de vencimento do boleto?*\n` +
+              `Digite no formato dd/mm/aaaa (ex: 25/10/2025) ou "cancelar"`
+          });
+          return;
+        }
+        
         // Reprocessar o lançamento com a forma de pagamento
         console.log('[DEBUG] Reprocessando lançamento com forma de pagamento:', formaPagamentoEscolhida);
         
         // Continuar com o processamento normal usando parsedComPagamento
         // Vou criar uma função auxiliar para processar o lançamento
         await processarLancamento(userId, parsedComPagamento, sock);
+        return;
+      }
+
+      // --- TRATAMENTO DE RESPOSTA DE DATA DE VENCIMENTO ---
+      if (aguardandoDataVencimento[userId]) {
+        console.log('[DEBUG] Processando resposta de data de vencimento');
+        const contexto = aguardandoDataVencimento[userId];
+        
+        if (textoLower === 'cancelar') {
+          delete aguardandoDataVencimento[userId];
+          await sock.sendMessage(userId, { text: '❌ Operação cancelada.' });
+          return;
+        }
+        
+        // Validar formato da data (dd/mm/aaaa)
+        const dataMatch = texto.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if (!dataMatch) {
+          await sock.sendMessage(userId, { 
+            text: '❌ Formato inválido. Digite a data no formato dd/mm/aaaa (ex: 25/10/2025) ou "cancelar".' 
+          });
+          return;
+        }
+        
+        const dia = parseInt(dataMatch[1]);
+        const mes = parseInt(dataMatch[2]);
+        const ano = parseInt(dataMatch[3]);
+        
+        // Validar se a data é válida
+        const dataVencimentoObj = new Date(ano, mes - 1, dia);
+        if (isNaN(dataVencimentoObj.getTime()) || dia < 1 || dia > 31 || mes < 1 || mes > 12) {
+          await sock.sendMessage(userId, { 
+            text: '❌ Data inválida. Digite uma data válida no formato dd/mm/aaaa ou "cancelar".' 
+          });
+          return;
+        }
+        
+        const dataVencimento = dataVencimentoObj.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+        
+        // Atualizar o parsed com a data de vencimento
+        const parsedComVencimento = {
+          ...contexto.parsed,
+          dataVencimento: dataVencimento,
+          faltaDataVencimento: false
+        };
+        
+        // Limpar o contexto
+        delete aguardandoDataVencimento[userId];
+        
+        // Reprocessar o lançamento com a data de vencimento
+        console.log('[DEBUG] Reprocessando lançamento com data de vencimento:', dataVencimento);
+        await processarLancamento(userId, parsedComVencimento, sock);
         return;
       }
 
@@ -1039,7 +1286,8 @@ async function startBot() {
             mesFatura, // mes_fatura
             anoFatura, // ano_fatura
             cartaoEscolhido.dia_vencimento, // dia_vencimento
-            'pendente' // status_fatura
+            'pendente', // status_fatura
+            parsed.dataVencimento // data_vencimento
           ]);
           const dataContabilizacaoBR = dataContabilizacao.toLocaleDateString('pt-BR');
           const nomeMes = getNomeMes(mesFatura - 1);
@@ -1194,16 +1442,34 @@ async function startBot() {
     const parsed = parseMessage(texto);
       console.log('[DEBUG] parsed após parseMessage:', parsed);
 
+      // --- VERIFICAÇÃO DE FALTA DE DATA DE VENCIMENTO PARA BOLETOS ---
+      if (parsed && parsed.faltaDataVencimento) {
+        console.log('[DEBUG] Falta data de vencimento para boleto, solicitando ao usuário');
+        aguardandoDataVencimento[userId] = { parsed: parsed };
+        await sock.sendMessage(userId, {
+          text: `📄 *Boleto detectado*\n\n` +
+            `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+            `📂 Categoria: ${parsed.categoria}\n` +
+            `📝 Descrição: ${parsed.descricao}\n\n` +
+            `❓ *Qual é a data de vencimento do boleto?*\n` +
+            `Digite no formato dd/mm/aaaa (ex: 25/10/2025) ou "cancelar"`
+        });
+        return;
+      }
+
       // --- VERIFICAÇÃO DE FORMA DE PAGAMENTO ---
       if (parsed && parsed.faltaFormaPagamento) {
         console.log('[DEBUG] Falta forma de pagamento, solicitando ao usuário');
-        let msgFormaPagamento = `💳 *Qual forma de pagamento você usou?*\n\n`;
+        aguardandoFormaPagamento[userId] = { parsed: parsed };
+        let msgFormaPagamento = `💳 *Forma de pagamento não informada*\n\n`;
+        msgFormaPagamento += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+        msgFormaPagamento += `📂 Categoria: ${parsed.categoria}\n`;
+        msgFormaPagamento += `📝 Descrição: ${parsed.descricao}\n\n`;
+        msgFormaPagamento += `❓ *Qual forma de pagamento você usou?*\n\n`;
         formasPagamento.forEach((forma, index) => {
           msgFormaPagamento += `${index + 1}. ${forma}\n`;
         });
         msgFormaPagamento += `\nDigite o número da opção ou "cancelar"`;
-        
-        aguardandoFormaPagamento[userId] = { parsed: parsed };
         await sock.sendMessage(userId, { text: msgFormaPagamento });
         return;
       }
@@ -1337,7 +1603,8 @@ async function startBot() {
               mesFatura, // mes_fatura
               anoFatura, // ano_fatura
               cartao.dia_vencimento, // dia_vencimento
-              'pendente' // status_fatura
+              'pendente', // status_fatura
+              parsed.dataVencimento // data_vencimento
             ]);
             const dataContabilizacaoBR = dataContabilizacao.toLocaleDateString('pt-BR');
             const nomeMes = getNomeMes(mesFatura - 1);
@@ -1438,7 +1705,21 @@ async function startBot() {
             parsedComValor.descricao,
             parsedComValor.valor,
             parsedComValor.categoria,
-            parsedComValor.pagamento
+            parsedComValor.pagamento,
+            null, // parcelamento_id
+            null, // parcela_atual
+            null, // total_parcelas
+            null, // recorrente
+            null, // recorrente_fim
+            null, // recorrente_id
+            null, // cartao_nome
+            null, // data_lancamento
+            null, // data_contabilizacao
+            null, // mes_fatura
+            null, // ano_fatura
+            null, // dia_vencimento
+            null, // status_fatura
+            parsedComValor.dataVencimento // data_vencimento
           ]);
           
           let msg = `⚠️ ${parsed.error}\n\n✅ Lançamento registrado com sucesso!\n\n`;
@@ -1460,6 +1741,21 @@ async function startBot() {
 
       // --- LANÇAMENTO NORMAL SEM ERROS ---
       if (parsed && !parsed.error) {
+        // --- VERIFICAÇÃO DE FALTA DE DATA DE VENCIMENTO PARA BOLETOS ---
+        if (parsed.faltaDataVencimento) {
+          console.log('[DEBUG] Falta data de vencimento para boleto, solicitando ao usuário');
+          aguardandoDataVencimento[userId] = { parsed: parsed };
+          await sock.sendMessage(userId, {
+            text: `📄 *Boleto detectado*\n\n` +
+              `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+              `📂 Categoria: ${parsed.categoria}\n` +
+              `📝 Descrição: ${parsed.descricao}\n\n` +
+              `❓ *Qual é a data de vencimento do boleto?*\n` +
+              `Digite no formato dd/mm/aaaa (ex: 25/10/2025) ou "cancelar"`
+          });
+          return;
+        }
+
         try {
           const tipoNormalizado = (parsed.tipo || '').toLowerCase();
           
@@ -1516,7 +1812,21 @@ async function startBot() {
             parsed.descricao,
             parsed.valor,
             parsed.categoria,
-            parsed.pagamento
+            parsed.pagamento,
+            null, // parcelamento_id
+            null, // parcela_atual
+            null, // total_parcelas
+            null, // recorrente
+            null, // recorrente_fim
+            null, // recorrente_id
+            null, // cartao_nome
+            null, // data_lancamento
+            null, // data_contabilizacao
+            null, // mes_fatura
+            null, // ano_fatura
+            null, // dia_vencimento
+            null, // status_fatura
+            parsed.dataVencimento // data_vencimento
           ]);
           
           let msg = `✅ Lançamento registrado com sucesso!\n\n`;
