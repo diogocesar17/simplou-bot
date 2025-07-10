@@ -6,7 +6,7 @@ const categoriasPrincipais = {
     'feira', 'hortifruti', 'açougue', 'acougue', 'peixaria', 'queijaria', 'doceria', 'confeitaria', 'panificadora', 'salgados', 'bolos', 'tortas', 'sanduíches', 'sanduiches', 'cafeteria', 'cafeteria'
   ],
   'Saúde': [
-    'farmácia', 'remédio', 'remedio', 'dentista', 'médico', 'medico', 'consulta', 'exame', 'hospital', 'clínica', 'clinica', 'psicólogo', 'psicologo', 'plano de saúde', 'vacina',
+    'farmácia', 'farmacia', 'remédio', 'remedio', 'dentista', 'médico', 'medico', 'consulta', 'exame', 'hospital', 'clínica', 'clinica', 'psicólogo', 'psicologo', 'plano de saúde', 'vacina',
     'fisioterapeuta', 'nutricionista', 'personal trainer', 'academia', 'ginásio', 'ginasio', 'suplemento', 'vitamina', 'medicamento', 'antibiótico', 'antibiotico', 'analgésico', 'analgesico',
     'laboratório', 'laboratorio', 'raio x', 'ultrassom', 'resonância', 'resonancia', 'cardiologista', 'dermatologista', 'oftalmologista', 'ortopedista', 'ginecologista', 'urologista'
   ],

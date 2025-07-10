@@ -43,7 +43,8 @@ async function initializeDatabase() {
         mes_fatura INTEGER,
         ano_fatura INTEGER,
         dia_vencimento INTEGER,
-        status_fatura VARCHAR(20) DEFAULT 'pendente'
+        status_fatura VARCHAR(20) DEFAULT 'pendente',
+        data_vencimento DATE
       )
     `);
 
@@ -68,6 +69,9 @@ async function initializeDatabase() {
     
     // Migração: Adicionar coluna dia_fechamento na tabela cartoes_config
     await migrateCartoesConfigTable(client);
+
+    // Migração: Adicionar coluna data_vencimento para boletos
+    await migrateDataVencimentoColumn(client);
 
     // Criar índices para melhor performance
     await client.query(`
@@ -247,6 +251,29 @@ async function migrateCartoesConfigTable(client) {
   }
 }
 
+async function migrateDataVencimentoColumn(client) {
+  try {
+    // Verificar se a coluna data_vencimento existe na tabela lancamentos
+    const checkColumn = await client.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'lancamentos' 
+      AND column_name = 'data_vencimento'
+    `);
+    
+    if (checkColumn.rows.length === 0) {
+      console.log('🔄 Adicionando coluna data_vencimento à tabela lancamentos...');
+      await client.query(`ALTER TABLE lancamentos ADD COLUMN data_vencimento DATE`);
+      console.log('✅ Coluna data_vencimento adicionada à tabela lancamentos');
+    } else {
+      console.log('✅ Coluna data_vencimento já existe na tabela lancamentos');
+    }
+  } catch (error) {
+    console.error('❌ Erro na migração da coluna data_vencimento:', error.message);
+    throw error;
+  }
+}
+
 function formatarDataParaISO(dataBR) {
   if (!dataBR) return null;
   // Se for um objeto Date, converter para string ISO considerando o timezone do Brasil
@@ -359,7 +386,7 @@ function calcularDataContabilizacao(dataLancamento, diaVencimento, diaFechamento
 // Funções para operações CRUD
 async function appendRowToDatabase(userId, values) {
   // Suporte a novos campos opcionais
-  let [data, tipo, descricao, valor, categoria, pagamento, parcelamento_id, parcela_atual, total_parcelas, recorrente, recorrente_fim, recorrente_id, cartao_nome, data_lancamento, data_contabilizacao, mes_fatura, ano_fatura, dia_vencimento, status_fatura] = values;
+  let [data, tipo, descricao, valor, categoria, pagamento, parcelamento_id, parcela_atual, total_parcelas, recorrente, recorrente_fim, recorrente_id, cartao_nome, data_lancamento, data_contabilizacao, mes_fatura, ano_fatura, dia_vencimento, status_fatura, data_vencimento] = values;
   data = formatarDataParaISO(data);
   tipo = tipo.toLowerCase();
 
@@ -380,6 +407,7 @@ async function appendRowToDatabase(userId, values) {
   if (ano_fatura !== undefined) { campos.push('ano_fatura'); params.push(ano_fatura); }
   if (dia_vencimento !== undefined) { campos.push('dia_vencimento'); params.push(dia_vencimento); }
   if (status_fatura !== undefined) { campos.push('status_fatura'); params.push(status_fatura); }
+  if (data_vencimento !== undefined) { campos.push('data_vencimento'); params.push(data_vencimento); }
 
   const placeholders = params.map((_, i) => `$${i + 1}`);
   const query = `
@@ -984,6 +1012,129 @@ async function getResumoReal(userId, mes = null, ano = null) {
   };
 }
 
+// ===== FUNÇÕES DE ALERTA =====
+
+// Buscar cartões com vencimento próximo (3 dias antes e no dia)
+async function buscarCartoesVencimentoProximo(userId) {
+  const hoje = new Date();
+  const tresDias = new Date(hoje);
+  tresDias.setDate(hoje.getDate() + 3);
+  
+  const query = `
+    SELECT DISTINCT nome_cartao, dia_vencimento
+    FROM cartoes_config 
+    WHERE user_id = $1
+      AND (
+        dia_vencimento = EXTRACT(DAY FROM CURRENT_DATE) OR
+        dia_vencimento = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '3 days')
+      )
+  `;
+  
+  const result = await pool.query(query, [userId]);
+  return result.rows;
+}
+
+// Buscar boletos com vencimento próximo (3 dias antes e no dia)
+async function buscarBoletosVencimentoProximo(userId) {
+  const hoje = new Date();
+  const tresDias = new Date(hoje);
+  tresDias.setDate(hoje.getDate() + 3);
+  
+  const query = `
+    SELECT id, descricao, valor, data_vencimento, categoria
+    FROM lancamentos 
+    WHERE user_id = $1
+      AND pagamento ILIKE '%boleto%'
+      AND data_vencimento IS NOT NULL
+      AND data_vencimento >= CURRENT_DATE
+      AND data_vencimento <= CURRENT_DATE + INTERVAL '3 days'
+    ORDER BY data_vencimento ASC
+  `;
+  
+  const result = await pool.query(query, [userId]);
+  return result.rows;
+}
+
+// Buscar todos os alertas do dia (cartões + boletos)
+async function buscarAlertasDoDia(userId) {
+  const cartoes = await buscarCartoesVencimentoProximo(userId);
+  const boletos = await buscarBoletosVencimentoProximo(userId);
+  
+  return {
+    cartoes,
+    boletos,
+    temAlertas: cartoes.length > 0 || boletos.length > 0
+  };
+}
+
+// Função para formatar mensagem de alerta de cartão
+function formatarAlertaCartao(cartao) {
+  const hoje = new Date();
+  const diaHoje = hoje.getDate();
+  
+  if (cartao.dia_vencimento === diaHoje) {
+    return `🔴 *VENCIMENTO HOJE*: Cartão ${cartao.nome_cartao}`;
+  } else {
+    const diasRestantes = cartao.dia_vencimento - diaHoje;
+    return `🟡 *VENCIMENTO EM ${diasRestantes} DIAS*: Cartão ${cartao.nome_cartao}`;
+  }
+}
+
+// Função para formatar mensagem de alerta de boleto
+function formatarAlertaBoleto(boleto) {
+  const hoje = new Date();
+  const vencimento = new Date(boleto.data_vencimento);
+  const diffTime = vencimento - hoje;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  const valorFormatado = parseFloat(boleto.valor).toFixed(2);
+  
+  if (diffDays === 0) {
+    return `🔴 *VENCIMENTO HOJE*: ${boleto.descricao} - R$ ${valorFormatado}`;
+  } else {
+    return `🟡 *VENCIMENTO EM ${diffDays} DIAS*: ${boleto.descricao} - R$ ${valorFormatado}`;
+  }
+}
+
+// Função para gerar mensagem completa de alertas
+function gerarMensagemAlertas(alertas) {
+  if (!alertas.temAlertas) {
+    return null;
+  }
+  
+  let mensagem = "🚨 *ALERTAS DE VENCIMENTO*\n\n";
+  
+  // Alertas de cartões
+  if (alertas.cartoes.length > 0) {
+    mensagem += "*💳 CARTÕES DE CRÉDITO:*\n";
+    alertas.cartoes.forEach(cartao => {
+      mensagem += `• ${formatarAlertaCartao(cartao)}\n`;
+    });
+    mensagem += "\n";
+  }
+  
+  // Alertas de boletos
+  if (alertas.boletos.length > 0) {
+    mensagem += "*📄 BOLETOS:*\n";
+    alertas.boletos.forEach(boleto => {
+      mensagem += `• ${formatarAlertaBoleto(boleto)}\n`;
+    });
+  }
+  
+  return mensagem;
+}
+
+// Função genérica para executar queries
+async function queryDatabase(query, params = []) {
+  try {
+    const result = await pool.query(query, params);
+    return result.rows;
+  } catch (error) {
+    console.error('[DATABASE] Erro na query:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   initializeDatabase,
   appendRowToDatabase,
@@ -1008,5 +1159,8 @@ module.exports = {
   calcularDataContabilizacao,
   buscarFaturaCartao,
   getResumoReal,
-  formatarDataParaISO
+  formatarDataParaISO,
+  buscarAlertasDoDia,
+  gerarMensagemAlertas,
+  queryDatabase
 }; 
