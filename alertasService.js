@@ -172,11 +172,12 @@ function gerarMensagemAlertaCartao(cartao, tipoAlerta, diasRestantes) {
 function gerarMensagemAlertaBoleto(boleto, tipoAlerta, diasRestantes) {
   const dataVencimento = new Date(boleto.data_vencimento);
   const dataFormatada = dataVencimento.toLocaleDateString('pt-BR');
+  const valorNumerico = Number(boleto.valor);
   
   if (tipoAlerta === '3_dias_antes') {
     return `📄 *Alerta de Boleto*\n\n` +
            `Descrição: ${boleto.descricao}\n` +
-           `Valor: R$ ${boleto.valor.toFixed(2)}\n` +
+           `Valor: R$ ${valorNumerico.toFixed(2)}\n` +
            `Categoria: ${boleto.categoria}\n` +
            `Vencimento: ${dataFormatada}\n` +
            `⏰ Faltam ${diasRestantes} dias para o vencimento\n\n` +
@@ -184,7 +185,7 @@ function gerarMensagemAlertaBoleto(boleto, tipoAlerta, diasRestantes) {
   } else if (tipoAlerta === 'dia_vencimento') {
     return `🚨 *BOLETO VENCE HOJE!*\n\n` +
            `Descrição: ${boleto.descricao}\n` +
-           `Valor: R$ ${boleto.valor.toFixed(2)}\n` +
+           `Valor: R$ ${valorNumerico.toFixed(2)}\n` +
            `Categoria: ${boleto.categoria}\n` +
            `Vencimento: ${dataFormatada}\n\n` +
            `⚠️ O boleto vence hoje!`;
