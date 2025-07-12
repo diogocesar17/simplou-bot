@@ -613,7 +613,7 @@ async function processarLancamento(userId, parsed, sock) {
   }
 
   // Comando para iniciar edição de cartão
-  if (/^editar cartao$/i.test(texto.toLowerCase())) {
+  if (/^editar cartao$/i.test(textoLower)) {
     const cartoes = await listarCartoesConfigurados(userId);
     if (!cartoes || cartoes.length === 0) {
       await sock.sendMessage(userId, { text: '❌ Nenhum cartão configurado para editar.' });
@@ -631,7 +631,7 @@ async function processarLancamento(userId, parsed, sock) {
 
   // Fluxo aguardando escolha do cartão para editar
   if (aguardandoEdicaoCartao[userId] && !aguardandoEdicaoCartao[userId].cartaoEscolhido) {
-    const escolha = texto.toLowerCase().trim();
+    const escolha = textoLower.trim();
     if (escolha === 'cancelar') {
       delete aguardandoEdicaoCartao[userId];
       await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
@@ -650,7 +650,7 @@ async function processarLancamento(userId, parsed, sock) {
 
   // Fluxo aguardando escolha do campo para editar
   if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].cartaoEscolhido && !aguardandoEdicaoCartao[userId].campoEscolhido) {
-    const campo = texto.toLowerCase().trim();
+    const campo = textoLower.trim();
     let campoEscolhido = campo;
     if (["1", "2", "3"].includes(campo)) {
       if (campo === "1") campoEscolhido = "vencimento";
@@ -679,7 +679,7 @@ async function processarLancamento(userId, parsed, sock) {
   if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].campoEscolhido) {
     const campo = aguardandoEdicaoCartao[userId].campoEscolhido;
     const cartao = aguardandoEdicaoCartao[userId].cartaoEscolhido;
-    const valor = texto.toLowerCase().trim();
+    const valor = textoLower.trim();
     if (campo === 'vencimento') {
       const dia = parseInt(valor);
       if (isNaN(dia) || dia < 1 || dia > 31) {
@@ -1480,233 +1480,6 @@ async function startBot() {
       }
 
       // Após blocos de contexto (aguardandoDiaVencimento e aguardandoConfiguracaoCartao):
-      
-      // --- COMANDOS INTELIGENTES COM GEMINI (DEVE VIR ANTES DO PARSER) ---
-      
-      // Comando para análise de padrões de gastos
-      if (["analisar", "analise", "análise", "padroes", "padrões"].includes(textoLower)) {
-        if (!isGeminiAvailable()) {
-          await sock.sendMessage(userId, { 
-            text: '❌ Funcionalidade de análise inteligente não está disponível.\n\nConfigure a API key do Gemini para usar esta funcionalidade.' 
-          });
-          return;
-        }
-        
-        await sock.sendMessage(userId, { 
-          text: '🤖 *Analisando seus padrões de gastos...*\n\n⏳ Isso pode levar alguns segundos...' 
-        });
-        
-        try {
-          // Buscar dados dos últimos 3 meses
-          const hoje = new Date();
-          const dados = [];
-          
-          for (let i = 0; i < 3; i++) {
-            const mes = hoje.getMonth() - i;
-            const ano = hoje.getFullYear();
-            const resumo = await getResumoPorMes(userId, mes + 1, ano);
-            const gastosPorCategoria = await getGastosPorCategoria(userId, mes + 1, ano);
-            
-            dados.push({
-              mes: getNomeMes(mes),
-              ano: ano,
-              totalGastos: resumo.totalDespesas,
-              totalReceitas: resumo.totalReceitas,
-              saldo: resumo.saldo,
-              categorias: gastosPorCategoria
-            });
-          }
-          
-          const analise = await analisarPadroesGastos(userId, dados);
-          if (analise) {
-            await sock.sendMessage(userId, { text: analise });
-          } else {
-            await sock.sendMessage(userId, { 
-              text: '❌ Erro ao analisar padrões. Tente novamente mais tarde.' 
-            });
-          }
-        } catch (error) {
-          console.error('[ANALISE] Erro:', error);
-          await sock.sendMessage(userId, { 
-            text: '❌ Erro ao analisar padrões de gastos. Tente novamente.' 
-          });
-        }
-        return;
-      }
-
-      // Comando para sugestões de economia
-      if (["sugestoes", "sugestões", "dicas", "economia", "economizar"].includes(textoLower)) {
-        if (!isGeminiAvailable()) {
-          await sock.sendMessage(userId, { 
-            text: '❌ Funcionalidade de sugestões inteligentes não está disponível.\n\nConfigure a API key do Gemini para usar esta funcionalidade.' 
-          });
-          return;
-        }
-        
-        await sock.sendMessage(userId, { 
-          text: '💡 *Gerando sugestões de economia...*\n\n⏳ Analisando seus gastos...' 
-        });
-        
-        try {
-          // Buscar dados dos últimos 2 meses
-          const hoje = new Date();
-          const dados = [];
-          
-          for (let i = 0; i < 2; i++) {
-            const mes = hoje.getMonth() - i;
-            const ano = hoje.getFullYear();
-            const resumo = await getResumoPorMes(userId, mes + 1, ano);
-            const gastosPorCategoria = await getGastosPorCategoria(userId, mes + 1, ano);
-            
-            dados.push({
-              mes: getNomeMes(mes),
-              ano: ano,
-              totalGastos: resumo.totalDespesas,
-              categorias: gastosPorCategoria
-            });
-          }
-          
-          const sugestoes = await gerarSugestoesEconomia(userId, dados);
-          if (sugestoes) {
-            await sock.sendMessage(userId, { text: sugestoes });
-          } else {
-            await sock.sendMessage(userId, { 
-              text: '❌ Erro ao gerar sugestões. Tente novamente mais tarde.' 
-            });
-          }
-        } catch (error) {
-          console.error('[SUGESTOES] Erro:', error);
-          await sock.sendMessage(userId, { 
-            text: '❌ Erro ao gerar sugestões de economia. Tente novamente.' 
-          });
-        }
-        return;
-      }
-
-      // Comando para previsões de gastos
-      if (["previsao", "previsão", "prever", "futuro"].includes(textoLower)) {
-        if (!isGeminiAvailable()) {
-          await sock.sendMessage(userId, { 
-            text: '❌ Funcionalidade de previsões inteligentes não está disponível.\n\nConfigure a API key do Gemini para usar esta funcionalidade.' 
-          });
-          return;
-        }
-        
-        await sock.sendMessage(userId, { 
-          text: '🔮 *Analisando histórico para previsões...*\n\n⏳ Calculando tendências...' 
-        });
-        
-        try {
-          // Buscar dados dos últimos 6 meses
-          const hoje = new Date();
-          const dados = [];
-          
-          for (let i = 0; i < 6; i++) {
-            const mes = hoje.getMonth() - i;
-            const ano = hoje.getFullYear();
-            const resumo = await getResumoPorMes(userId, mes + 1, ano);
-            const gastosPorCategoria = await getGastosPorCategoria(userId, mes + 1, ano);
-            
-            dados.push({
-              mes: getNomeMes(mes),
-              ano: ano,
-              totalGastos: resumo.totalDespesas,
-              totalReceitas: resumo.totalReceitas,
-              categorias: gastosPorCategoria
-            });
-          }
-          
-          const previsao = await preverGastosFuturos(userId, dados);
-          if (previsao) {
-            await sock.sendMessage(userId, { text: previsao });
-          } else {
-            await sock.sendMessage(userId, { 
-              text: '❌ Erro ao gerar previsões. Tente novamente mais tarde.' 
-            });
-          }
-        } catch (error) {
-          console.error('[PREVISAO] Erro:', error);
-          await sock.sendMessage(userId, { 
-            text: '❌ Erro ao gerar previsões de gastos. Tente novamente.' 
-          });
-        }
-        return;
-      }
-
-      // Comando para ajuda inteligente
-      if (["ajuda inteligente", "ajuda financeira", "consulta", "pergunta"].includes(textoLower)) {
-        if (!isGeminiAvailable()) {
-          await sock.sendMessage(userId, { 
-            text: '❌ Funcionalidade de ajuda inteligente não está disponível.\n\nConfigure a API key do Gemini para usar esta funcionalidade.' 
-          });
-          return;
-        }
-        
-        await sock.sendMessage(userId, { 
-          text: '🤖 *Assistente Financeiro Inteligente*\n\n' +
-                'Pergunte sobre:\n' +
-                '• Como economizar dinheiro\n' +
-                '• Dicas de controle financeiro\n' +
-                '• Explicações sobre conceitos financeiros\n' +
-                '• Análise de seus padrões de gastos\n\n' +
-                'Digite sua pergunta ou digite "cancelar" para sair.'
-        });
-        
-        // Marcar que está aguardando pergunta
-        aguardandoPerguntaInteligente = aguardandoPerguntaInteligente || {};
-        aguardandoPerguntaInteligente[userId] = true;
-        return;
-      }
-
-      // Tratamento de perguntas inteligentes
-      if (aguardandoPerguntaInteligente && aguardandoPerguntaInteligente[userId]) {
-        if (textoLower === 'cancelar') {
-          delete aguardandoPerguntaInteligente[userId];
-          await sock.sendMessage(userId, { text: '❌ Consulta cancelada.' });
-          return;
-        }
-        
-        await sock.sendMessage(userId, { 
-          text: '🤖 *Processando sua pergunta...*\n\n⏳ Gerando resposta personalizada...' 
-        });
-        
-        try {
-          // Buscar contexto dos últimos 3 meses para personalizar a resposta
-          const hoje = new Date();
-          const contexto = [];
-          
-          for (let i = 0; i < 3; i++) {
-            const mes = hoje.getMonth() - i;
-            const ano = hoje.getFullYear();
-            const resumo = await getResumoPorMes(userId, mes + 1, ano);
-            contexto.push({
-              mes: getNomeMes(mes),
-              ano: ano,
-              totalGastos: resumo.totalDespesas,
-              totalReceitas: resumo.totalReceitas,
-              saldo: resumo.saldo
-            });
-          }
-          
-          const resposta = await responderPerguntaFinanceira(userId, texto, contexto);
-          if (resposta) {
-            await sock.sendMessage(userId, { text: resposta });
-          } else {
-            await sock.sendMessage(userId, { 
-              text: '❌ Erro ao processar pergunta. Tente novamente mais tarde.' 
-            });
-          }
-        } catch (error) {
-          console.error('[PERGUNTA] Erro:', error);
-          await sock.sendMessage(userId, { 
-            text: '❌ Erro ao processar pergunta. Tente novamente.' 
-          });
-        }
-        
-        delete aguardandoPerguntaInteligente[userId];
-        return;
-      }
-
       console.log('[DEBUG] Antes do parseMessage');
     const parsed = parseMessage(texto);
     console.log('[DEBUG] parsed após parseMessage:', parsed);
@@ -2150,7 +1923,7 @@ async function startBot() {
       }
 
       // Comando para iniciar edição de cartão
-      if (/^editar cartao$/i.test(texto.toLowerCase())) {
+      if (/^editar cartao$/i.test(textoLower)) {
         const cartoes = await listarCartoesConfigurados(userId);
         if (!cartoes || cartoes.length === 0) {
           await sock.sendMessage(userId, { text: '❌ Nenhum cartão configurado para editar.' });
@@ -2168,7 +1941,7 @@ async function startBot() {
 
       // Fluxo aguardando escolha do cartão para editar
       if (aguardandoEdicaoCartao[userId] && !aguardandoEdicaoCartao[userId].cartaoEscolhido) {
-        const escolha = texto.toLowerCase().trim();
+        const escolha = textoLower.trim();
         if (escolha === 'cancelar') {
           delete aguardandoEdicaoCartao[userId];
           await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
@@ -2187,7 +1960,7 @@ async function startBot() {
 
       // Fluxo aguardando escolha do campo para editar
       if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].cartaoEscolhido && !aguardandoEdicaoCartao[userId].campoEscolhido) {
-        const campo = texto.toLowerCase().trim();
+        const campo = textoLower.trim();
         let campoEscolhido = campo;
         if (["1", "2", "3"].includes(campo)) {
           if (campo === "1") campoEscolhido = "vencimento";
@@ -2216,7 +1989,7 @@ async function startBot() {
       if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].campoEscolhido) {
         const campo = aguardandoEdicaoCartao[userId].campoEscolhido;
         const cartao = aguardandoEdicaoCartao[userId].cartaoEscolhido;
-        const valor = texto.toLowerCase().trim();
+        const valor = textoLower.trim();
         if (campo === 'vencimento') {
           const dia = parseInt(valor);
           if (isNaN(dia) || dia < 1 || dia > 31) {
@@ -2265,6 +2038,245 @@ async function startBot() {
       }
     }, 60 * 60 * 1000); // 1 hora
     
+    // Verificar alertas imediatamente ao iniciar (caso seja horário de alerta)
+    setTimeout(async () => {
+      try {
+        await verificarEEnviarAlertas(sock);
+      } catch (error) {
+        console.error('[ALERTAS] Erro na verificação inicial de alertas:', error);
+      }
+    }, 5000); // 5 segundos após iniciar
+    
+    console.log('✅ Sistema de alertas configurado');
+    console.log('📅 Alertas serão verificados a cada hora');
+    console.log('⏰ Horário de envio: 8h às 12h da manhã');
+    console.log('💳 Alertas: Cartões (3 dias antes + dia do vencimento)');
+    console.log('📄 Alertas: Boletos (3 dias antes + dia do vencimento)');
+
+    // --- COMANDOS INTELIGENTES COM GEMINI ---
+    
+    // Comando para análise de padrões de gastos
+    if (["analisar", "analise", "análise", "padroes", "padrões"].includes(textoLower)) {
+      if (!isGeminiAvailable()) {
+        await sock.sendMessage(userId, { 
+          text: '❌ Funcionalidade de análise inteligente não está disponível.\n\nConfigure a API key do Gemini para usar esta funcionalidade.' 
+        });
+        return;
+      }
+      
+      await sock.sendMessage(userId, { 
+        text: '🤖 *Analisando seus padrões de gastos...*\n\n⏳ Isso pode levar alguns segundos...' 
+      });
+      
+      try {
+        // Buscar dados dos últimos 3 meses
+        const hoje = new Date();
+        const dados = [];
+        
+        for (let i = 0; i < 3; i++) {
+          const mes = hoje.getMonth() - i;
+          const ano = hoje.getFullYear();
+          const resumo = await getResumoPorMes(userId, mes + 1, ano);
+          const gastosPorCategoria = await getGastosPorCategoria(userId, mes + 1, ano);
+          
+          dados.push({
+            mes: getNomeMes(mes),
+            ano: ano,
+            totalGastos: resumo.totalDespesas,
+            totalReceitas: resumo.totalReceitas,
+            saldo: resumo.saldo,
+            categorias: gastosPorCategoria
+          });
+        }
+        
+        const analise = await analisarPadroesGastos(userId, dados);
+        if (analise) {
+          await sock.sendMessage(userId, { text: analise });
+        } else {
+          await sock.sendMessage(userId, { 
+            text: '❌ Erro ao analisar padrões. Tente novamente mais tarde.' 
+          });
+        }
+      } catch (error) {
+        console.error('[ANALISE] Erro:', error);
+        await sock.sendMessage(userId, { 
+          text: '❌ Erro ao analisar padrões de gastos. Tente novamente.' 
+        });
+      }
+      return;
+    }
+
+    // Comando para sugestões de economia
+    if (["sugestoes", "sugestões", "dicas", "economia", "economizar"].includes(textoLower)) {
+      if (!isGeminiAvailable()) {
+        await sock.sendMessage(userId, { 
+          text: '❌ Funcionalidade de sugestões inteligentes não está disponível.\n\nConfigure a API key do Gemini para usar esta funcionalidade.' 
+        });
+        return;
+      }
+      
+      await sock.sendMessage(userId, { 
+        text: '💡 *Gerando sugestões de economia...*\n\n⏳ Analisando seus gastos...' 
+      });
+      
+      try {
+        // Buscar dados dos últimos 2 meses
+        const hoje = new Date();
+        const dados = [];
+        
+        for (let i = 0; i < 2; i++) {
+          const mes = hoje.getMonth() - i;
+          const ano = hoje.getFullYear();
+          const resumo = await getResumoPorMes(userId, mes + 1, ano);
+          const gastosPorCategoria = await getGastosPorCategoria(userId, mes + 1, ano);
+          
+          dados.push({
+            mes: getNomeMes(mes),
+            ano: ano,
+            totalGastos: resumo.totalDespesas,
+            categorias: gastosPorCategoria
+          });
+        }
+        
+        const sugestoes = await gerarSugestoesEconomia(userId, dados);
+        if (sugestoes) {
+          await sock.sendMessage(userId, { text: sugestoes });
+        } else {
+          await sock.sendMessage(userId, { 
+            text: '❌ Erro ao gerar sugestões. Tente novamente mais tarde.' 
+          });
+        }
+      } catch (error) {
+        console.error('[SUGESTOES] Erro:', error);
+        await sock.sendMessage(userId, { 
+          text: '❌ Erro ao gerar sugestões de economia. Tente novamente.' 
+        });
+      }
+      return;
+    }
+
+    // Comando para previsões de gastos
+    if (["previsao", "previsão", "prever", "futuro"].includes(textoLower)) {
+      if (!isGeminiAvailable()) {
+        await sock.sendMessage(userId, { 
+          text: '❌ Funcionalidade de previsões inteligentes não está disponível.\n\nConfigure a API key do Gemini para usar esta funcionalidade.' 
+        });
+        return;
+      }
+      
+      await sock.sendMessage(userId, { 
+        text: '🔮 *Analisando histórico para previsões...*\n\n⏳ Calculando tendências...' 
+      });
+      
+      try {
+        // Buscar dados dos últimos 6 meses
+        const hoje = new Date();
+        const dados = [];
+        
+        for (let i = 0; i < 6; i++) {
+          const mes = hoje.getMonth() - i;
+          const ano = hoje.getFullYear();
+          const resumo = await getResumoPorMes(userId, mes + 1, ano);
+          const gastosPorCategoria = await getGastosPorCategoria(userId, mes + 1, ano);
+          
+          dados.push({
+            mes: getNomeMes(mes),
+            ano: ano,
+            totalGastos: resumo.totalDespesas,
+            totalReceitas: resumo.totalReceitas,
+            categorias: gastosPorCategoria
+          });
+        }
+        
+        const previsao = await preverGastosFuturos(userId, dados);
+        if (previsao) {
+          await sock.sendMessage(userId, { text: previsao });
+        } else {
+          await sock.sendMessage(userId, { 
+            text: '❌ Erro ao gerar previsões. Tente novamente mais tarde.' 
+          });
+        }
+      } catch (error) {
+        console.error('[PREVISAO] Erro:', error);
+        await sock.sendMessage(userId, { 
+          text: '❌ Erro ao gerar previsões de gastos. Tente novamente.' 
+        });
+      }
+      return;
+    }
+
+    // Comando para ajuda inteligente
+    if (["ajuda inteligente", "ajuda financeira", "consulta", "pergunta"].includes(textoLower)) {
+      if (!isGeminiAvailable()) {
+        await sock.sendMessage(userId, { 
+          text: '❌ Funcionalidade de ajuda inteligente não está disponível.\n\nConfigure a API key do Gemini para usar esta funcionalidade.' 
+        });
+        return;
+      }
+      
+      await sock.sendMessage(userId, { 
+        text: '🤖 *Assistente Financeiro Inteligente*\n\n' +
+              'Pergunte sobre:\n' +
+              '• Como economizar dinheiro\n' +
+              '• Dicas de controle financeiro\n' +
+              '• Explicações sobre conceitos financeiros\n' +
+              '• Análise de seus padrões de gastos\n\n' +
+              'Digite sua pergunta ou digite "cancelar" para sair.'
+      });
+      
+      // Marcar que está aguardando pergunta
+      aguardandoPerguntaInteligente = aguardandoPerguntaInteligente || {};
+      aguardandoPerguntaInteligente[userId] = true;
+      return;
+    }
+
+    // Tratamento de perguntas inteligentes
+    if (aguardandoPerguntaInteligente && aguardandoPerguntaInteligente[userId]) {
+      if (textoLower === 'cancelar') {
+        delete aguardandoPerguntaInteligente[userId];
+        await sock.sendMessage(userId, { text: '❌ Consulta cancelada.' });
+        return;
+      }
+      
+      await sock.sendMessage(userId, { 
+        text: '🤖 *Processando sua pergunta...*\n\n⏳ Gerando resposta personalizada...' 
+      });
+      
+      try {
+        // Buscar contexto dos últimos 3 meses para personalizar a resposta
+        const hoje = new Date();
+        const contexto = [];
+        
+        for (let i = 0; i < 3; i++) {
+          const mes = hoje.getMonth() - i;
+          const ano = hoje.getFullYear();
+          const resumo = await getResumoPorMes(userId, mes + 1, ano);
+          contexto.push({
+            mes: getNomeMes(mes),
+            gastos: resumo.totalDespesas,
+            receitas: resumo.totalReceitas
+          });
+        }
+        
+        const resposta = await responderPerguntaFinanceira(texto, JSON.stringify(contexto));
+        if (resposta) {
+          await sock.sendMessage(userId, { text: resposta });
+        } else {
+          await sock.sendMessage(userId, { 
+            text: '❌ Erro ao processar pergunta. Tente novamente.' 
+          });
+        }
+      } catch (error) {
+        console.error('[PERGUNTA] Erro:', error);
+        await sock.sendMessage(userId, { 
+          text: '❌ Erro ao processar pergunta. Tente novamente.' 
+        });
+      }
+      
+      delete aguardandoPerguntaInteligente[userId];
+      return;
+    }
+
   } catch (error) {
     console.error('Erro ao iniciar o bot:', error);
     }
