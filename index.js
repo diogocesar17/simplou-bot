@@ -32,6 +32,7 @@ const {
   gerarMensagemAlertas
 } = require('./databaseService');
 const { getGastosCategoriaEspecifica, parseMonthYear, getNomeMes } = require('./googleSheetService');
+const { verificarEEnviarAlertas } = require('./alertasService');
 
 // Função utilitária para formatar valores de forma segura
 function formatarValor(valor, casasDecimais = 2) {
@@ -1954,6 +1955,34 @@ async function startBot() {
       });
       return;
       });
+
+    // --- AGENDAMENTO DE ALERTAS ---
+    console.log('🔔 Configurando sistema de alertas...');
+    
+    // Verificar alertas a cada hora (para garantir que não perca o horário da manhã)
+    setInterval(async () => {
+      try {
+        await verificarEEnviarAlertas(sock);
+      } catch (error) {
+        console.error('[ALERTAS] Erro ao verificar alertas:', error);
+      }
+    }, 60 * 60 * 1000); // 1 hora
+    
+    // Verificar alertas imediatamente ao iniciar (caso seja horário de alerta)
+    setTimeout(async () => {
+      try {
+        await verificarEEnviarAlertas(sock);
+      } catch (error) {
+        console.error('[ALERTAS] Erro na verificação inicial de alertas:', error);
+      }
+    }, 5000); // 5 segundos após iniciar
+    
+    console.log('✅ Sistema de alertas configurado');
+    console.log('📅 Alertas serão verificados a cada hora');
+    console.log('⏰ Horário de envio: 8h às 12h da manhã');
+    console.log('💳 Alertas: Cartões (3 dias antes + dia do vencimento)');
+    console.log('📄 Alertas: Boletos (3 dias antes + dia do vencimento)');
+
   } catch (error) {
     console.error('Erro ao iniciar o bot:', error);
     }
