@@ -2,6 +2,7 @@ require('dotenv').config();
 const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const http = require('http');
+const { ADMIN_USERS, AUTHORIZED_USERS, SYSTEM_CONFIG, listUsers } = require('./config.js');
 const { parseMessage, categoriasCadastradas, isDataMuitoDistante, formasPagamento, mapeamentoFormasPagamento } = require('./messageParser');
 const { analisarMensagemInteligente } = require('./intelligentParser');
 const { 
@@ -1102,6 +1103,178 @@ async function startBot() {
         return;
       }
 
+      // --- COMANDOS ADMINISTRATIVOS ---
+      
+      // Comando para verificar status do sistema (apenas admin)
+      if (textoLower === 'status') {
+        if (!ADMIN_USERS.includes(userId)) {
+          await sock.sendMessage(userId, { text: '❌ Acesso negado. Apenas administradores podem usar este comando.' });
+          return;
+        }
+        
+        try {
+          const { pool, registrarLog } = require('./databaseService');
+          const result = await pool.query('SELECT COUNT(*) as total FROM lancamentos');
+          const totalLancamentos = result.rows[0].total;
+          
+          const stats = await listUsers();
+          const msg = `📊 *Status do Sistema*\n\n` +
+                     `👥 Usuários: ${stats.total}/${stats.max}\n` +
+                     `📋 Total de lançamentos: ${totalLancamentos}\n` +
+                     `🤖 Versão: ${SYSTEM_CONFIG.VERSION}\n` +
+                     `⏰ Última verificação: ${new Date().toLocaleString('pt-BR')}`;
+          
+          await sock.sendMessage(userId, { text: msg });
+          
+          // Registrar log de auditoria
+          await registrarLog(userId, 'COMANDO_ADMIN', 'Status do sistema consultado');
+        } catch (error) {
+          console.error('[STATUS] Erro:', error);
+          await sock.sendMessage(userId, { text: '❌ Erro ao verificar status do sistema.' });
+        }
+        return;
+      }
+
+      // Comando para limpar dados antigos (apenas admin)
+      if (textoLower === 'limpar') {
+        if (!ADMIN_USERS.includes(userId)) {
+          await sock.sendMessage(userId, { text: '❌ Acesso negado. Apenas administradores podem usar este comando.' });
+          return;
+        }
+        
+        await sock.sendMessage(userId, { 
+          text: '🧹 *Iniciando limpeza de dados antigos...*\n\n⏳ Isso pode levar alguns segundos...' 
+        });
+        
+        try {
+          const { limparDadosAntigos, registrarLog } = require('./databaseService');
+          const resultado = await limparDadosAntigos();
+          
+          const msg = `✅ *Limpeza concluída!*\n\n` +
+                     `🗑️ Lançamentos removidos: ${resultado.lancamentosRemovidos}\n` +
+                     `💳 Cartões removidos: ${resultado.cartoesRemovidos}\n` +
+                     `📅 Dados mais antigos que ${SYSTEM_CONFIG.CLEANUP_RETENTION_DAYS} dias foram removidos\n` +
+                     `💾 Backup automático gerado antes da limpeza`;
+          
+          await sock.sendMessage(userId, { text: msg });
+          
+          // Registrar log de auditoria
+          await registrarLog(userId, 'COMANDO_ADMIN', `Limpeza executada: ${resultado.lancamentosRemovidos} lançamentos removidos`);
+        } catch (error) {
+          console.error('[LIMPAR] Erro:', error);
+          await sock.sendMessage(userId, { text: '❌ Erro ao limpar dados antigos.' });
+        }
+        return;
+      }
+
+      // Comando para gerar backup (todos os usuários autorizados)
+      if (textoLower === 'backup') {
+        if (!AUTHORIZED_USERS.includes(userId)) {
+          await sock.sendMessage(userId, { text: '❌ Acesso negado. Apenas usuários autorizados podem usar este comando.' });
+          return;
+        }
+        
+        await sock.sendMessage(userId, { 
+          text: '💾 *Gerando backup dos seus dados...*\n\n⏳ Isso pode levar alguns segundos...' 
+        });
+        
+        try {
+          const { gerarBackupCSV, registrarLog } = require('./databaseService');
+          const csvData = await gerarBackupCSV(userId);
+          // Se csvData for objeto, pegar o campo csvContent
+          const csvString = typeof csvData === 'string' ? csvData : (csvData && (csvData.csv || csvData.csvContent) ? (csvData.csv || csvData.csvContent) : '');
+          if (!csvString) throw new Error('Backup vazio ou erro ao gerar CSV.');
+          // Enviar arquivo CSV como anexo
+          const buffer = Buffer.from(csvString, 'utf-8');
+          const fileName = `backup_financebot_${userId.split('@')[0]}_${new Date().toISOString().split('T')[0]}.csv`;
+          
+          await sock.sendMessage(userId, {
+            document: buffer,
+            fileName: fileName,
+            mimetype: 'text/csv',
+            caption: `✅ *Backup gerado com sucesso!*\n\n📁 Arquivo: ${fileName}\n📊 Seus dados foram exportados em formato CSV\n💡 Guarde este arquivo em local seguro`
+          });
+          
+          // Registrar log de auditoria
+          await registrarLog(userId, 'COMANDO_BACKUP', `Backup gerado: ${fileName}`);
+        } catch (error) {
+          console.error('[BACKUP] Erro:', error);
+          await sock.sendMessage(userId, { text: '❌ Erro ao gerar backup.' });
+        }
+        return;
+      }
+
+      // Comando para logs (admin, aceita maiúsculas/minúsculas)
+      if (textoLower === 'logs') {
+        if (!ADMIN_USERS.includes(userId)) {
+          await sock.sendMessage(userId, { text: '❌ Acesso negado. Apenas administradores podem usar este comando.' });
+          return;
+        }
+        try {
+          const { gerarLogAuditoria, registrarLog } = require('./databaseService');
+          const logData = await gerarLogAuditoria();
+          const logString = typeof logData === 'string' ? logData : (logData && logData.csv ? logData.csv : '');
+          if (!logString) throw new Error('Log vazio ou erro ao gerar CSV.');
+          const buffer = Buffer.from(logString, 'utf-8');
+          const fileName = `logs_financebot_${new Date().toISOString().split('T')[0]}.csv`;
+          await sock.sendMessage(userId, {
+            document: buffer,
+            fileName: fileName,
+            mimetype: 'text/csv',
+            caption: `✅ *Logs de auditoria gerados com sucesso!*\n\n📁 Arquivo: ${fileName}`
+          });
+          
+          // Registrar log de auditoria
+          await registrarLog(userId, 'COMANDO_ADMIN', `Logs de auditoria gerados: ${fileName}`);
+        } catch (error) {
+          console.error('[LOGS] Erro:', error);
+          await sock.sendMessage(userId, { text: '❌ Erro ao gerar logs de auditoria.' });
+        }
+        return;
+      }
+
+      // Comando para descobrir ID do WhatsApp
+      if (textoLower === 'meuid') {
+        const msg = `🆔 *Seu ID do WhatsApp:*\n\n` +
+                   `📱 ${userId}\n\n` +
+                   `💡 *Como usar:*\n` +
+                   `1. Copie este ID\n` +
+                   `2. Adicione no arquivo config.js\n` +
+                   `3. Reinicie o bot\n\n` +
+                   `⚠️ *Importante:* Mantenha este ID seguro!`;
+        
+        await sock.sendMessage(userId, { text: msg });
+        return;
+      }
+
+      // Comando para verificar quem sou eu
+      if (textoLower === 'quemsou') {
+        const isAdmin = ADMIN_USERS.includes(userId);
+        const isAuthorized = AUTHORIZED_USERS.includes(userId);
+        
+        let msg = `👤 *Informações do seu usuário:*\n\n`;
+        msg += `📱 ID: ${userId}\n`;
+        msg += `🔐 Status: `;
+        
+        if (isAdmin) {
+          msg += `👑 *Administrador*\n`;
+          msg += `✅ Acesso total ao sistema\n`;
+          msg += `🔧 Comandos admin disponíveis: status, limpar\n`;
+        } else if (isAuthorized) {
+          msg += `✅ *Usuário autorizado*\n`;
+          msg += `✅ Acesso normal ao sistema\n`;
+        } else {
+          msg += `❌ *Não autorizado*\n`;
+          msg += `❌ Sem acesso ao sistema\n`;
+          msg += `💡 Peça ao administrador para adicionar seu ID`;
+        }
+        
+        msg += `\n📊 Comandos disponíveis: ajuda`;
+        
+        await sock.sendMessage(userId, { text: msg });
+        return;
+      }
+
       // --- FLUXO DE ESCOLHA DO CAMPO (NUMERADO) ---
       if (aguardandoEdicao[userId] && aguardandoEdicao[userId].etapa === 'campo') {
         const op = texto.trim();
@@ -1127,7 +1300,7 @@ async function startBot() {
         await sock.sendMessage(userId, { text: `Digite o novo valor para o campo *${campoEscolhido}*:` });
         return;
       }
-
+      
       // --- FLUXO DE EDIÇÃO DE VALOR DO CAMPO ---
       if (aguardandoEdicao[userId] && aguardandoEdicao[userId].etapa === 'valor') {
         const { lista, idx, lancamento, campo } = aguardandoEdicao[userId];

@@ -324,25 +324,50 @@ function formatarDataParaISO(dataBR) {
 
 // Funções para gerenciar cartões de crédito
 async function salvarConfiguracaoCartao(userId, nomeCartao, diaVencimento, diaFechamento = null) {
-  const query = `
-    INSERT INTO cartoes_config (user_id, nome_cartao, dia_vencimento, dia_fechamento)
-    VALUES ($1, $2, $3, $4)
-    ON CONFLICT (user_id, nome_cartao) 
-    DO UPDATE SET dia_vencimento = $3, dia_fechamento = $4, criado_em = CURRENT_TIMESTAMP
-    RETURNING id
-  `;
-  const result = await pool.query(query, [userId, nomeCartao, diaVencimento, diaFechamento]);
-  return result.rows[0].id;
+  try {
+    const query = `
+      INSERT INTO cartoes_config (user_id, nome_cartao, dia_vencimento, dia_fechamento)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (user_id, nome_cartao) 
+      DO UPDATE SET 
+        dia_vencimento = EXCLUDED.dia_vencimento,
+        dia_fechamento = EXCLUDED.dia_fechamento
+      RETURNING id
+    `;
+    
+    const result = await pool.query(query, [userId, nomeCartao, diaVencimento, diaFechamento]);
+    
+    // Registrar log de auditoria
+    const detalhes = `Cartão: ${nomeCartao}, Vencimento: dia ${diaVencimento}, Fechamento: dia ${diaFechamento || 'N/A'}`;
+    await registrarLog(userId, 'CONFIGURAR_CARTAO', detalhes);
+    
+    return result.rows[0].id;
+  } catch (error) {
+    console.error('❌ Erro ao salvar configuração de cartão:', error);
+    throw error;
+  }
 }
 
 async function atualizarCartaoConfigurado(userId, nomeCartao, diaVencimento, diaFechamento = null) {
-  const query = `
-    UPDATE cartoes_config SET dia_vencimento = $3, dia_fechamento = $4, criado_em = CURRENT_TIMESTAMP
-    WHERE user_id = $1 AND nome_cartao = $2
-    RETURNING *
-  `;
-  const result = await pool.query(query, [userId, nomeCartao, diaVencimento, diaFechamento]);
-  return result.rows[0];
+  try {
+    const query = `
+      UPDATE cartoes_config 
+      SET dia_vencimento = $3, dia_fechamento = $4
+      WHERE user_id = $1 AND nome_cartao = $2
+      RETURNING id
+    `;
+    
+    const result = await pool.query(query, [userId, nomeCartao, diaVencimento, diaFechamento]);
+    
+    // Registrar log de auditoria
+    const detalhes = `Cartão: ${nomeCartao}, Vencimento: dia ${diaVencimento}, Fechamento: dia ${diaFechamento || 'N/A'}`;
+    await registrarLog(userId, 'ATUALIZAR_CARTAO', detalhes);
+    
+    return result.rows[0]?.id;
+  } catch (error) {
+    console.error('❌ Erro ao atualizar configuração de cartão:', error);
+    throw error;
+  }
 }
 
 async function buscarConfiguracaoCartao(userId, nomeCartao) {
@@ -413,38 +438,56 @@ function calcularDataContabilizacao(dataLancamento, diaVencimento, diaFechamento
 
 // Funções para operações CRUD
 async function appendRowToDatabase(userId, values) {
-  // Suporte a novos campos opcionais
-  let [data, tipo, descricao, valor, categoria, pagamento, parcelamento_id, parcela_atual, total_parcelas, recorrente, recorrente_fim, recorrente_id, cartao_nome, data_lancamento, data_contabilizacao, mes_fatura, ano_fatura, dia_vencimento, status_fatura, data_vencimento] = values;
-  data = formatarDataParaISO(data);
-  tipo = tipo.toLowerCase();
-
-  // Monta query dinâmica conforme os campos fornecidos
-  const campos = ['user_id', 'data', 'tipo', 'descricao', 'valor', 'categoria', 'pagamento'];
-  const params = [userId, data, tipo, descricao, valor, categoria, pagamento];
-
-  if (parcelamento_id !== undefined) { campos.push('parcelamento_id'); params.push(parcelamento_id); }
-  if (parcela_atual !== undefined) { campos.push('parcela_atual'); params.push(parcela_atual); }
-  if (total_parcelas !== undefined) { campos.push('total_parcelas'); params.push(total_parcelas); }
-  if (recorrente !== undefined) { campos.push('recorrente'); params.push(recorrente); }
-  if (recorrente_fim !== undefined) { campos.push('recorrente_fim'); params.push(recorrente_fim); }
-  if (recorrente_id !== undefined) { campos.push('recorrente_id'); params.push(recorrente_id); }
-  if (cartao_nome !== undefined) { campos.push('cartao_nome'); params.push(cartao_nome); }
-  if (data_lancamento !== undefined) { campos.push('data_lancamento'); params.push(data_lancamento); }
-  if (data_contabilizacao !== undefined) { campos.push('data_contabilizacao'); params.push(data_contabilizacao); }
-  if (mes_fatura !== undefined) { campos.push('mes_fatura'); params.push(mes_fatura); }
-  if (ano_fatura !== undefined) { campos.push('ano_fatura'); params.push(ano_fatura); }
-  if (dia_vencimento !== undefined) { campos.push('dia_vencimento'); params.push(dia_vencimento); }
-  if (status_fatura !== undefined) { campos.push('status_fatura'); params.push(status_fatura); }
-  if (data_vencimento !== undefined) { campos.push('data_vencimento'); params.push(data_vencimento); }
-
-  const placeholders = params.map((_, i) => `$${i + 1}`);
-  const query = `
-    INSERT INTO lancamentos (${campos.join(', ')})
-    VALUES (${placeholders.join(', ')})
-    RETURNING id
-  `;
-  const result = await pool.query(query, params);
-  return result.rows[0].id;
+  try {
+    const query = `
+      INSERT INTO lancamentos (
+        user_id, data, tipo, descricao, valor, categoria, pagamento,
+        parcelamento_id, parcela_atual, total_parcelas,
+        recorrente, recorrente_fim, recorrente_id,
+        cartao_nome, data_lancamento, data_contabilizacao,
+        mes_fatura, ano_fatura, dia_vencimento, status_fatura, data_vencimento
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      RETURNING id
+    `;
+    
+    const result = await pool.query(query, [userId, ...values]);
+    const lancamentoId = result.rows[0].id;
+    
+    // Registrar log de auditoria
+    const tipo = values[1] || 'gasto';
+    const valor = values[3] || 0;
+    const categoria = values[4] || 'Outros';
+    const pagamento = values[5] || 'NÃO INFORMADO';
+    const descricao = values[2] || 'Lançamento';
+    
+    let acao = 'CRIAR_LANCAMENTO';
+    let detalhes = `Tipo: ${tipo}, Valor: R$ ${valor}, Categoria: ${categoria}, Pagamento: ${pagamento}`;
+    
+    // Verificar se é parcelamento
+    if (values[6]) { // parcelamento_id
+      acao = 'CRIAR_PARCELAMENTO';
+      const totalParcelas = values[8] || 0;
+      detalhes += `, Parcelamento: ${totalParcelas}x`;
+    }
+    
+    // Verificar se é recorrente
+    if (values[10]) { // recorrente
+      acao = 'CRIAR_RECORRENTE';
+      detalhes += `, Recorrente: ${values[11] || 'N/A'}`;
+    }
+    
+    // Verificar se é cartão
+    if (values[13]) { // cartao_nome
+      detalhes += `, Cartão: ${values[13]}`;
+    }
+    
+    await registrarLog(userId, acao, detalhes);
+    
+    return lancamentoId;
+  } catch (error) {
+    console.error('❌ Erro ao adicionar lançamento:', error);
+    throw error;
+  }
 }
 
 async function getDatabaseData(userId) {
@@ -555,12 +598,15 @@ async function getResumoPorMes(userId, mes, ano) {
       COUNT(*) as quantidade
     FROM lancamentos 
     WHERE user_id = $1 
-      AND EXTRACT(MONTH FROM data) = $2
-      AND EXTRACT(YEAR FROM data) = $3
+      AND (
+        (EXTRACT(MONTH FROM data) = $2 AND EXTRACT(YEAR FROM data) = $3)
+        OR
+        (data_contabilizacao IS NOT NULL AND EXTRACT(MONTH FROM data_contabilizacao) = $2 AND EXTRACT(YEAR FROM data_contabilizacao) = $3)
+      )
     GROUP BY tipo
   `;
   
-  const params = [userId, mes, ano]; // Removido o +1, pois parseMesAno já retorna 1-12
+  const params = [userId, mes, ano];
   console.log('[DEBUG] Query params:', params);
   console.log('[DEBUG] Query SQL:', query);
   
@@ -685,12 +731,26 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
       // Ordena o grupo por criado_em para pegar o mais recente como representante
       grupo.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
       const representante = grupo[0]; // Pega o mais recente
-      // Valor total = valor da parcela * total de parcelas
-      const valorTotal = parseFloat(representante.valor) * parseInt(representante.total_parcelas);
+      
+      // Se é histórico por período, mostra apenas o valor da parcela específica
+      // Se é histórico geral, mostra o valor total do parcelamento
+      let valorParaMostrar;
+      let descricaoParaMostrar;
+      
+      if (mes !== null && ano !== null) {
+        // Histórico por período: mostra apenas o valor da parcela
+        valorParaMostrar = parseFloat(representante.valor);
+        descricaoParaMostrar = `${representante.descricao.replace(/\(1\/\d+\)/, '').trim()} (${representante.parcela_atual}/${representante.total_parcelas})`;
+      } else {
+        // Histórico geral: mostra o valor total do parcelamento
+        valorParaMostrar = parseFloat(representante.valor) * parseInt(representante.total_parcelas);
+        descricaoParaMostrar = `${representante.descricao.replace(/\(1\/\d+\)/, '').trim()} (${representante.total_parcelas}x de R$ ${formatarValor(representante.valor)})`;
+      }
+      
       lancamentosAgrupados.push({
         ...representante,
-        valor: valorTotal,
-        descricao: `${representante.descricao.replace(/\(1\/\d+\)/, '').trim()} (${representante.total_parcelas}x de R$ ${formatarValor(representante.valor)})`,
+        valor: valorParaMostrar,
+        descricao: descricaoParaMostrar,
         agrupado: true,
         tipoAgrupamento: 'parcelado',
         grupo: grupo
@@ -760,76 +820,119 @@ async function getLancamentoPorId(userId, id) {
 }
 
 async function atualizarLancamentoPorId(userId, id, novosDados) {
-  // Verifica se novosDados existe e tem conteúdo
-  if (!novosDados || Object.keys(novosDados).length === 0) {
-    throw new Error('Dados de atualização não fornecidos');
-  }
+  try {
+    // Buscar informações do lançamento antes de atualizar
+    const lancamentoAntes = await getLancamentoPorId(userId, id);
+    
+    const campos = [];
+    const valores = [];
+    let paramIndex = 1;
 
-  // Constrói a query dinamicamente baseada nos campos fornecidos
-  const campos = [];
-  const valores = [];
-  let paramIndex = 1;
+    // Adiciona os campos a serem atualizados
+    if (novosDados.data !== undefined) {
+      campos.push(`data = $${paramIndex}`);
+      valores.push(formatarDataParaISO(novosDados.data));
+      paramIndex++;
+    }
+    if (novosDados.tipo !== undefined) {
+      campos.push(`tipo = $${paramIndex}`);
+      valores.push(novosDados.tipo.toLowerCase());
+      paramIndex++;
+    }
+    if (novosDados.descricao !== undefined) {
+      campos.push(`descricao = $${paramIndex}`);
+      valores.push(novosDados.descricao);
+      paramIndex++;
+    }
+    if (novosDados.valor !== undefined) {
+      campos.push(`valor = $${paramIndex}`);
+      valores.push(novosDados.valor);
+      paramIndex++;
+    }
+    if (novosDados.categoria !== undefined) {
+      campos.push(`categoria = $${paramIndex}`);
+      valores.push(novosDados.categoria);
+      paramIndex++;
+    }
+    if (novosDados.pagamento !== undefined) {
+      campos.push(`pagamento = $${paramIndex}`);
+      valores.push(novosDados.pagamento);
+      paramIndex++;
+    }
 
-  if (novosDados.data !== undefined) {
-    campos.push(`data = $${paramIndex}`);
-    valores.push(novosDados.data);
-    paramIndex++;
-  }
-  if (novosDados.tipo !== undefined) {
-    campos.push(`tipo = $${paramIndex}`);
-    valores.push(novosDados.tipo);
-    paramIndex++;
-  }
-  if (novosDados.descricao !== undefined) {
-    campos.push(`descricao = $${paramIndex}`);
-    valores.push(novosDados.descricao);
-    paramIndex++;
-  }
-  if (novosDados.valor !== undefined) {
-    campos.push(`valor = $${paramIndex}`);
-    valores.push(novosDados.valor);
-    paramIndex++;
-  }
-  if (novosDados.categoria !== undefined) {
-    campos.push(`categoria = $${paramIndex}`);
-    valores.push(novosDados.categoria);
-    paramIndex++;
-  }
-  if (novosDados.pagamento !== undefined) {
-    campos.push(`pagamento = $${paramIndex}`);
-    valores.push(novosDados.pagamento);
-    paramIndex++;
-  }
+    if (campos.length === 0) {
+      throw new Error('Nenhum campo foi fornecido para atualização');
+    }
 
-  // Adiciona sempre o campo atualizado_em
-  campos.push(`atualizado_em = CURRENT_TIMESTAMP`);
+    campos.push(`atualizado_em = CURRENT_TIMESTAMP`);
 
-  // Adiciona os parâmetros de WHERE
-  valores.push(userId, id);
+    // Adiciona os parâmetros de WHERE
+    valores.push(userId, id);
 
-  const query = `
-    UPDATE lancamentos 
-    SET ${campos.join(', ')}
-    WHERE user_id = $${paramIndex} AND id = $${paramIndex + 1}
-    RETURNING id
-  `;
-  
-  console.log('[DEBUG] Query de atualização:', query);
-  console.log('[DEBUG] Valores:', valores);
-  
-  const result = await pool.query(query, valores);
-  return result.rows[0];
+    const query = `
+      UPDATE lancamentos 
+      SET ${campos.join(', ')}
+      WHERE user_id = $${paramIndex} AND id = $${paramIndex + 1}
+      RETURNING id
+    `;
+    
+    console.log('[DEBUG] Query de atualização:', query);
+    console.log('[DEBUG] Valores:', valores);
+    
+    const result = await pool.query(query, valores);
+    
+    // Registrar log de auditoria
+    if (lancamentoAntes) {
+      const mudancas = [];
+      if (novosDados.data !== undefined && novosDados.data !== lancamentoAntes.data) {
+        mudancas.push(`Data: ${lancamentoAntes.data} → ${novosDados.data}`);
+      }
+      if (novosDados.tipo !== undefined && novosDados.tipo !== lancamentoAntes.tipo) {
+        mudancas.push(`Tipo: ${lancamentoAntes.tipo} → ${novosDados.tipo}`);
+      }
+      if (novosDados.valor !== undefined && novosDados.valor !== lancamentoAntes.valor) {
+        mudancas.push(`Valor: R$ ${lancamentoAntes.valor} → R$ ${novosDados.valor}`);
+      }
+      if (novosDados.categoria !== undefined && novosDados.categoria !== lancamentoAntes.categoria) {
+        mudancas.push(`Categoria: ${lancamentoAntes.categoria} → ${novosDados.categoria}`);
+      }
+      if (novosDados.pagamento !== undefined && novosDados.pagamento !== lancamentoAntes.pagamento) {
+        mudancas.push(`Pagamento: ${lancamentoAntes.pagamento} → ${novosDados.pagamento}`);
+      }
+      if (novosDados.descricao !== undefined && novosDados.descricao !== lancamentoAntes.descricao) {
+        mudancas.push(`Descrição: ${lancamentoAntes.descricao} → ${novosDados.descricao}`);
+      }
+      
+      if (mudancas.length > 0) {
+        const detalhes = `ID: ${id}, Mudanças: ${mudancas.join(', ')}`;
+        await registrarLog(userId, 'EDITAR_LANCAMENTO', detalhes);
+      }
+    }
+    
+    return result.rows[0];
+  } catch (error) {
+    console.error('❌ Erro ao atualizar lançamento:', error);
+    throw error;
+  }
 }
 
 async function excluirLancamentoPorId(userId, id) {
-  const query = `
-    DELETE FROM lancamentos 
-    WHERE user_id = $1 AND id = $2
-    RETURNING id
-  `;
-  
-  const result = await pool.query(query, [userId, id]);
-  return result.rows[0];
+  try {
+    // Buscar informações do lançamento antes de excluir
+    const lancamento = await getLancamentoPorId(userId, id);
+    
+    const query = `DELETE FROM lancamentos WHERE user_id = $1 AND id = $2`;
+    await pool.query(query, [userId, id]);
+    
+    // Registrar log de auditoria
+    if (lancamento) {
+      const detalhes = `ID: ${id}, Tipo: ${lancamento.tipo}, Valor: R$ ${lancamento.valor}, Categoria: ${lancamento.categoria}, Descrição: ${lancamento.descricao}`;
+      await registrarLog(userId, 'EXCLUIR_LANCAMENTO', detalhes);
+    }
+  } catch (error) {
+    console.error('❌ Erro ao excluir lançamento:', error);
+    throw error;
+  }
 }
 
 // Consulta total de gastos por tipo de pagamento
@@ -856,24 +959,66 @@ async function getTotalGastosPorPagamento(userId, pagamento, mes = null, ano = n
 
 // Excluir todas as parcelas de um parcelamento
 async function excluirParcelamentoPorId(userId, parcelamentoId) {
-  const query = `
-    DELETE FROM lancamentos
-    WHERE user_id = $1 AND parcelamento_id = $2
-    RETURNING id
-  `;
-  const result = await pool.query(query, [userId, parcelamentoId]);
-  return result.rowCount;
+  try {
+    // Buscar informações do parcelamento antes de excluir
+    const query = `
+      SELECT COUNT(*) as total_parcelas, SUM(valor) as valor_total, descricao, categoria
+      FROM lancamentos 
+      WHERE user_id = $1 AND parcelamento_id = $2
+    `;
+    const result = await pool.query(query, [userId, parcelamentoId]);
+    const info = result.rows[0];
+    
+    const deleteQuery = `
+      DELETE FROM lancamentos
+      WHERE user_id = $1 AND parcelamento_id = $2
+      RETURNING id
+    `;
+    const deleteResult = await pool.query(deleteQuery, [userId, parcelamentoId]);
+    
+    // Registrar log de auditoria
+    if (info && info.total_parcelas > 0) {
+      const detalhes = `Parcelamento ID: ${parcelamentoId}, Parcelas: ${info.total_parcelas}, Valor Total: R$ ${info.valor_total}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
+      await registrarLog(userId, 'EXCLUIR_PARCELAMENTO', detalhes);
+    }
+    
+    return deleteResult.rowCount;
+  } catch (error) {
+    console.error('❌ Erro ao excluir parcelamento:', error);
+    throw error;
+  }
 }
 
 // Excluir todos os lançamentos futuros de um recorrente
 async function excluirRecorrentePorId(userId, recorrenteId) {
-  const query = `
-    DELETE FROM lancamentos
-    WHERE user_id = $1 AND recorrente_id = $2 AND data >= CURRENT_DATE
-    RETURNING id
-  `;
-  const result = await pool.query(query, [userId, recorrenteId]);
-  return result.rowCount;
+  try {
+    // Buscar informações do recorrente antes de excluir
+    const query = `
+      SELECT COUNT(*) as total_recorrencias, valor, descricao, categoria
+      FROM lancamentos 
+      WHERE user_id = $1 AND recorrente_id = $2
+    `;
+    const result = await pool.query(query, [userId, recorrenteId]);
+    const info = result.rows[0];
+    
+    const deleteQuery = `
+      DELETE FROM lancamentos
+      WHERE user_id = $1 AND recorrente_id = $2 AND data >= CURRENT_DATE
+      RETURNING id
+    `;
+    const deleteResult = await pool.query(deleteQuery, [userId, recorrenteId]);
+    
+    // Registrar log de auditoria
+    if (info && info.total_recorrencias > 0) {
+      const detalhes = `Recorrente ID: ${recorrenteId}, Recorrências: ${info.total_recorrencias}, Valor: R$ ${info.valor}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
+      await registrarLog(userId, 'EXCLUIR_RECORRENTE', detalhes);
+    }
+    
+    return deleteResult.rowCount;
+  } catch (error) {
+    console.error('❌ Erro ao excluir recorrente:', error);
+    throw error;
+  }
 }
 
 // Buscar lançamentos agrupados para exclusão (similar à listagem mas com foco na exclusão)
@@ -949,8 +1094,40 @@ async function buscarLancamentosParaExclusao(userId, limite = 20) {
   return lancamentosAgrupados;
 }
 
+// Função para normalizar texto removendo acentos
+function normalizarTexto(texto) {
+  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
 // Buscar faturas de cartão por mês/ano
 async function buscarFaturaCartao(userId, nomeCartao, mes, ano) {
+  // Normalizar o nome do cartão para remover acentos
+  const nomeCartaoNormalizado = normalizarTexto(nomeCartao);
+  
+  // Buscar todos os cartões configurados para encontrar matches
+  const cartoesQuery = `
+    SELECT nome_cartao
+    FROM cartoes_config 
+    WHERE user_id = $1
+  `;
+  
+  const cartoesResult = await pool.query(cartoesQuery, [userId]);
+  const cartoes = cartoesResult.rows;
+  
+  // Encontrar o nome exato do cartão que corresponde ao input normalizado
+  let nomeCartaoExato = null;
+  for (const cartao of cartoes) {
+    if (normalizarTexto(cartao.nome_cartao) === nomeCartaoNormalizado) {
+      nomeCartaoExato = cartao.nome_cartao;
+      break;
+    }
+  }
+  
+  // Se não encontrou match, usar o nome original
+  if (!nomeCartaoExato) {
+    nomeCartaoExato = nomeCartao;
+  }
+  
   const query = `
     SELECT id, data_lancamento, descricao, valor, categoria, data_contabilizacao, dia_vencimento
     FROM lancamentos 
@@ -961,7 +1138,7 @@ async function buscarFaturaCartao(userId, nomeCartao, mes, ano) {
     ORDER BY data_lancamento ASC
   `;
   
-  const result = await pool.query(query, [userId, nomeCartao, mes, ano]);
+  const result = await pool.query(query, [userId, `%${nomeCartaoExato}%`, mes, ano]);
   return result.rows;
 }
 
@@ -1428,6 +1605,36 @@ async function limparDadosAntigos() {
   }
 }
 
+/**
+ * Gera log de auditoria em formato CSV
+ */
+async function gerarLogAuditoria(limite = 100) {
+  try {
+    const query = `
+      SELECT user_id, acao, detalhes, timestamp
+      FROM logs_auditoria
+      ORDER BY timestamp DESC
+      LIMIT $1
+    `;
+    const result = await pool.query(query, [limite]);
+    const logs = result.rows;
+    const headers = ['User ID', 'Ação', 'Detalhes', 'Timestamp'];
+    let csv = headers.join(',') + '\n';
+    logs.forEach(log => {
+      csv += [
+        log.user_id,
+        log.acao,
+        '"' + (log.detalhes ? log.detalhes.replace(/"/g, '""') : '') + '"',
+        log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : ''
+      ].join(',') + '\n';
+    });
+    return { csv, total: logs.length };
+  } catch (error) {
+    console.error('[LOGS] Erro ao gerar log de auditoria:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   pool,
   initializeDatabase,
@@ -1437,30 +1644,35 @@ module.exports = {
   getResumoDoDia,
   getResumoPorMes,
   getGastosPorCategoria,
+  listarLancamentos,
+  formatarValor,
   getUltimosLancamentos,
   getLancamentoPorId,
   atualizarLancamentoPorId,
   excluirLancamentoPorId,
   getTotalGastosPorPagamento,
   excluirParcelamentoPorId,
-  listarLancamentos,
   excluirRecorrentePorId,
   buscarLancamentosParaExclusao,
-  salvarConfiguracaoCartao,
-  buscarConfiguracaoCartao,
-  listarCartoesConfigurados,
-  calcularDataContabilizacao,
   buscarFaturaCartao,
   getResumoReal,
-  atualizarCartaoConfigurado,
-  formatarDataParaISO,
+  buscarCartoesVencimentoProximo,
+  buscarBoletosVencimentoProximo,
   buscarAlertasDoDia,
+  formatarAlertaCartao,
+  formatarAlertaBoleto,
   gerarMensagemAlertas,
   queryDatabase,
-  // Novas funções de administração
   registrarLog,
   buscarLogsRecentes,
   gerarEstatisticasSistema,
   gerarBackupCSV,
-  limparDadosAntigos
+  limparDadosAntigos,
+  gerarLogAuditoria,
+  salvarConfiguracaoCartao,
+  atualizarCartaoConfigurado,
+  buscarConfiguracaoCartao,
+  listarCartoesConfigurados,
+  calcularDataContabilizacao,
+  normalizarTexto
 }; 
