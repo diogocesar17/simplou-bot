@@ -73,3 +73,12 @@ dump.rdb
 # Temporary files
 tmp/
 temp/
+
+test-*.js
+# Arquivos de teste temporários
+*.test.js
+*.spec.js
+
+# Arquivos de planejamento e roadmap (opcional, remova se quiser versionar)
+PLANO-RELATORIO-MENSAL.txt
+ROADMAP-*.md
