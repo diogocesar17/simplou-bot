@@ -150,7 +150,7 @@ async function buscarBoletosParaAlerta() {
  */
 function gerarMensagemAlertaCartao(cartao, tipoAlerta, diasRestantes) {
   const dataVencimento = calcularVencimentoCartao(cartao.dia_vencimento);
-  const dataFormatada = dataVencimento.toLocaleDateString('pt-BR');
+  const dataFormatada = dataVencimento.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   
   if (tipoAlerta === '3_dias_antes') {
     return `💳 *Alerta de Cartão de Crédito*\n\n` +
@@ -171,7 +171,7 @@ function gerarMensagemAlertaCartao(cartao, tipoAlerta, diasRestantes) {
  */
 function gerarMensagemAlertaBoleto(boleto, tipoAlerta, diasRestantes) {
   const dataVencimento = new Date(boleto.data_vencimento);
-  const dataFormatada = dataVencimento.toLocaleDateString('pt-BR');
+  const dataFormatada = dataVencimento.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   const valorNumerico = Number(boleto.valor);
   
   if (tipoAlerta === '3_dias_antes') {

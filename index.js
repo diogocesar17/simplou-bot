@@ -902,6 +902,22 @@ async function startBot() {
         });
         return;
       }
+
+      // --- MENSAGENS DE BOAS-VINDAS ---
+      if (["oi", "olá", "ola", "hello", "hi", "ei", "opa"].includes(textoLower)) {
+        await sock.sendMessage(userId, {
+          text: `🤖 *Olá! Bem-vindo ao FinanceBot!*\n\n` +
+                `💰 *Seu assistente financeiro pessoal*\n\n` +
+                `📊 *Comandos principais:*\n` +
+                `• resumo: ver resumo do mês\n` +
+                `• gastei 50 no mercado: registrar gasto\n` +
+                `• recebi 1000 salário: registrar receita\n` +
+                `• histórico: ver últimos lançamentos\n` +
+                `• ajuda: menu completo\n\n` +
+                `💡 *Dica:* Digite *ajuda* para ver todos os comandos disponíveis!`
+        });
+        return;
+      }
       if (["cartoes", "cartões"].includes(textoLower)) {
         const cartoes = await listarCartoesConfigurados(userId);
         if (!cartoes || cartoes.length === 0) {

@@ -78,6 +78,17 @@ async function initializeDatabase() {
       )
     `);
 
+    // Criar tabela de logs de auditoria
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS logs_auditoria (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR(50) NOT NULL,
+        acao VARCHAR(100) NOT NULL,
+        detalhes TEXT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Migração: Adicionar colunas de cartão se não existirem
     await migrateCartaoColumns(client);
     
@@ -1152,7 +1163,273 @@ async function queryDatabase(query, params = []) {
   }
 }
 
+// ===== FUNÇÕES DE ADMINISTRAÇÃO E AUDITORIA =====
+
+/**
+ * Registra log de auditoria
+ */
+async function registrarLog(userId, acao, detalhes = null) {
+  try {
+    const query = `
+      INSERT INTO logs_auditoria (user_id, acao, detalhes) 
+      VALUES ($1, $2, $3)
+    `;
+    await pool.query(query, [userId, acao, detalhes]);
+  } catch (error) {
+    console.error('[LOGS] Erro ao registrar log:', error);
+  }
+}
+
+/**
+ * Busca logs recentes de auditoria
+ */
+async function buscarLogsRecentes(limite = 10) {
+  try {
+    const query = `
+      SELECT user_id, acao, detalhes, timestamp
+      FROM logs_auditoria 
+      ORDER BY timestamp DESC 
+      LIMIT $1
+    `;
+    const result = await pool.query(query, [limite]);
+    return result.rows;
+  } catch (error) {
+    console.error('[LOGS] Erro ao buscar logs:', error);
+    return [];
+  }
+}
+
+/**
+ * Gera estatísticas do sistema
+ */
+async function gerarEstatisticasSistema() {
+  try {
+    // Contar usuários ativos (que fizeram lançamentos nos últimos 30 dias)
+    const dataLimite = new Date();
+    dataLimite.setDate(dataLimite.getDate() - 30);
+    
+    const usuariosAtivosQuery = `
+      SELECT COUNT(DISTINCT user_id) as total
+      FROM lancamentos 
+      WHERE criado_em >= $1
+    `;
+    const usuariosResult = await pool.query(usuariosAtivosQuery, [dataLimite.toISOString()]);
+    
+    // Total de lançamentos
+    const totalLancamentosQuery = `SELECT COUNT(*) as total FROM lancamentos`;
+    const totalResult = await pool.query(totalLancamentosQuery);
+    
+    // Cartões configurados
+    const cartoesQuery = `SELECT COUNT(*) as total FROM cartoes_config`;
+    const cartoesResult = await pool.query(cartoesQuery);
+    
+    // Lançamentos de hoje
+    const hoje = new Date().toISOString().split('T')[0];
+    const lancamentosHojeQuery = `
+      SELECT COUNT(*) as total 
+      FROM lancamentos 
+      WHERE DATE(criado_em) = $1
+    `;
+    const lancamentosHojeResult = await pool.query(lancamentosHojeQuery, [hoje]);
+    
+    // Última atividade
+    const ultimaAtividadeQuery = `
+      SELECT MAX(criado_em) as ultima
+      FROM lancamentos
+    `;
+    const ultimaResult = await pool.query(ultimaAtividadeQuery);
+    
+    // Tamanho aproximado do banco
+    const tamanhoQuery = `
+      SELECT pg_size_pretty(pg_total_relation_size('lancamentos')) as tamanho
+    `;
+    const tamanhoResult = await pool.query(tamanhoQuery);
+    
+    return {
+      usuariosAtivos: usuariosResult.rows[0]?.total || 0,
+      totalLancamentos: totalResult.rows[0]?.total || 0,
+      cartoesConfigurados: cartoesResult.rows[0]?.total || 0,
+      alertasHoje: 0, // Será implementado quando tivermos tabela de alertas
+      tamanhoBanco: tamanhoResult.rows[0]?.tamanho || 'N/A',
+      ultimaAtividade: ultimaResult.rows[0]?.ultima ? 
+        new Date(ultimaResult.rows[0].ultima).toLocaleString('pt-BR') : 'N/A',
+      lancamentosHoje: lancamentosHojeResult.rows[0]?.total || 0
+    };
+  } catch (error) {
+    console.error('[STATS] Erro ao gerar estatísticas:', error);
+    throw error;
+  }
+}
+
+/**
+ * Gera backup em formato CSV
+ */
+async function gerarBackupCSV(userId) {
+  try {
+    // Buscar todos os lançamentos do usuário
+    const query = `
+      SELECT 
+        data,
+        tipo,
+        descricao,
+        valor,
+        categoria,
+        pagamento,
+        criado_em,
+        parcelamento_id,
+        parcela_atual,
+        total_parcelas,
+        recorrente,
+        recorrente_fim,
+        recorrente_id,
+        cartao_nome,
+        data_lancamento,
+        data_contabilizacao,
+        mes_fatura,
+        ano_fatura,
+        dia_vencimento,
+        status_fatura,
+        data_vencimento
+      FROM lancamentos 
+      WHERE user_id = $1 
+      ORDER BY data DESC, criado_em DESC
+    `;
+    
+    const result = await pool.query(query, [userId]);
+    const lancamentos = result.rows;
+    
+    // Gerar cabeçalho CSV
+    const headers = [
+      'Data',
+      'Tipo',
+      'Descrição',
+      'Valor',
+      'Categoria',
+      'Pagamento',
+      'Criado em',
+      'Parcelamento ID',
+      'Parcela Atual',
+      'Total Parcelas',
+      'Recorrente',
+      'Recorrente Fim',
+      'Recorrente ID',
+      'Cartão',
+      'Data Lançamento',
+      'Data Contabilização',
+      'Mês Fatura',
+      'Ano Fatura',
+      'Dia Vencimento',
+      'Status Fatura',
+      'Data Vencimento'
+    ];
+    
+    let csvContent = headers.join(',') + '\n';
+    
+    // Adicionar dados
+    lancamentos.forEach(lancamento => {
+      // Função para formatar data
+      const formatarData = (data) => {
+        if (!data) return '';
+        if (typeof data === 'string') {
+          // Se já é string, verificar se é formato ISO
+          if (data.match(/^\d{4}-\d{2}-\d{2}/)) {
+            const [ano, mes, dia] = data.split('-');
+            return `${dia}/${mes}/${ano}`;
+          }
+          return data;
+        }
+        if (data instanceof Date) {
+          return data.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+        }
+        return '';
+      };
+
+      const row = [
+        formatarData(lancamento.data),
+        lancamento.tipo,
+        `"${lancamento.descricao || ''}"`,
+        lancamento.valor,
+        lancamento.categoria,
+        lancamento.pagamento,
+        formatarData(lancamento.criado_em),
+        lancamento.parcelamento_id || '',
+        lancamento.parcela_atual || '',
+        lancamento.total_parcelas || '',
+        lancamento.recorrente ? 'true' : 'false',
+        formatarData(lancamento.recorrente_fim),
+        lancamento.recorrente_id || '',
+        lancamento.cartao_nome || '',
+        formatarData(lancamento.data_lancamento),
+        formatarData(lancamento.data_contabilizacao),
+        lancamento.mes_fatura || '',
+        lancamento.ano_fatura || '',
+        lancamento.dia_vencimento || '',
+        lancamento.status_fatura || '',
+        formatarData(lancamento.data_vencimento)
+      ];
+      csvContent += row.join(',') + '\n';
+    });
+    
+    const tamanho = Math.round(csvContent.length / 1024); // KB
+    
+    return {
+      csvContent,
+      totalLancamentos: lancamentos.length,
+      tamanho
+    };
+  } catch (error) {
+    console.error('[BACKUP] Erro ao gerar backup:', error);
+    throw error;
+  }
+}
+
+/**
+ * Limpa dados antigos (mais de 2 anos)
+ */
+async function limparDadosAntigos() {
+  const inicio = Date.now();
+  
+  try {
+    // Calcular data limite (2 anos atrás)
+    const dataLimite = new Date();
+    dataLimite.setFullYear(dataLimite.getFullYear() - 2);
+    
+    // Contar lançamentos que serão removidos
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM lancamentos 
+      WHERE data < $1
+    `;
+    const countResult = await pool.query(countQuery, [dataLimite.toISOString().split('T')[0]]);
+    const lancamentosParaRemover = countResult.rows[0]?.total || 0;
+    
+    // Remover lançamentos antigos
+    const deleteQuery = `
+      DELETE FROM lancamentos 
+      WHERE data < $1
+    `;
+    await pool.query(deleteQuery, [dataLimite.toISOString().split('T')[0]]);
+    
+    // Calcular tempo de processamento
+    const tempoProcessamento = Math.round((Date.now() - inicio) / 1000);
+    
+    // Calcular espaço liberado (aproximado)
+    const espacoLiberado = Math.round(lancamentosParaRemover * 0.1); // ~100 bytes por registro
+    
+    return {
+      lancamentosRemovidos: lancamentosParaRemover,
+      espacoLiberado,
+      tempoProcessamento,
+      dataLimite: dataLimite.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+    };
+  } catch (error) {
+    console.error('[LIMPEZA] Erro ao limpar dados:', error);
+    throw error;
+  }
+}
+
 module.exports = {
+  pool,
   initializeDatabase,
   appendRowToDatabase,
   getDatabaseData,
@@ -1165,19 +1442,25 @@ module.exports = {
   atualizarLancamentoPorId,
   excluirLancamentoPorId,
   getTotalGastosPorPagamento,
-  pool,
   excluirParcelamentoPorId,
   listarLancamentos,
   excluirRecorrentePorId,
   buscarLancamentosParaExclusao,
   salvarConfiguracaoCartao,
-  atualizarCartaoConfigurado,
+  buscarConfiguracaoCartao,
   listarCartoesConfigurados,
   calcularDataContabilizacao,
   buscarFaturaCartao,
   getResumoReal,
+  atualizarCartaoConfigurado,
   formatarDataParaISO,
   buscarAlertasDoDia,
   gerarMensagemAlertas,
-  queryDatabase
+  queryDatabase,
+  // Novas funções de administração
+  registrarLog,
+  buscarLogsRecentes,
+  gerarEstatisticasSistema,
+  gerarBackupCSV,
+  limparDadosAntigos
 }; 
