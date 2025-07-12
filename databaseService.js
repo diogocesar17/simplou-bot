@@ -1,9 +1,26 @@
 const { Pool } = require('pg');
 
-// Configuração da conexão com PostgreSQL
+// Configuração otimizada da conexão com PostgreSQL
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  // Otimizações de performance
+  max: 20, // Máximo de conexões
+  idleTimeoutMillis: 30000, // 30 segundos
+  connectionTimeoutMillis: 2000, // 2 segundos
+  allowExitOnIdle: true,
+  // Configurações de query
+  statement_timeout: 10000, // 10 segundos
+  query_timeout: 10000, // 10 segundos
+});
+
+// Monitoramento de conexões
+pool.on('connect', (client) => {
+  console.log('🔌 Nova conexão PostgreSQL estabelecida');
+});
+
+pool.on('error', (err, client) => {
+  console.error('❌ Erro no pool PostgreSQL:', err.message);
 });
 
 // Inicializar tabelas se não existirem
