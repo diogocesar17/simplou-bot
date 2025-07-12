@@ -34,6 +34,16 @@ const {
 } = require('./databaseService');
 const { getGastosCategoriaEspecifica, parseMonthYear, getNomeMes } = require('./googleSheetService');
 const { verificarEEnviarAlertas } = require('./alertasService');
+const { 
+  initializeGemini, 
+  analisarTransacaoComGemini, 
+  analisarPadroesGastos, 
+  gerarSugestoesEconomia, 
+  preverGastosFuturos, 
+  responderPerguntaFinanceira,
+  testarConexaoGemini,
+  isGeminiAvailable 
+} = require('./geminiService');
 
 // Função utilitária para formatar valores de forma segura
 function formatarValor(valor, casasDecimais = 2) {
@@ -723,6 +733,14 @@ async function startBot() {
     // Inicializar banco de dados
     await initializeDatabase();
     console.log('✅ Banco de dados inicializado');
+
+    // Inicializar Gemini AI
+    const geminiInicializado = initializeGemini();
+    if (geminiInicializado) {
+      console.log('🤖 Gemini AI inicializado com sucesso!');
+    } else {
+      console.log('⚠️ Gemini AI não disponível - funcionalidades inteligentes desabilitadas');
+    }
 
     // Persistência local de sessão WhatsApp
     const { state, saveCreds } = await useMultiFileAuthState('auth');

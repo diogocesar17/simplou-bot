@@ -1,4 +1,5 @@
 const { buscarConfiguracaoCartao, listarCartoesConfigurados } = require('./databaseService');
+const { analisarTransacaoComGemini, isGeminiAvailable } = require('./geminiService');
 
 // Palavras-chave para categorias
 const CATEGORIAS_KEYWORDS = {
@@ -71,13 +72,55 @@ async function analisarMensagemInteligente(texto, userId) {
   // Extrair descrição
   const descricao = extrairDescricao(texto, valor);
   
-  return {
+  // Verificar se o parser baseado em regras conseguiu identificar tudo
+  const resultadoParser = {
     tipo,
     valor,
     categoria,
     formaPagamento,
     descricao,
     textoOriginal: texto
+  };
+  
+  // Se o parser baseado em regras não conseguiu identificar categoria ou forma de pagamento,
+  // OU se o valor extraído parece incorreto (muito baixo), tentar usar o Gemini como fallback
+  const valorPareceIncorreto = valor < 1 || (valor < 5 && texto.toLowerCase().includes('reais'));
+  const precisaUsarGemini = (categoria === 'Outros' || formaPagamento === 'Não especificado' || valorPareceIncorreto) && isGeminiAvailable();
+  
+  if (precisaUsarGemini) {
+    console.log('[PARSER INTELIGENTE] Parser baseado em regras não conseguiu identificar tudo ou valor parece incorreto, tentando Gemini...');
+    console.log('[PARSER INTELIGENTE] Motivo:', {
+      categoria: categoria === 'Outros' ? 'categoria não identificada' : 'ok',
+      formaPagamento: formaPagamento === 'Não especificado' ? 'forma de pagamento não identificada' : 'ok',
+      valorPareceIncorreto: valorPareceIncorreto ? `valor ${valor} parece incorreto` : 'ok'
+    });
+    
+    try {
+      const resultadoGemini = await analisarTransacaoComGemini(texto, userId);
+      if (resultadoGemini) {
+        console.log('[PARSER INTELIGENTE] Gemini forneceu análise melhor:', resultadoGemini);
+        
+        // Combinar resultados: usar Gemini para campos que o parser falhou
+        return {
+          tipo: resultadoGemini.tipo || tipo,
+          valor: resultadoGemini.valor || valor,
+          categoria: categoria === 'Outros' ? resultadoGemini.categoria : categoria,
+          formaPagamento: formaPagamento === 'Não especificado' ? resultadoGemini.formaPagamento : formaPagamento,
+          descricao: resultadoGemini.descricao || descricao,
+          textoOriginal: texto,
+          usadoGemini: true,
+          confiancaGemini: resultadoGemini.confianca
+        };
+      }
+    } catch (error) {
+      console.log('[PARSER INTELIGENTE] Erro ao usar Gemini como fallback:', error.message);
+    }
+  }
+  
+  // Retornar resultado do parser baseado em regras
+  return {
+    ...resultadoParser,
+    usadoGemini: false
   };
 }
 
