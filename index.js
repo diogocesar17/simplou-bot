@@ -3,6 +3,7 @@ const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysocket
 const qrcode = require('qrcode-terminal');
 const http = require('http');
 const { parseMessage, categoriasCadastradas, isDataMuitoDistante, formasPagamento, mapeamentoFormasPagamento } = require('./messageParser');
+const { analisarMensagemInteligente } = require('./intelligentParser');
 const { 
   initializeDatabase,
   appendRowToDatabase, 
@@ -1457,7 +1458,36 @@ async function startBot() {
       // Após blocos de contexto (aguardandoDiaVencimento e aguardandoConfiguracaoCartao):
       console.log('[DEBUG] Antes do parseMessage');
     const parsed = parseMessage(texto);
-      console.log('[DEBUG] parsed após parseMessage:', parsed);
+    console.log('[DEBUG] parsed após parseMessage:', parsed);
+
+    // --- VERIFICAÇÃO DE TIPO 'Outro' (CORREÇÃO INTELIGENTE) ---
+    if (parsed && (parsed.tipo === 'Outro' || !parsed.tipo)) {
+      console.log('[DEBUG] Tipo é "Outro", tentando correção inteligente...');
+      const analise = await analisarMensagemInteligente(texto, userId);
+      if (analise && analise.tipo && (analise.tipo === 'gasto' || analise.tipo === 'receita')) {
+        // Substituir os campos principais do parsed pelo resultado do parser inteligente
+        parsed.tipo = analise.tipo;
+        parsed.valor = analise.valor;
+        parsed.categoria = analise.categoria;
+        parsed.pagamento = analise.formaPagamento;
+        parsed.descricao = analise.descricao;
+        console.log('[DEBUG] Correção inteligente aplicada ao parsed:', parsed);
+        
+        // Verificar se o pagamento ainda não foi especificado após a correção
+        const pagamentoNormalizado = (parsed.pagamento || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        if (pagamentoNormalizado.includes('nao especificado') || 
+            pagamentoNormalizado.includes('não especificado') || 
+            pagamentoNormalizado.includes('nao informado') || 
+            pagamentoNormalizado.includes('não informado')) {
+          parsed.faltaFormaPagamento = true;
+          console.log('[DEBUG] Pagamento ainda não especificado após correção inteligente');
+        }
+      } else {
+        console.log('[DEBUG] Parser inteligente não conseguiu identificar o tipo');
+        await sock.sendMessage(userId, { text: '❌ Não foi possível identificar o tipo do lançamento. Por favor, especifique se é gasto ou receita.' });
+        return;
+      }
+    }
 
       // --- VERIFICAÇÃO DE FALTA DE DATA DE VENCIMENTO PARA BOLETOS ---
       if (parsed && parsed.faltaDataVencimento) {
