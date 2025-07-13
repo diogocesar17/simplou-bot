@@ -12,7 +12,7 @@ const categoriasPrincipais = {
   ],
   'Moradia': [
     'aluguel', 'energia', 'água', 'agua', 'internet', 'condomínio', 'condominio', 'gás', 'gas', 'luz', 'telefone', 'imóvel', 'imovel', 'iptu', 'ipva',
-    'reforma', 'manutenção', 'manutencao', 'limpeza', 'faxina', 'empregada', 'segurança', 'seguranca', 'portaria', 'elevador', 'piscina', 'academia', 'salao', 'salão',
+    'reforma', 'limpeza', 'faxina', 'empregada', 'segurança', 'seguranca', 'portaria', 'elevador', 'piscina', 'academia', 'salao', 'salão',
     'móveis', 'moveis', 'eletrodomésticos', 'eletrodomesticos', 'geladeira', 'fogão', 'fogao', 'microondas', 'lavadora', 'secadora', 'ar condicionado', 'ventilador', 'lâmpada', 'lampada'
   ],
   'Transporte': [
@@ -71,6 +71,15 @@ let categoriasCadastradas = Object.keys(categoriasPrincipais);
 // Função para detectar categoria com base no texto
 function detectarCategoria(texto) {
   texto = texto.toLowerCase();
+  
+  // Verificações específicas de contexto primeiro (mais específicas)
+  if (texto.includes('manutencao') && (texto.includes('carro') || texto.includes('moto') || texto.includes('veiculo') || texto.includes('veículo'))) {
+    return { categoria: 'Transporte', confianca: 'alta' };
+  }
+  
+  if (texto.includes('manutencao') && (texto.includes('casa') || texto.includes('apartamento') || texto.includes('imovel') || texto.includes('imóvel'))) {
+    return { categoria: 'Moradia', confianca: 'alta' };
+  }
   
   // Primeiro, tenta encontrar correspondência exata nas categorias principais
   for (const [categoria, palavras] of Object.entries(categoriasPrincipais)) {
@@ -266,18 +275,42 @@ function parseMessage(msg) {
 
   // Data (procura por formatos dd/mm/aaaa, d/m/aaaa, dd/mm, d/m, etc)
   let data = null;
-  let dataMatch = texto.match(/(?:em\s*)?(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/);
-  if (dataMatch) {
-    let partes = dataMatch[1].replace(/-/g, '/').split('/');
-    let dia = parseInt(partes[0]);
-    let mes = parseInt(partes[1]) - 1; // JS: 0-based
-    let ano = (partes[2]) ? parseInt(partes[2]) : (new Date()).getFullYear();
-    if (ano < 100) ano += 2000; // Suporte para ano 2 dígitos
-    const dataObj = new Date(ano, mes, dia);
-    if (!isNaN(dataObj.getTime())) {
-      data = dataObj.toLocaleDateString('pt-BR');
+  
+  // Primeiro, tenta detectar formato textual: "dia 19 de outubro", "19 de outubro", etc.
+  const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const regexDataTextual = /(?:dia\s+)?(\d{1,2})\s+(?:de\s+)?(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)(?:\s+(?:de\s+)?(\d{4}))?/i;
+  const matchDataTextual = texto.match(regexDataTextual);
+  
+  if (matchDataTextual) {
+    const dia = parseInt(matchDataTextual[1]);
+    const nomeMes = matchDataTextual[2].toLowerCase();
+    const mesIndex = meses.findIndex(m => m.toLowerCase() === nomeMes);
+    const ano = matchDataTextual[3] ? parseInt(matchDataTextual[3]) : (new Date()).getFullYear();
+    
+    if (mesIndex !== -1 && dia >= 1 && dia <= 31) {
+      const dataObj = new Date(ano, mesIndex, dia);
+      if (!isNaN(dataObj.getTime())) {
+        data = dataObj.toLocaleDateString('pt-BR');
+      }
     }
   }
+  
+  // Se não encontrou formato textual, tenta formato numérico
+  if (!data) {
+    let dataMatch = texto.match(/(?:em\s*)?(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/);
+    if (dataMatch) {
+      let partes = dataMatch[1].replace(/-/g, '/').split('/');
+      let dia = parseInt(partes[0]);
+      let mes = parseInt(partes[1]) - 1; // JS: 0-based
+      let ano = (partes[2]) ? parseInt(partes[2]) : (new Date()).getFullYear();
+      if (ano < 100) ano += 2000; // Suporte para ano 2 dígitos
+      const dataObj = new Date(ano, mes, dia);
+      if (!isNaN(dataObj.getTime())) {
+        data = dataObj.toLocaleDateString('pt-BR');
+      }
+    }
+  }
+  
   if (!data) {
     // Corrigir: sempre usar timezone do Brasil e formato correto DD/MM/YYYY
     const hoje = new Date();
