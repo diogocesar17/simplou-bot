@@ -12,7 +12,7 @@ const ADMIN_USERS = [
 const AUTHORIZED_USERS = [
   '556181429135@s.whatsapp.net', // Seu número (administrador)
   // Adicione outros usuários aqui (máximo 4 usuários adicionais)
-  // '5511888888888@s.whatsapp.net', // Usuário 1
+  '556193096344@s.whatsapp.net', // Usuário 1
   // '5511777777777@s.whatsapp.net', // Usuário 2
   // '5511666666666@s.whatsapp.net', // Usuário 3
   // '5511555555555@s.whatsapp.net', // Usuário 4

@@ -279,8 +279,12 @@ function parseMessage(msg) {
     }
   }
   if (!data) {
-    // Corrigir: sempre usar timezone do Brasil
-    data = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    // Corrigir: sempre usar timezone do Brasil e formato correto DD/MM/YYYY
+    const hoje = new Date();
+    const dia = hoje.getDate().toString().padStart(2, '0');
+    const mes = (hoje.getMonth() + 1).toString().padStart(2, '0');
+    const ano = hoje.getFullYear();
+    data = `${dia}/${mes}/${ano}`;
   }
 
   // Data de vencimento para boletos (procura por "vencimento", "vence", "venc", "para o dia", "para", etc)

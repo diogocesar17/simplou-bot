@@ -106,8 +106,11 @@ async function criarParcelamento(userId, parsed, cartaoInfo = null) {
     const dataParcela = calcularDataFutura(dataInicial, i); // string dd/mm/yyyy
     const descricaoParcela = `${parsed.descricao} (${i + 1}/${parsed.numParcelas})`;
     
+    // Converter data para formato ISO (YYYY-MM-DD) para o PostgreSQL
+    const dataParcelaISO = dataParcela.split('/').reverse().join('-');
+    
     let valores = [
-      dataParcela,
+      dataParcelaISO,
       parsed.tipo.toLowerCase(),
       descricaoParcela,
       valorParcela,
@@ -153,13 +156,19 @@ async function criarRecorrente(userId, parsed, cartaoInfo = null) {
   const dataInicial = new Date(parsed.data.split('/').reverse().join('-'));
   const dataFim = calcularDataFutura(dataInicial, parsed.recorrenteMeses - 1);
   
+  // Converter dataFim para formato ISO (YYYY-MM-DD) para o PostgreSQL
+  const dataFimISO = dataFim.split('/').reverse().join('-');
+  
   let lancamentosCriados = [];
   
   for (let i = 0; i < parsed.recorrenteMeses; i++) {
     const dataRecorrente = calcularDataFutura(dataInicial, i);
     
+    // Converter data para formato ISO (YYYY-MM-DD) para o PostgreSQL
+    const dataRecorrenteISO = dataRecorrente.split('/').reverse().join('-');
+    
     let valores = [
-      dataRecorrente,
+      dataRecorrenteISO,
       parsed.tipo.toLowerCase(),
       parsed.descricao,
       parsed.valor,
@@ -169,7 +178,7 @@ async function criarRecorrente(userId, parsed, cartaoInfo = null) {
       null, // parcela_atual
       null, // total_parcelas
       true, // recorrente
-      dataFim,
+      dataFimISO,
       recorrenteId
     ];
     
@@ -254,7 +263,7 @@ async function processarLancamento(userId, parsed, sock) {
       try {
         const tipoNormalizado = (parsed.tipo || '').toLowerCase();
         await appendRowToDatabase(userId, [
-          parsed.data,
+          parsed.data.split('/').reverse().join('-'),
           tipoNormalizado,
           parsed.descricao,
           parsed.valor,
@@ -347,7 +356,7 @@ async function processarLancamento(userId, parsed, sock) {
         // Gasto normal no cartão (não parcelado, não recorrente)
         console.log('[DEBUG] Criando gasto normal no cartão');
         await appendRowToDatabase(userId, [
-          parsed.data,
+          parsed.data.split('/').reverse().join('-'),
           parsed.tipo,
           parsed.descricao,
           parsed.valor,
@@ -462,7 +471,7 @@ async function processarLancamento(userId, parsed, sock) {
       
       // Lançamento normal com aviso
       await appendRowToDatabase(userId, [
-        parsedComValor.data,
+        parsedComValor.data.split('/').reverse().join('-'),
         tipoNormalizado,
         parsedComValor.descricao,
         parsedComValor.valor,
@@ -569,7 +578,7 @@ async function processarLancamento(userId, parsed, sock) {
       
       // Lançamento normal
       await appendRowToDatabase(userId, [
-        parsed.data,
+        parsed.data.split('/').reverse().join('-'),
         tipoNormalizado,
         parsed.descricao,
         parsed.valor,
@@ -1483,7 +1492,7 @@ async function startBot() {
           // Gasto normal no cartão escolhido (não parcelado, não recorrente)
           console.log('[DEBUG] Criando gasto normal no cartão escolhido');
           await appendRowToDatabase(userId, [
-            parsedComValor.data,
+            parsedComValor.data.split('/').reverse().join('-'),
             parsedComValor.tipo,
             parsedComValor.descricao,
             parsedComValor.valor,
@@ -1963,7 +1972,7 @@ async function startBot() {
           try {
             const tipoNormalizado = (parsed.tipo || '').toLowerCase();
             await appendRowToDatabase(userId, [
-              parsed.data,
+              parsed.data.split('/').reverse().join('-'),
               tipoNormalizado,
               parsed.descricao,
               parsed.valor,
@@ -2056,7 +2065,7 @@ async function startBot() {
             // Gasto normal no cartão (não parcelado, não recorrente)
             console.log('[DEBUG] Criando gasto normal no cartão');
             await appendRowToDatabase(userId, [
-              parsed.data,
+              parsed.data.split('/').reverse().join('-'),
               parsed.tipo,
               parsed.descricao,
               parsed.valor,
@@ -2171,7 +2180,7 @@ async function startBot() {
           
           // Lançamento normal com aviso
           await appendRowToDatabase(userId, [
-            parsedComValor.data,
+            parsedComValor.data.split('/').reverse().join('-'),
             tipoNormalizado,
             parsedComValor.descricao,
             parsedComValor.valor,
@@ -2278,7 +2287,7 @@ async function startBot() {
           
           // Lançamento normal
           await appendRowToDatabase(userId, [
-            parsed.data,
+            parsed.data.split('/').reverse().join('-'),
             tipoNormalizado,
             parsed.descricao,
             parsed.valor,
