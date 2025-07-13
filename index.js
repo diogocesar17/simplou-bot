@@ -268,7 +268,21 @@ async function processarLancamento(userId, parsed, sock) {
           parsed.descricao,
           parsed.valor,
           parsed.categoria,
-          parsed.pagamento
+          parsed.pagamento,
+          null, // parcelamento_id
+          null, // parcela_atual
+          null, // total_parcelas
+          null, // recorrente
+          null, // recorrente_fim
+          null, // recorrente_id
+          null, // cartao_nome
+          null, // data_lancamento
+          null, // data_contabilizacao
+          null, // mes_fatura
+          null, // ano_fatura
+          null, // dia_vencimento
+          null, // status_fatura
+          parsed.dataVencimento // data_vencimento
         ]);
         await sock.sendMessage(userId, {
           text: `✅ Gasto registrado com sucesso!\n\n` +
@@ -1996,7 +2010,21 @@ async function startBot() {
               parsed.descricao,
               parsed.valor,
               parsed.categoria,
-              parsed.pagamento
+              parsed.pagamento,
+              null, // parcelamento_id
+              null, // parcela_atual
+              null, // total_parcelas
+              null, // recorrente
+              null, // recorrente_fim
+              null, // recorrente_id
+              null, // cartao_nome
+              null, // data_lancamento
+              null, // data_contabilizacao
+              null, // mes_fatura
+              null, // ano_fatura
+              null, // dia_vencimento
+              null, // status_fatura
+              parsed.dataVencimento // data_vencimento
             ]);
             await sock.sendMessage(userId, {
               text: `✅ Gasto registrado com sucesso!\n\n` +

@@ -24,7 +24,8 @@ const categoriasPrincipais = {
     'cinema', 'teatro', 'show', 'concerto', 'festival', 'balada', 'boate', 'disco', 'pub', 'bar', 'restaurante', 'pizzaria', 'pizza', 'hamburguer', 'fast food', 'fastfood',
     'shopping', 'loja', 'roupa', 'sapato', 'bolsa', 'acessório', 'acessorio', 'perfume', 'cosmético', 'cosmetico', 'maquiagem', 'cabelo', 'unha', 'spa', 'massagem',
     'viagem', 'hotel', 'pousada', 'airbnb', 'passagem', 'avião', 'aviao', 'ônibus', 'onibus', 'trem', 'navio', 'cruzeiro', 'passeio', 'turismo', 'museu', 'parque', 'zoológico', 'zoologico',
-    'jogos', 'video game', 'videogame', 'console', 'revista', 'jornal', 'netflix', 'spotify', 'youtube', 'streaming', 'assinatura', 'hobby', 'esporte', 'futebol', 'basquete', 'tênis', 'tenis'
+    'jogos', 'video game', 'videogame', 'console', 'revista', 'jornal', 'netflix', 'spotify', 'youtube', 'streaming', 'assinatura', 'hobby', 'esporte', 'futebol', 'basquete', 'tênis', 'tenis',
+    'apple music', 'deezer', 'music', 'prime video', 'disney+', 'disney plus', 'globoplay', 'hbo max', 'paramount', 'star+', 'star plus', 'amazon prime', 'prime video', 'telecine', 'now', 'claro tv', 'oi play', 'looke', 'crunchyroll', 'apple tv', 'apple tv+', 'youtube premium', 'youtube music'
   ],
   'Educação': [
     'escola', 'faculdade', 'universidade', 'curso', 'aula', 'professor', 'professora', 'tutor', 'mentor', 'coaching', 'workshop', 'seminário', 'seminario', 'palestra', 'conferência', 'conferencia',
@@ -233,7 +234,7 @@ function parseMessage(msg) {
 
   // Tipo
   const isIncome = /recebi|ganhei|entrou|salário|salario|pagamento|bonus|bônus|freela|freelance|venda|vendi/i.test(texto);
-  const isExpense = /paguei|comprei|gastei|usei|debitou|saquei|transferi|pix|boleto|cartão|cartao/i.test(texto);
+  const isExpense = /paguei|pagar|comprei|gastei|usei|debitou|saquei|transferi|pix|boleto|cartão|cartao/i.test(texto);
   const tipo = isIncome ? 'Receita' : isExpense ? 'Gasto' : 'Outro';
 
   // Valor
