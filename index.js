@@ -1074,7 +1074,24 @@ async function startBot() {
         }
         aguardandoEdicao[userId] = { lista, idx, lancamento: l, etapa: 'campo' };
         let msg = `📝 *Editar lançamento ${idx + 1}:*\n`;
-        msg += `Data: ${l.data}\nValor: R$ ${formatarValor(l.valor)}\nCategoria: ${l.categoria}\nPagamento: ${l.pagamento}\nDescrição: ${l.descricao || '-'}\n`;
+        
+        // Formatar a data corretamente
+        let dataFormatada;
+        if (l.data instanceof Date) {
+          dataFormatada = l.data.toLocaleDateString('pt-BR');
+        } else if (typeof l.data === 'string') {
+          // Se já for string, verificar se está no formato YYYY-MM-DD e converter
+          if (/^\d{4}-\d{2}-\d{2}$/.test(l.data)) {
+            const [ano, mes, dia] = l.data.split('-');
+            dataFormatada = `${dia}/${mes}/${ano}`;
+          } else {
+            dataFormatada = l.data;
+          }
+        } else {
+          dataFormatada = 'Data inválida';
+        }
+        
+        msg += `Data: ${dataFormatada}\nValor: R$ ${formatarValor(l.valor)}\nCategoria: ${l.categoria}\nPagamento: ${l.pagamento}\nDescrição: ${l.descricao || '-'}\n`;
         msg += '\nQual campo deseja editar?\n1. data\n2. valor\n3. categoria\n4. pagamento\n5. descricao';
         await sock.sendMessage(userId, { text: msg });
         return;
@@ -1406,10 +1423,12 @@ async function startBot() {
       }
 
       // --- TRATAMENTO DE COMANDO CONFIGURAR CARTÃO ---
-      const textoNormalizado = texto.normalize('NFD').replace(/[ -\u036f]/g, '').toLowerCase().trim();
+      const textoNormalizado = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
       console.log('[DEBUG] texto original:', texto);
       console.log('[DEBUG] texto normalizado:', textoNormalizado);
-      if (/^configurar cartao$/.test(textoNormalizado) || /^configurar cartao$/.test(textoLower)) {
+      
+      // Aceitar variações com e sem acento: "configurar cartao", "configurar cartão", "Configurar Cartão", etc.
+      if (/^configurar\s+cart[aã]o$/.test(textoNormalizado) || /^configurar\s+cart[aã]o$/.test(textoLower)) {
         console.log('[DEBUG] Comando CONFIGURAR CARTAO reconhecido!');
         aguardandoConfiguracaoCartao[userId] = {};
         await sock.sendMessage(userId, { text: '💳 Qual o nome do cartão? (Exemplo: Nubank, Itaú, Inter)\n\nDigite "cancelar" para abortar.' });
