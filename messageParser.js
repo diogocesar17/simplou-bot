@@ -234,7 +234,7 @@ function parseMessage(msg) {
 
   // Tipo
   const isIncome = /recebi|ganhei|entrou|salário|salario|pagamento|bonus|bônus|freela|freelance|venda|vendi/i.test(texto);
-  const isExpense = /paguei|pagar|comprei|gastei|usei|debitou|saquei|transferi|pix|boleto|cartão|cartao/i.test(texto);
+  const isExpense = /paguei|pagar|comprei|gastei|gasto|usei|debitou|saquei|transferi|pix|boleto|cartão|cartao/i.test(texto);
   const tipo = isIncome ? 'receita' : isExpense ? 'gasto' : 'outro';
 
   // Valor

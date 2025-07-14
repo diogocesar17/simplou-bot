@@ -371,7 +371,7 @@ async function processarLancamento(userId, parsed, sock) {
         console.log('[DEBUG] Criando gasto normal no cartão');
         await appendRowToDatabase(userId, [
           parsed.data.split('/').reverse().join('-'),
-          parsed.tipo,
+          parsed.tipo.toLowerCase(),
           parsed.descricao,
           parsed.valor,
           parsed.categoria,
@@ -1526,7 +1526,7 @@ async function startBot() {
           console.log('[DEBUG] Criando gasto normal no cartão escolhido');
           await appendRowToDatabase(userId, [
             parsedComValor.data.split('/').reverse().join('-'),
-            parsedComValor.tipo,
+            parsedComValor.tipo.toLowerCase(),
             parsedComValor.descricao,
             parsedComValor.valor,
             parsedComValor.categoria,
@@ -1927,8 +1927,8 @@ async function startBot() {
     console.log('[DEBUG] parsed após parseMessage:', parsed);
 
     // --- VERIFICAÇÃO DE TIPO 'Outro' (CORREÇÃO INTELIGENTE) ---
-    if (parsed && (parsed.tipo === 'Outro' || !parsed.tipo)) {
-      console.log('[DEBUG] Tipo é "Outro", tentando correção inteligente...');
+    if (parsed && (parsed.tipo === 'outro' || !parsed.tipo)) {
+      console.log('[DEBUG] Tipo é "outro", tentando correção inteligente...');
       const analise = await analisarMensagemInteligente(texto, userId);
       if (analise && analise.tipo && (analise.tipo === 'gasto' || analise.tipo === 'receita')) {
         // Substituir os campos principais do parsed pelo resultado do parser inteligente
@@ -1938,19 +1938,11 @@ async function startBot() {
         parsed.pagamento = analise.formaPagamento;
         parsed.descricao = analise.descricao;
         console.log('[DEBUG] Correção inteligente aplicada ao parsed:', parsed);
-        
-        // Verificar se o pagamento ainda não foi especificado após a correção
-        const pagamentoNormalizado = (parsed.pagamento || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-        if (pagamentoNormalizado.includes('nao especificado') || 
-            pagamentoNormalizado.includes('não especificado') || 
-            pagamentoNormalizado.includes('nao informado') || 
-            pagamentoNormalizado.includes('não informado')) {
-          parsed.faltaFormaPagamento = true;
-          console.log('[DEBUG] Pagamento ainda não especificado após correção inteligente');
-        }
+        // Reprocessar o lançamento com os dados corrigidos
+        return await processarLancamento(userId, parsed, sock);
       } else {
         console.log('[DEBUG] Parser inteligente não conseguiu identificar o tipo');
-        await sock.sendMessage(userId, { text: '❌ Não foi possível identificar o tipo do lançamento. Por favor, especifique se é gasto ou receita.' });
+        await sock.sendMessage(userId, { text: '❌ Não foi possível identificar se é gasto ou receita. Por favor, especifique na mensagem.' });
         return;
       }
     }
@@ -2113,11 +2105,11 @@ async function startBot() {
             console.log('[DEBUG] Criando gasto normal no cartão');
             await appendRowToDatabase(userId, [
               parsed.data.split('/').reverse().join('-'),
-        parsed.tipo,
-        parsed.descricao,
-        parsed.valor,
-        parsed.categoria,
-        parsed.pagamento,
+              parsed.tipo.toLowerCase(),
+              parsed.descricao,
+              parsed.valor,
+              parsed.categoria,
+              parsed.pagamento,
               null, // parcelamento_id
               null, // parcela_atual
               null, // total_parcelas
