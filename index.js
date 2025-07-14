@@ -818,9 +818,9 @@ async function startBot() {
         if (textoLower === 'cancelar') {
           delete aguardandoFormaPagamento[userId];
           await sock.sendMessage(userId, { text: '❌ Operação cancelada.' });
-          return;
-        }
-        
+      return;
+    }
+
         const numeroEscolhido = parseInt(texto.trim());
         if (isNaN(numeroEscolhido) || numeroEscolhido < 1 || numeroEscolhido > formasPagamento.length) {
           await sock.sendMessage(userId, { 
@@ -2113,11 +2113,11 @@ async function startBot() {
             console.log('[DEBUG] Criando gasto normal no cartão');
             await appendRowToDatabase(userId, [
               parsed.data.split('/').reverse().join('-'),
-              parsed.tipo,
-              parsed.descricao,
-              parsed.valor,
-              parsed.categoria,
-              parsed.pagamento,
+        parsed.tipo,
+        parsed.descricao,
+        parsed.valor,
+        parsed.categoria,
+        parsed.pagamento,
               null, // parcelamento_id
               null, // parcela_atual
               null, // total_parcelas

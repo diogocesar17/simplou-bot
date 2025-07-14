@@ -166,7 +166,7 @@ function validarValor(valor, categoria, tipo, texto) {
   }
   
   // Alerta para valores altos
-  if (valor > limites.alerta && tipo === 'Gasto') {
+  if (valor > limites.alerta && tipo === 'gasto') {
     validacoes.push(`🚨 Valor alto para ${categoria}: R$ ${valor.toFixed(2)} (limite de alerta: R$ ${limites.alerta.toFixed(2)})`);
   }
   
@@ -235,7 +235,7 @@ function parseMessage(msg) {
   // Tipo
   const isIncome = /recebi|ganhei|entrou|salário|salario|pagamento|bonus|bônus|freela|freelance|venda|vendi/i.test(texto);
   const isExpense = /paguei|pagar|comprei|gastei|usei|debitou|saquei|transferi|pix|boleto|cartão|cartao/i.test(texto);
-  const tipo = isIncome ? 'Receita' : isExpense ? 'Gasto' : 'Outro';
+  const tipo = isIncome ? 'receita' : isExpense ? 'gasto' : 'outro';
 
   // Valor
   // Novo: aceita formatos 10.631,80 ou 10631,80 ou 10631.80
@@ -272,7 +272,7 @@ function parseMessage(msg) {
   }
   
   // Verificar se falta forma de pagamento (apenas para gastos)
-  const faltaFormaPagamento = tipo === 'Gasto' && pagamento === 'NÃO INFORMADO';
+  const faltaFormaPagamento = tipo === 'gasto' && pagamento === 'NÃO INFORMADO';
 
   // Data (procura por formatos dd/mm/aaaa, d/m/aaaa, dd/mm, d/m, etc)
   let data = null;
@@ -338,7 +338,7 @@ function parseMessage(msg) {
   }
 
   // Verificar se falta data de vencimento para boletos
-  const faltaDataVencimento = tipo === 'Gasto' && pagamento === 'BOLETO' && !dataVencimento;
+  const faltaDataVencimento = tipo === 'gasto' && pagamento === 'BOLETO' && !dataVencimento;
 
   // Categoria inteligente usando o novo sistema
   const resultadoCategoria = detectarCategoria(texto);
@@ -405,7 +405,7 @@ function parseMessage(msg) {
   }
 
   // Para receitas, não aplicar alertas de valor alto
-  if (tipo === 'Receita') {
+  if (tipo === 'receita') {
     validacao.validacoes = validacao.validacoes.filter(v => !v.includes('🚨'));
   }
 
