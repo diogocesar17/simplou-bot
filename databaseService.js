@@ -697,13 +697,14 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
   let paramIndex = 2;
   
   if (mes !== null && ano !== null) {
-    // Histórico por período: filtra por data do gasto (data ou data_lancamento)
+    // Histórico por período: filtra por data do gasto (data, data_lancamento ou data_contabilizacao)
     query += ` AND (
       (EXTRACT(MONTH FROM data) = $${paramIndex} AND EXTRACT(YEAR FROM data) = $${paramIndex + 1}) OR
-      (data_lancamento IS NOT NULL AND EXTRACT(MONTH FROM data_lancamento) = $${paramIndex} AND EXTRACT(YEAR FROM data_lancamento) = $${paramIndex + 1})
+      (data_lancamento IS NOT NULL AND EXTRACT(MONTH FROM data_lancamento) = $${paramIndex} AND EXTRACT(YEAR FROM data_lancamento) = $${paramIndex + 1}) OR
+      (data_contabilizacao IS NOT NULL AND EXTRACT(MONTH FROM data_contabilizacao) = $${paramIndex} AND EXTRACT(YEAR FROM data_contabilizacao) = $${paramIndex + 1})
     )`;
     params.push(mes, ano);
-    query += ` ORDER BY COALESCE(data_lancamento, data) DESC LIMIT $${paramIndex + 2}`;
+    query += ` ORDER BY COALESCE(data_contabilizacao, data_lancamento, data) DESC LIMIT $${paramIndex + 2}`;
     params.push(limite * 5); // Busca mais para garantir agrupamento
   } else {
     // Histórico simples: ordena por criado_em (últimos lançamentos)
