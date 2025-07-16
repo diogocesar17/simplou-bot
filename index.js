@@ -923,31 +923,52 @@ async function startBot() {
       if (["ajuda", "menu", "help"].includes(textoLower)) {
         await sock.sendMessage(userId, {
           text:
-            "🤖 *Comandos disponíveis:*\n" +
-            "• ajuda ou menu: mostra este menu\n" +
-            "• resumo: resumo do mês atual\n" +
-            "• resumo hoje: resumo do dia atual\n" +
-            "• resumo mês/ano: resumo de outro mês (ex: resumo 03/2024)\n" +
-            "• histórico: últimos lançamentos\n" +
-            "• histórico mês/ano: todos os lançamentos do mês (ex: histórico julho 2025)\n" +
-            "• cartoes: listar cartões configurados\n" +
-            "• configurar cartao: cadastrar cartão de crédito\n" +
-            "• editar cartao: editar vencimento/fechamento de cartão\n" +
-            "• categorias: ver categorias cadastradas\n" +
-            "• excluir [id]: excluir lançamento por id\n" +
-            "• cancelar: cancela qualquer operação em andamento\n" +
-            "\n🤖 *Comandos Inteligentes (Gemini AI):*\n" +
-            "• analisar: análise de padrões de gastos\n" +
-            "• sugestões: dicas de economia personalizadas\n" +
-            "• previsão: previsões de gastos futuros\n" +
-            "• ajuda inteligente: assistente financeiro IA\n" +
-            "\n*Exemplos de lançamentos:*\n" +
-            "- Gasto simples: gastei 50 no mercado no crédito\n" +
-            "- Receita: recebi 1000 salário\n" +
-            "- Parcelado: gastei 1200 no notebook em 12x no crédito\n" +
-            "- Fixo/mensal: gastei 100 aluguel todo mês\n" +
-            "- Recorrente por N meses: gastei 50 Netflix por 6 meses\n" +
-            "\n💡 Dúvidas? Digite *ajuda* a qualquer momento."
+            "🤖 *FINANCEBOT - SEU ASSISTENTE FINANCEIRO*\n\n" +
+            "📋 *COMANDOS PRINCIPAIS*\n\n" +
+            "📊 *Consultas e Resumos*\n" +
+            "• `resumo` - Resumo do mês atual\n" +
+            "• `resumo hoje` - Resumo do dia atual\n" +
+            "• `resumo [mês/ano]` - Resumo específico (ex: resumo 03/2024)\n" +
+            "• `historico` - Últimos lançamentos\n" +
+            "• `historico [mês/ano]` - Lançamentos do mês (ex: historico julho 2025)\n" +
+            "• `fatura [cartão] [mês/ano]` - Fatura de cartão (ex: fatura nubank 08/2025)\n\n" +
+            "💳 *Gestão de Cartões*\n" +
+            "• `configurar cartao` - Cadastrar cartão de crédito\n" +
+            "• `editar cartao` - Editar vencimento/fechamento\n" +
+            "• `cartoes` - Listar cartões configurados\n\n" +
+            "📝 *Gestão de Lançamentos*\n" +
+            "• `editar [número]` - Editar lançamento específico\n" +
+            "• `excluir [número]` - Excluir lançamento específico\n" +
+            "• `cancelar` - Cancela operação em andamento\n\n" +
+            "🧠 *Comandos Inteligentes (Gemini AI)*\n" +
+            "• `analisar` - Análise de padrões de gastos\n" +
+            "• `sugestões` - Dicas de economia personalizadas\n" +
+            "• `previsão` - Previsões de gastos futuros\n" +
+            "• `ajuda inteligente` - Assistente financeiro IA\n\n" +
+            "🔧 *Comandos Administrativos*\n" +
+            "• `status` - Status do sistema (apenas admin)\n" +
+            "• `limpar` - Limpar dados antigos (apenas admin)\n" +
+            "• `backup` - Gerar backup dos dados\n" +
+            "• `logs` - Logs de auditoria (apenas admin)\n" +
+            "• `meuid` - Descobrir ID do WhatsApp\n" +
+            "• `quemsou` - Verificar permissões\n\n" +
+            "📚 *Ajuda e Informações*\n" +
+            "• `ajuda` / `menu` / `help` - Este menu\n" +
+            "• `oi` / `olá` - Mensagem de boas-vindas\n\n" +
+            "🎯 *EXEMPLOS DE LANÇAMENTOS*\n\n" +
+            "📝 *Formatos Suportados*\n" +
+            "• **Gasto simples**: `gastei 50 no mercado no crédito`\n" +
+            "• **Receita**: `recebi 1000 salário`\n" +
+            "• **Parcelado**: `gastei 1200 no notebook em 12x no crédito`\n" +
+            "• **Fixo/mensal**: `gastei 100 aluguel todo mês`\n" +
+            "• **Recorrente**: `gastei 50 Netflix por 6 meses`\n" +
+            "• **Com data**: `gastei 50 no mercado dia 15/08/2025`\n" +
+            "• **Data textual**: `gastei 50 no mercado dia 19 de outubro`\n\n" +
+            "🏷️ *Categorias Automáticas*\n" +
+            "Alimentação, Transporte, Moradia, Lazer, Saúde, Educação, etc.\n\n" +
+            "💳 *Formas de Pagamento*\n" +
+            "PIX, CRÉDITO, DÉBITO, DINHEIRO, BOLETO\n\n" +
+            "💡 *Dúvidas? Digite `ajuda` a qualquer momento!*"
         });
         return;
       }
