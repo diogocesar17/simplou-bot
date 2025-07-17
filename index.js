@@ -1278,7 +1278,18 @@ async function startBot() {
         }
         aguardandoEdicao[userId].campo = campoEscolhido;
         aguardandoEdicao[userId].etapa = 'valor';
-        await sock.sendMessage(userId, { text: `Digite o novo valor para o campo *${campoEscolhido}*:` });
+        
+        // Personalizar mensagem para o campo pagamento
+        if (campoEscolhido === 'pagamento') {
+          let msgPagamento = `💳 *Qual forma de pagamento você usou?*\n\n`;
+          formasPagamento.forEach((forma, index) => {
+            msgPagamento += `${index + 1}. ${forma}\n`;
+          });
+          msgPagamento += `\nDigite o número da opção ou "cancelar"`;
+          await sock.sendMessage(userId, { text: msgPagamento });
+        } else {
+          await sock.sendMessage(userId, { text: `Digite o novo valor para o campo *${campoEscolhido}*:` });
+        }
         return;
       }
       
@@ -1324,7 +1335,15 @@ async function startBot() {
         } else if (campo === 'categoria') {
           atualizacao.categoria = novoValor;
         } else if (campo === 'pagamento') {
-          atualizacao.pagamento = novoValor;
+          // Verificar se é um número (opção escolhida) ou texto direto
+          const opcaoPagamento = parseInt(novoValor);
+          if (!isNaN(opcaoPagamento) && opcaoPagamento >= 1 && opcaoPagamento <= formasPagamento.length) {
+            // Usar o mapeamento para converter número em forma de pagamento
+            atualizacao.pagamento = mapeamentoFormasPagamento[opcaoPagamento];
+          } else {
+            // Usar o texto diretamente
+            atualizacao.pagamento = novoValor;
+          }
         } else if (campo === 'descricao' || campo === 'descrição') {
           atualizacao.descricao = novoValor;
         }
