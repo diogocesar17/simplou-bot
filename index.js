@@ -1863,6 +1863,88 @@ async function startBot() {
         return;
       }
 
+
+        // --- NOVO COMANDO: EDITAR LANÇAMENTO DIRETO ---
+        if (/^editar\s+(um\s+)?lanc[aã]mentos?((\s+de)?\s+\w+\s*\d{4})?$/i.test(texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())) {
+          console.log('[DEBUG] Comando EDITAR LANÇAMENTO reconhecido!');
+          
+          // Extrai possível mês/ano
+          const partes = texto.trim().split(/\s+/);
+          let mesAno = null;
+          if (partes.length > 2) {
+            const resto = partes.slice(2).join(' ');
+            mesAno = parseMesAno(resto);
+          }
+          
+          let todos;
+          if (mesAno) {
+            todos = await listarLancamentos(userId, 9999, mesAno.mes, mesAno.ano);
+            if (!todos || todos.length === 0) {
+              await sock.sendMessage(userId, { 
+                text: `❌ Nenhum lançamento encontrado para ${getNomeMes(mesAno.mes - 1)}/${mesAno.ano}.\n\nUse "histórico" para ver lançamentos de outros períodos.` 
+              });
+              return;
+            }
+          } else {
+            todos = await listarLancamentos(userId, 9999);
+            if (!todos || todos.length === 0) {
+              await sock.sendMessage(userId, { 
+                text: '❌ Nenhum lançamento encontrado.\n\nUse "histórico" para ver lançamentos de outros períodos.' 
+              });
+              return;
+            }
+          }
+          
+          let msg = mesAno 
+            ? `📝 *Lançamentos de ${getNomeMes(mesAno.mes - 1)}/${mesAno.ano} para editar:*\n\n`
+            : '📝 *Lançamentos do mês atual para editar:*\n\n';
+          
+          todos.forEach((l, idx) => {
+            const dataBR = (l.data instanceof Date)
+              ? l.data.toLocaleDateString('pt-BR')
+              : (typeof l.data === 'string' && l.data.match(/\d{4}-\d{2}-\d{2}/)
+                  ? new Date(l.data).toLocaleDateString('pt-BR')
+                  : l.data);
+            msg += `${idx + 1}. ${dataBR} | 💰 R$ ${formatarValor(l.valor)} | 📂 ${l.categoria} | 💳 ${l.pagamento}`;
+            if (l.tipoAgrupamento === 'parcelado') {
+              msg += ` | 📦 Parcelado: ${l.total_parcelas}x de R$ ${formatarValor(l.grupo[0].valor)}`;
+            }
+            if (l.tipoAgrupamento === 'recorrente') {
+              msg += ` | 🔁 Recorrente: ${l.grupo.length}x`;
+            }
+            if (l.descricao) msg += ` | 📝 ${l.descricao}`;
+            msg += '\n';
+          });
+          
+          msg += '\n💡 *Digite o número do lançamento que deseja editar ou "cancelar"*';
+          
+          aguardandoEdicao[userId] = { lista: todos, etapa: null };
+          await sock.sendMessage(userId, { text: msg });
+          return;
+        }
+
+        // --- FLUXO DE ESCOLHA DO LANÇAMENTO PARA EDITAR ---
+        if (aguardandoEdicao[userId] && aguardandoEdicao[userId].etapa === null) {
+          const op = texto.trim();
+          if (op.toLowerCase() === 'cancelar') {
+            delete aguardandoEdicao[userId];
+            await sock.sendMessage(userId, { text: '❌ Edição de lançamento cancelada.' });
+            return;
+          }
+          const idx = parseInt(op);
+          const lista = aguardandoEdicao[userId].lista;
+          if (isNaN(idx) || idx < 1 || idx > lista.length) {
+            await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${lista.length} ou "cancelar".` });
+            return;
+          }
+          aguardandoEdicao[userId].indiceSelecionado = idx - 1;
+          aguardandoEdicao[userId].lancamento = lista[idx - 1];
+          aguardandoEdicao[userId].etapa = 'campo';
+          let msg = 'Qual campo deseja editar?\n1. data\n2. valor\n3. categoria\n4. pagamento\n5. descricao\n6. cancelar';
+          await sock.sendMessage(userId, { text: msg });
+          return;
+        }
+
         // Comando para iniciar edição de cartão
         const textoNormalizado = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
         if (/^editar cartao$/i.test(textoNormalizado)) {
@@ -1880,6 +1962,7 @@ async function startBot() {
           await sock.sendMessage(userId, { text: msgCartoes });
           return;
         }
+
 
         // Fluxo aguardando escolha do cartão para editar
         if (aguardandoEdicaoCartao[userId] && !aguardandoEdicaoCartao[userId].cartaoEscolhido) {
