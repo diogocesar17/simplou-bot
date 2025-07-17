@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  financebot:
+  simplou:
     build: .
-    container_name: financebot
+    container_name: simplou
     restart: always  # Reinicia automaticamente se parar
     ports:
       - "3000:3000"
@@ -21,7 +21,7 @@ services:
       # Persistir logs (opcional)
       - ./logs:/app/logs
     networks:
-      - financebot-network
+      - simplou-network
     # Configurações de saúde e recursos
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
@@ -42,7 +42,7 @@ services:
   # PostgreSQL (opcional - se quiser rodar localmente)
   postgres:
     image: postgres:15-alpine
-    container_name: financebot-postgres
+    container_name: simplou-postgres
     restart: always
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
@@ -53,24 +53,12 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - financebot-network
-
-  # Redis (opcional - se quiser rodar localmente)
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: financebot-redis
-  #   restart: always
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis_data:/data
-  #   networks:
-  #     - financebot-network
+      - simplou-network
 
 volumes:
   postgres_data:
   # redis_data:
 
 networks:
-  financebot-network:
+  simplou-network:
     driver: bridge 
