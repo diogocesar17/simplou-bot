@@ -1,0 +1,26 @@
+name: Deploy Simplou
+
+on:
+  push:
+    branches:
+      - main  # ou 'master' dependendo do seu branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Conectar via SSH e fazer pull
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/simplou
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
