@@ -1,4 +1,4 @@
-// Sistema de Parser de Intenções - FinanceBot
+// Sistema de Parser de Intenções - Simplou
 // Pode evoluir de regex simples para NLP avançado
 
 class IntentParser {

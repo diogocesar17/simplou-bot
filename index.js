@@ -923,7 +923,7 @@ async function startBot() {
       if (["ajuda", "menu", "help"].includes(textoLower)) {
         await sock.sendMessage(userId, {
           text:
-            "🤖 *FINANCEBOT - SEU ASSISTENTE FINANCEIRO*\n\n" +
+            "🤖 *SIMPLOU - SEU ASSISTENTE FINANCEIRO*\n\n" +
             "📋 *COMANDOS PRINCIPAIS*\n\n" +
             "📊 *Consultas e Resumos*\n" +
             "• `resumo` - Resumo do mês atual\n" +
@@ -976,7 +976,7 @@ async function startBot() {
       // --- MENSAGENS DE BOAS-VINDAS ---
       if (["oi", "olá", "ola", "hello", "hi", "ei", "opa"].includes(textoLower)) {
         await sock.sendMessage(userId, {
-          text: `🤖 *Olá! Bem-vindo ao FinanceBot!*\n\n` +
+          text: `�� *Olá! Bem-vindo ao Simplou!*\n\n` +
                 `💰 *Seu assistente financeiro pessoal*\n\n` +
                 `📊 *Comandos principais:*\n` +
                 `• resumo: ver resumo do mês\n` +
@@ -1247,7 +1247,7 @@ async function startBot() {
           if (!csvString) throw new Error('Backup vazio ou erro ao gerar CSV.');
           // Enviar arquivo CSV como anexo
           const buffer = Buffer.from(csvString, 'utf-8');
-          const fileName = `backup_financebot_${userId.split('@')[0]}_${new Date().toISOString().split('T')[0]}.csv`;
+          const fileName = `backup_simplou_${userId.split('@')[0]}_${new Date().toISOString().split('T')[0]}.csv`;
           
           await sock.sendMessage(userId, {
             document: buffer,
@@ -1277,7 +1277,7 @@ async function startBot() {
           const logString = typeof logData === 'string' ? logData : (logData && logData.csv ? logData.csv : '');
           if (!logString) throw new Error('Log vazio ou erro ao gerar CSV.');
           const buffer = Buffer.from(logString, 'utf-8');
-          const fileName = `logs_financebot_${new Date().toISOString().split('T')[0]}.csv`;
+          const fileName = `logs_simplou_${new Date().toISOString().split('T')[0]}.csv`;
           await sock.sendMessage(userId, {
             document: buffer,
             fileName: fileName,

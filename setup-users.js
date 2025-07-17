@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🔧 Configuração de Usuários do FinanceBot\n');
+console.log('🔧 Configuração de Usuários do Simplou\n');
 
 // Função para validar número de WhatsApp
 function isValidWhatsAppNumber(number) {

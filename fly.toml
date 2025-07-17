@@ -1,4 +1,4 @@
-app = "financebot"
+app = "simplou"
 primary_region = "gru"
 
 [build]

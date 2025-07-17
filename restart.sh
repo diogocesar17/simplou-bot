@@ -1,18 +1,19 @@
 #!/bin/bash
 
-echo "🔄 Iniciando restart do financebot..."
-echo ""
+echo "🔄 Iniciando restart do simplou..."
 
-# Parar e subir containers
-echo "📦 Restartando containers..."
-docker-compose restart
+# Parar containers
+echo "📦 Parando containers..."
+docker-compose down
 
-# Aguardar um pouco para o container inicializar
+# Subir containers
+echo "🚀 Subindo containers..."
+docker-compose up -d
+
+# Aguardar inicialização
 echo "⏳ Aguardando inicialização..."
-sleep 2
+sleep 5
 
 # Mostrar logs
-echo "📋 Mostrando logs do financebot..."
-echo "Pressione Ctrl+C para parar de acompanhar os logs"
-echo ""
-docker-compose logs -f financebot 
+echo "📋 Mostrando logs do simplou..."
+docker-compose logs -f simplou 

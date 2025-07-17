@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: financebot
+    name: simplou
     env: node
     plan: free
     buildCommand: npm install

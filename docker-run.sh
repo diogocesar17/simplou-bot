@@ -1,55 +1,57 @@
 #!/bin/bash
 
-# Script para gerenciar o FinanceBot com Docker
-# Uso: ./docker-run.sh [comando]
+# Script para gerenciar o Simplou com Docker
 
 case "$1" in
-    "start")
-        echo "🚀 Iniciando FinanceBot..."
+    start)
+        echo "🚀 Iniciando Simplou..."
         docker-compose up -d
-        echo "✅ FinanceBot iniciado! Verifique os logs com: ./docker-run.sh logs"
+        echo "✅ Simplou iniciado! Verifique os logs com: ./docker-run.sh logs"
         ;;
-    "stop")
-        echo "🛑 Parando FinanceBot..."
+    stop)
+        echo "🛑 Parando Simplou..."
         docker-compose down
-        echo "✅ FinanceBot parado!"
+        echo "✅ Simplou parado!"
         ;;
-    "restart")
-        echo "🔄 Reiniciando FinanceBot..."
+    restart)
+        echo "🔄 Reiniciando Simplou..."
         docker-compose restart
-        echo "✅ FinanceBot reiniciado!"
+        echo "✅ Simplou reiniciado!"
         ;;
-    "logs")
-        echo "📋 Mostrando logs do FinanceBot..."
-        docker-compose logs -f financebot
+    logs)
+        echo "📋 Mostrando logs do Simplou..."
+        docker-compose logs -f simplou
         ;;
-    "build")
-        echo "🔨 Construindo imagem do FinanceBot..."
-        docker-compose build
+    build)
+        echo "🔨 Construindo imagem do Simplou..."
+        docker-compose build --no-cache
         echo "✅ Imagem construída!"
         ;;
-    "status")
+    status)
         echo "📊 Status dos containers:"
         docker-compose ps
         ;;
-    "clean")
-        echo "🧹 Limpando containers e volumes..."
-        docker-compose down -v
-        docker system prune -f
-        echo "✅ Limpeza concluída!"
+    shell)
+        echo "🐚 Abrindo shell do Simplou..."
+        docker-compose exec simplou sh
+        ;;
+    db)
+        echo "🗄️ Abrindo shell do PostgreSQL..."
+        docker-compose exec postgres psql -U simplou -d simplou
         ;;
     *)
-        echo "🤖 FinanceBot Docker Manager"
+        echo "🤖 Simplou Docker Manager"
         echo ""
-        echo "Comandos disponíveis:"
-        echo "  start   - Inicia o FinanceBot"
-        echo "  stop    - Para o FinanceBot"
-        echo "  restart - Reinicia o FinanceBot"
-        echo "  logs    - Mostra os logs em tempo real"
+        echo "Uso: $0 {start|stop|restart|logs|build|status|shell|db}"
+        echo ""
+        echo "Comandos:"
+        echo "  start   - Inicia o Simplou"
+        echo "  stop    - Para o Simplou"
+        echo "  restart - Reinicia o Simplou"
+        echo "  logs    - Mostra logs em tempo real"
         echo "  build   - Reconstrói a imagem"
         echo "  status  - Mostra status dos containers"
-        echo "  clean   - Limpa containers e volumes"
-        echo ""
-        echo "Exemplo: ./docker-run.sh start"
+        echo "  shell   - Abre shell no container"
+        echo "  db      - Abre shell no PostgreSQL"
         ;;
 esac 

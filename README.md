@@ -1,152 +1,78 @@
-# 🤖 FinanceBot
+# 🤖 Simplou
 
-Chatbot financeiro para WhatsApp que registra gastos e receitas, salva em Google Sheets e gera resumos mensais.
+Um bot inteligente para WhatsApp que ajuda você a controlar suas finanças pessoais de forma simples e eficiente.
 
-## 🚀 Deploy no Render (Gratuito)
+## ✨ Funcionalidades
 
-### 1. Preparação
-- Crie uma conta no [Render](https://render.com)
-- Conecte seu repositório GitHub
+- 💰 **Registro de gastos e receitas** com categorização automática
+- 📊 **Resumos mensais** e relatórios detalhados
+- 💳 **Gestão de cartões de crédito** com controle de faturas
+- 🔄 **Lançamentos recorrentes** e parcelamentos
+- 🤖 **IA integrada** para análise inteligente de gastos
+- 📈 **Histórico completo** com filtros por período
+- 🔔 **Sistema de alertas** para vencimentos
+- 📱 **Interface WhatsApp** intuitiva e fácil de usar
 
-### 2. Configuração
-1. Clique em "New +" → "Blueprint"
-2. Conecte seu repositório
-3. Render detectará automaticamente o `render.yaml`
-4. Configure as variáveis de ambiente:
-   - `GOOGLE_SHEETS_CREDENTIALS` (JSON das credenciais Google)
-   - `GOOGLE_SHEETS_ID` (ID da planilha)
-   - `REDIS_URL` (URL do Redis - será gerada automaticamente)
-   - `DATABASE_URL` (URL do PostgreSQL - será gerada automaticamente)
-
-### 3. Deploy
-- Render criará automaticamente:
-  - Web Service (Node.js)
-  - Redis Database
-  - PostgreSQL Database
-- Aguarde o deploy completar (~5-10 minutos)
-
-## 🔧 Configuração Local
+## 🚀 Instalação
 
 ### Pré-requisitos
 - Node.js 18+
-- Redis
 - PostgreSQL
-- Google Sheets API
+- Conta no Google Cloud (para IA)
+- Número de WhatsApp
 
-### Instalação
+### Configuração
+
+1. **Clone o repositório:**
+```bash
+git clone https://github.com/seu-usuario/simplou-bot.git
+cd simplou-bot
+```
+
+2. **Instale as dependências:**
 ```bash
 npm install
 ```
 
-### Variáveis de Ambiente
-Crie um arquivo `.env`:
-```env
-GOOGLE_SHEETS_CREDENTIALS={"type":"service_account",...}
-GOOGLE_SHEETS_ID=1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms
-REDIS_URL=redis://localhost:6379
-DATABASE_URL=postgresql://user:pass@localhost:5432/financebot
+3. **Configure as variáveis de ambiente:**
+```bash
+cp .env.example .env
 ```
 
-### Execução
+Edite o arquivo `.env` com suas configurações:
+```env
+DATABASE_URL=postgresql://user:pass@localhost:5432/simplou
+GEMINI_API_KEY=sua_chave_api_aqui
+```
+
+4. **Inicialize o banco de dados:**
+```bash
+npm run setup
+```
+
+5. **Inicie o bot:**
 ```bash
 npm start
 ```
 
-## 📱 Comandos Disponíveis
+## 📱 Como usar
 
-### Resumos
-- `resumo` - Resumo do mês atual
-- `resumo janeiro 2024` - Resumo de mês específico
-- `resumo jan 2024` - Resumo com abreviação
+Envie mensagens para o bot no WhatsApp:
 
-### Análise por Categoria
-- `categorias` - Gastos por categoria (mês atual)
-- `categorias janeiro 2024` - Categorias de mês específico
-- `categoria alimentação` - Detalhes da categoria
+- `gastei 50 no mercado` - Registra um gasto
+- `recebi 1000 salário` - Registra uma receita
+- `resumo` - Ver resumo do mês
+- `histórico` - Ver últimos lançamentos
+- `ajuda` - Menu completo de comandos
 
-### Edição e Exclusão
-- `editar <N>` - Editar lançamento pelo número do histórico
-- `excluir <N>` - Excluir lançamento pelo número do histórico
+## 🐳 Docker
 
-### Histórico
-- `histórico` ou `ultimos 5` - Ver últimos lançamentos
+Para rodar com Docker:
 
-### Registrar Lançamentos
-- "gastei 50 no mercado com pix"
-- "recebi 1000 salário com crédito"
-- "paguei 120 aluguel com débito"
-
-## 🏗️ Arquitetura
-
-- **WhatsApp**: @whiskeysockets/baileys
-- **Banco de Dados**: Google Sheets + PostgreSQL
-- **Cache**: Redis
-- **Hospedagem**: Render (gratuito)
-
-## 📊 Funcionalidades
-
-- ✅ Registro de gastos e receitas
-- ✅ Categorização inteligente
-- ✅ Resumos mensais
-- ✅ Análise por categoria
-- ✅ Edição e exclusão de lançamentos
-- ✅ Histórico de lançamentos
-- ✅ Validação de valores
-- ✅ Confirmação de novas categorias
-
-## 🗄️ Banco de Dados
-
-### Estrutura da Tabela
-
-```sql
-CREATE TABLE lancamentos (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id VARCHAR(50) NOT NULL,
-  data DATE NOT NULL,
-  tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('receita', 'gasto')),
-  descricao TEXT,
-  valor DECIMAL(10,2) NOT NULL,
-  categoria VARCHAR(50),
-  pagamento VARCHAR(20),
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+```bash
+docker-compose up -d
 ```
 
-### Índices
+## 📄 Licença
 
-- `idx_lancamentos_user_id` - Para filtrar por usuário
-- `idx_lancamentos_data` - Para consultas por data
-- `idx_lancamentos_categoria` - Para análises por categoria
-
-## 🔄 Migração do Google Sheets
-
-O bot agora usa PostgreSQL como banco principal, mas mantém compatibilidade com Google Sheets para backup:
-
-1. **Configure** as credenciais do Google Sheets no `.env`
-2. **Mantenha** o `googleSheetService.js` para backup
-3. **Dados isolados** por usuário via `user_id`
-
-## 🚀 Próximos Passos
-
-- [ ] API própria do WhatsApp (Twilio)
-- [ ] App React com gráficos
-- [ ] Relatórios avançados
-- [ ] Exportação de dados
-- [ ] Notificações automáticas
-
-## 📝 Licença
-
-ISC
-
-## 🤝 Contribuição
-
-1. Fork o projeto
-2. Crie uma branch para sua feature
-3. Commit suas mudanças
-4. Push para a branch
-5. Abra um Pull Request
-
----
-
-**Desenvolvido com ❤️ para controle financeiro inteligente**
+MIT License
