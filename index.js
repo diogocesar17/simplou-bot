@@ -1039,7 +1039,7 @@ async function startBot() {
         }
         
         msg += `Data: ${dataFormatada}\nValor: R$ ${formatarValor(l.valor)}\nCategoria: ${l.categoria}\nPagamento: ${l.pagamento}\nDescrição: ${l.descricao || '-'}\n`;
-        msg += '\nQual campo deseja editar?\n1. data\n2. valor\n3. categoria\n4. pagamento\n5. descricao';
+        msg += '\nQual campo deseja editar?\n1. data\n2. valor\n3. categoria\n4. pagamento\n5. descricao\n6. cancelar';
         await sock.sendMessage(userId, { text: msg });
         return;
       }
@@ -1253,13 +1253,21 @@ async function startBot() {
         const op = texto.trim();
         const campos = ['data', 'valor', 'categoria', 'pagamento', 'descricao'];
         let campoEscolhido = null;
+        
+        // Verificar se é cancelar (opção 6 ou texto "cancelar")
+        if (op === '6' || op.toLowerCase() === 'cancelar') {
+          delete aguardandoEdicao[userId];
+          await sock.sendMessage(userId, { text: '❌ Edição de lançamento cancelada.' });
+          return;
+        }
+        
         if (/^[1-5]$/.test(op)) {
           campoEscolhido = campos[parseInt(op, 10) - 1];
         } else if (campos.includes(op.toLowerCase()) || op.toLowerCase() === 'descrição') {
           campoEscolhido = op.toLowerCase().replace('ç','c');
         }
         if (!campoEscolhido) {
-          await sock.sendMessage(userId, { text: '❌ Opção inválida. Responda com o número do campo ou o nome.' });
+          await sock.sendMessage(userId, { text: '❌ Opção inválida. Responda com o número do campo (1-5), o nome do campo, ou "6" para cancelar.' });
           return;
         }
         // Bloquear edição de valor de parcelado (por segurança extra)
