@@ -25,6 +25,8 @@ const {
   salvarConfiguracaoCartao,
   buscarConfiguracaoCartao,
   listarCartoesConfigurados,
+  excluirCartaoConfigurado,
+  contarLancamentosAssociadosCartao,
   calcularDataContabilizacao,
   buscarFaturaCartao,
   getResumoReal,
@@ -652,6 +654,7 @@ let aguardandoConfirmacaoRecorrente = {};
 let aguardandoConfiguracaoCartao = {};
 let aguardandoDiaVencimento = {};
 let aguardandoEdicaoCartao = {};
+let aguardandoExclusaoCartao = {};
 let aguardandoFormaPagamento = {};
 let aguardandoDataVencimento = {};
 let aguardandoPerguntaInteligente = {};
@@ -847,6 +850,7 @@ async function startBot() {
             "💳 *Gestão de Cartões*\n" +
             "• `configurar cartao` - Cadastrar cartão de crédito\n" +
             "• `editar cartao` - Editar vencimento/fechamento\n" +
+            "• `excluir cartao` - Excluir cartão configurado\n" +
             "• `cartoes` - Listar cartões configurados\n\n" +
             "📝 *Gestão de Lançamentos*\n" +
             "• `editar [número]` - Editar lançamento específico\n" +
@@ -1982,6 +1986,23 @@ async function startBot() {
           return;
         }
 
+        // Comando para iniciar exclusão de cartão
+        if (/^excluir cartao$/i.test(textoNormalizado)) {
+          const cartoes = await listarCartoesConfigurados(userId);
+          if (!cartoes || cartoes.length === 0) {
+            await sock.sendMessage(userId, { text: '❌ Nenhum cartão configurado para excluir.' });
+            return;
+          }
+          let msgCartoes = 'Qual cartão deseja excluir?\n';
+          cartoes.forEach((cartao, idx) => {
+            msgCartoes += `${idx + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento}, fecha dia ${cartao.dia_fechamento || 'NÃO INFORMADO'})\n`;
+          });
+          msgCartoes += '\nDigite o número do cartão ou "cancelar"';
+          aguardandoExclusaoCartao[userId] = { cartoes };
+          await sock.sendMessage(userId, { text: msgCartoes });
+          return;
+        }
+
 
         // Fluxo aguardando escolha do cartão para editar
         if (aguardandoEdicaoCartao[userId] && !aguardandoEdicaoCartao[userId].cartaoEscolhido) {
@@ -2060,6 +2081,83 @@ async function startBot() {
             delete aguardandoEdicaoCartao[userId];
             return;
           }
+        }
+
+        // Fluxo aguardando escolha do cartão para excluir
+        if (aguardandoExclusaoCartao[userId] && !aguardandoExclusaoCartao[userId].cartaoEscolhido) {
+          const escolha = texto.toLowerCase().trim();
+          if (escolha === 'cancelar') {
+            delete aguardandoExclusaoCartao[userId];
+            await sock.sendMessage(userId, { text: '❌ Exclusão de cartão cancelada.' });
+            return;
+          }
+          const idx = parseInt(escolha);
+          const cartoes = aguardandoExclusaoCartao[userId].cartoes;
+          if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
+            await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${cartoes.length} ou "cancelar".` });
+            return;
+          }
+          const cartaoEscolhido = cartoes[idx - 1];
+          
+          // Verificar se existem lançamentos associados
+          const totalLancamentos = await contarLancamentosAssociadosCartao(userId, cartaoEscolhido.nome_cartao);
+          
+          let msgConfirmacao = `🗑️ *Confirmar exclusão do cartão*\n\n`;
+          msgConfirmacao += `💳 Cartão: ${cartaoEscolhido.nome_cartao}\n`;
+          msgConfirmacao += `📅 Vencimento: dia ${cartaoEscolhido.dia_vencimento}\n`;
+          if (cartaoEscolhido.dia_fechamento) {
+            msgConfirmacao += `📅 Fechamento: dia ${cartaoEscolhido.dia_fechamento}\n`;
+          }
+          msgConfirmacao += `📊 Lançamentos associados: ${totalLancamentos}\n\n`;
+          
+          if (totalLancamentos > 0) {
+            msgConfirmacao += `⚠️ *ATENÇÃO:* Este cartão possui ${totalLancamentos} lançamento(s) associado(s).\n`;
+            msgConfirmacao += `Os lançamentos continuarão existindo, mas ficarão sem referência ao cartão.\n\n`;
+          }
+          
+          msgConfirmacao += `❓ Confirma a exclusão?\nDigite "sim" para confirmar ou "cancelar" para abortar.`;
+          
+          aguardandoExclusaoCartao[userId].cartaoEscolhido = cartaoEscolhido;
+          aguardandoExclusaoCartao[userId].totalLancamentos = totalLancamentos;
+          await sock.sendMessage(userId, { text: msgConfirmacao });
+          return;
+        }
+
+        // Fluxo aguardando confirmação de exclusão
+        if (aguardandoExclusaoCartao[userId] && aguardandoExclusaoCartao[userId].cartaoEscolhido) {
+          const confirmacao = texto.toLowerCase().trim();
+          if (confirmacao === 'cancelar') {
+            delete aguardandoExclusaoCartao[userId];
+            await sock.sendMessage(userId, { text: '❌ Exclusão de cartão cancelada.' });
+            return;
+          }
+          if (confirmacao !== 'sim') {
+            await sock.sendMessage(userId, { text: '❌ Confirmação inválida. Digite "sim" para confirmar ou "cancelar" para abortar.' });
+            return;
+          }
+          
+          const cartao = aguardandoExclusaoCartao[userId].cartaoEscolhido;
+          const totalLancamentos = aguardandoExclusaoCartao[userId].totalLancamentos;
+          
+          try {
+            const resultado = await excluirCartaoConfigurado(userId, cartao.nome_cartao);
+            
+            let msgSucesso = `✅ Cartão excluído com sucesso!\n\n`;
+            msgSucesso += `💳 Cartão: ${cartao.nome_cartao}\n`;
+            msgSucesso += `📊 Lançamentos associados: ${totalLancamentos}\n\n`;
+            
+            if (totalLancamentos > 0) {
+              msgSucesso += `ℹ️ Os ${totalLancamentos} lançamento(s) associado(s) continuam no sistema, mas sem referência ao cartão.\n`;
+              msgSucesso += `Para limpar completamente, você pode editar os lançamentos individualmente.`;
+            }
+            
+            await sock.sendMessage(userId, { text: msgSucesso });
+          } catch (error) {
+            await sock.sendMessage(userId, { text: `❌ Erro ao excluir cartão: ${error.message}` });
+          } finally {
+            delete aguardandoExclusaoCartao[userId];
+          }
+          return;
         }
 
 

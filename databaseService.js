@@ -391,6 +391,51 @@ async function listarCartoesConfigurados(userId) {
   return result.rows;
 }
 
+async function contarLancamentosAssociadosCartao(userId, nomeCartao) {
+  try {
+    const query = `
+      SELECT COUNT(*) as total
+      FROM lancamentos
+      WHERE user_id = $1 AND cartao_nome ILIKE $2
+    `;
+    const result = await pool.query(query, [userId, nomeCartao]);
+    return parseInt(result.rows[0].total);
+  } catch (error) {
+    console.error('❌ Erro ao contar lançamentos associados:', error);
+    throw error;
+  }
+}
+
+async function excluirCartaoConfigurado(userId, nomeCartao) {
+  try {
+    // Primeiro, verificar se existem lançamentos associados ao cartão
+    const totalLancamentos = await contarLancamentosAssociadosCartao(userId, nomeCartao);
+
+    // Excluir o cartão da configuração
+    const deleteQuery = `
+      DELETE FROM cartoes_config
+      WHERE user_id = $1 AND nome_cartao ILIKE $2
+    `;
+    const result = await pool.query(deleteQuery, [userId, nomeCartao]);
+
+    if (result.rowCount === 0) {
+      throw new Error('Cartão não encontrado');
+    }
+
+    // Registrar log de auditoria
+    await registrarLog(userId, 'EXCLUIR_CARTAO', `Cartão: ${nomeCartao}, Lançamentos associados: ${totalLancamentos}`);
+
+    return {
+      sucesso: true,
+      cartaoExcluido: nomeCartao,
+      lancamentosAssociados: totalLancamentos
+    };
+  } catch (error) {
+    console.error('❌ Erro ao excluir cartão:', error);
+    throw error;
+  }
+}
+
 // Calcular data de contabilização baseada no dia de vencimento e fechamento
 function calcularDataContabilizacao(dataLancamento, diaVencimento, diaFechamento = null) {
   const lancamento = new Date(dataLancamento);
@@ -1674,6 +1719,8 @@ module.exports = {
   atualizarCartaoConfigurado,
   buscarConfiguracaoCartao,
   listarCartoesConfigurados,
+  excluirCartaoConfigurado,
+  contarLancamentosAssociadosCartao,
   calcularDataContabilizacao,
   normalizarTexto
 }; 
