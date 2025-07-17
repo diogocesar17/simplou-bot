@@ -33,7 +33,6 @@ const {
   buscarAlertasDoDia,
   gerarMensagemAlertas
 } = require('./databaseService');
-const { getGastosCategoriaEspecifica, parseMonthYear, getNomeMes } = require('./googleSheetService');
 const { verificarEEnviarAlertas } = require('./alertasService');
 const { 
   initializeGemini, 
