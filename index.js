@@ -635,102 +635,6 @@ async function processarLancamento(userId, parsed, sock) {
     }
   }
 
-  // Comando para iniciar edição de cartão
-  if (/^editar cartao$/i.test(texto.toLowerCase())) {
-    const cartoes = await listarCartoesConfigurados(userId);
-    if (!cartoes || cartoes.length === 0) {
-      await sock.sendMessage(userId, { text: '❌ Nenhum cartão configurado para editar.' });
-      return;
-    }
-    let msgCartoes = 'Qual cartão deseja editar?\n';
-    cartoes.forEach((cartao, idx) => {
-      msgCartoes += `${idx + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento}, fecha dia ${cartao.dia_fechamento || 'NÃO INFORMADO'})\n`;
-    });
-    msgCartoes += '\nDigite o número do cartão ou "cancelar"';
-    aguardandoEdicaoCartao[userId] = { cartoes };
-    await sock.sendMessage(userId, { text: msgCartoes });
-    return;
-  }
-
-  // Fluxo aguardando escolha do cartão para editar
-  if (aguardandoEdicaoCartao[userId] && !aguardandoEdicaoCartao[userId].cartaoEscolhido) {
-    const escolha = texto.toLowerCase().trim();
-    if (escolha === 'cancelar') {
-      delete aguardandoEdicaoCartao[userId];
-      await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
-      return;
-    }
-    const idx = parseInt(escolha);
-    const cartoes = aguardandoEdicaoCartao[userId].cartoes;
-    if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
-      await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${cartoes.length} ou "cancelar".` });
-      return;
-    }
-    aguardandoEdicaoCartao[userId].cartaoEscolhido = cartoes[idx - 1];
-    await sock.sendMessage(userId, { text: 'Qual campo deseja editar?\n1. vencimento\n2. fechamento\n3. cancelar' });
-    return;
-  }
-
-  // Fluxo aguardando escolha do campo para editar
-  if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].cartaoEscolhido && !aguardandoEdicaoCartao[userId].campoEscolhido) {
-    const campo = texto.toLowerCase().trim();
-    let campoEscolhido = campo;
-    if (["1", "2", "3"].includes(campo)) {
-      if (campo === "1") campoEscolhido = "vencimento";
-      else if (campo === "2") campoEscolhido = "fechamento";
-      else if (campo === "3") campoEscolhido = "cancelar";
-    }
-    if (campoEscolhido === 'cancelar') {
-      delete aguardandoEdicaoCartao[userId];
-      await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
-      return;
-    }
-    if (!['vencimento', 'fechamento'].includes(campoEscolhido)) {
-      await sock.sendMessage(userId, { text: '❌ Campo inválido. Digite: 1, 2, 3 ou o nome do campo.' });
-      return;
-    }
-    aguardandoEdicaoCartao[userId].campoEscolhido = campoEscolhido;
-    if (campoEscolhido === 'vencimento') {
-      await sock.sendMessage(userId, { text: 'Digite o novo dia de vencimento (1-31):' });
-    } else if (campoEscolhido === 'fechamento') {
-      await sock.sendMessage(userId, { text: 'Digite o novo dia de fechamento (1-31):' });
-    }
-    return;
-  }
-
-  // Fluxo aguardando novo valor de vencimento/fechamento
-  if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].campoEscolhido) {
-    const campo = aguardandoEdicaoCartao[userId].campoEscolhido;
-    const cartao = aguardandoEdicaoCartao[userId].cartaoEscolhido;
-    const valor = texto.toLowerCase().trim();
-    if (campo === 'vencimento') {
-      const dia = parseInt(valor);
-      if (isNaN(dia) || dia < 1 || dia > 31) {
-        await sock.sendMessage(userId, { text: '❌ Dia de vencimento inválido. Digite um número entre 1 e 31.' });
-        return;
-      }
-      aguardandoEdicaoCartao[userId].novoVencimento = dia;
-      // Atualizar só vencimento
-      await atualizarCartaoConfigurado(userId, cartao.nome_cartao, dia, cartao.dia_fechamento);
-      await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nNovo vencimento: dia ${dia}\nFechamento: dia ${cartao.dia_fechamento || 'NÃO INFORMADO'}` });
-      delete aguardandoEdicaoCartao[userId];
-      return;
-    }
-    if (campo === 'fechamento') {
-      const dia = parseInt(valor);
-      if (isNaN(dia) || dia < 1 || dia > 31) {
-        await sock.sendMessage(userId, { text: '❌ Dia de fechamento inválido. Digite um número entre 1 e 31.' });
-        return;
-      }
-      aguardandoEdicaoCartao[userId].novoFechamento = dia;
-      // Atualizar só fechamento
-      await atualizarCartaoConfigurado(userId, cartao.nome_cartao, cartao.dia_vencimento, dia);
-      await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nVencimento: dia ${cartao.dia_vencimento}\nNovo fechamento: dia ${dia}` });
-      delete aguardandoEdicaoCartao[userId];
-      return;
-    }
-  }
-
   // Dentro do bloco de resposta padrão (mensagem não reconhecida):
   console.log('[DEBUG] Nenhum comando reconhecido, enviando resposta padrão.');
   await sock.sendMessage(userId, {
@@ -751,6 +655,15 @@ let aguardandoEdicaoCartao = {};
 let aguardandoFormaPagamento = {};
 let aguardandoDataVencimento = {};
 let aguardandoPerguntaInteligente = {};
+
+// Função utilitária para obter o nome do mês em português
+function getNomeMes(mes) {
+  const nomes = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+  return nomes[mes] || '';
+}
 
 async function startBot() {
   try {
@@ -1457,19 +1370,19 @@ async function startBot() {
       }
 
       // --- TRATAMENTO DE COMANDO CONFIGURAR CARTÃO ---
-      const textoNormalizado = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      const textoNormalizadoConfigurar  = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
       console.log('[DEBUG] texto original:', texto);
-      console.log('[DEBUG] texto normalizado:', textoNormalizado);
+      console.log('[DEBUG] texto normalizado:', textoNormalizadoConfigurar);
       
-      // Aceitar variações com e sem acento: "configurar cartao", "configurar cartão", "Configurar Cartão", etc.
-      if (/^configurar\s+cart[aã]o$/.test(textoNormalizado) || /^configurar\s+cart[aã]o$/.test(textoLower)) {
-        console.log('[DEBUG] Comando CONFIGURAR CARTAO reconhecido!');
+      // Aceitar variações: "configurar cartao", "configurar cartão", "cadastrar cartao", "cadastrar cartão", etc.
+      if (/^(configurar|cadastrar)\s+cart[aã]o$/.test(textoNormalizadoConfigurar) || /^(configurar|cadastrar)\s+cart[aã]o$/.test(textoLower)) {
+        console.log('[DEBUG] Comando CONFIGURAR/CADASTRAR CARTAO reconhecido!');
         aguardandoConfiguracaoCartao[userId] = {};
         await sock.sendMessage(userId, { text: '💳 Qual o nome do cartão? (Exemplo: Nubank, Itaú, Inter)\n\nDigite "cancelar" para abortar.' });
         return;
       } else {
-        if (textoNormalizado.includes('configurar')) {
-          console.log('[DEBUG] Comando configurar detectado mas não bateu regex:', textoNormalizado);
+        if (textoNormalizadoConfigurar.includes('configurar') || textoNormalizadoConfigurar.includes('cadastrar')) {
+          console.log('[DEBUG] Comando configurar/cadastrar detectado mas não bateu regex:', textoNormalizadoConfigurar);
         }
       }
 
@@ -1942,7 +1855,105 @@ async function startBot() {
         return;
       }
 
-      console.log('[DEBUG] Antes do parseMessage');
+        // Comando para iniciar edição de cartão
+        const textoNormalizado = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        if (/^editar cartao$/i.test(textoNormalizado)) {
+          const cartoes = await listarCartoesConfigurados(userId);
+          if (!cartoes || cartoes.length === 0) {
+            await sock.sendMessage(userId, { text: '❌ Nenhum cartão configurado para editar.' });
+            return;
+          }
+          let msgCartoes = 'Qual cartão deseja editar?\n';
+          cartoes.forEach((cartao, idx) => {
+            msgCartoes += `${idx + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento}, fecha dia ${cartao.dia_fechamento || 'NÃO INFORMADO'})\n`;
+          });
+          msgCartoes += '\nDigite o número do cartão ou "cancelar"';
+          aguardandoEdicaoCartao[userId] = { cartoes };
+          await sock.sendMessage(userId, { text: msgCartoes });
+          return;
+        }
+
+        // Fluxo aguardando escolha do cartão para editar
+        if (aguardandoEdicaoCartao[userId] && !aguardandoEdicaoCartao[userId].cartaoEscolhido) {
+          const escolha = texto.toLowerCase().trim();
+          if (escolha === 'cancelar') {
+            delete aguardandoEdicaoCartao[userId];
+            await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
+            return;
+          }
+          const idx = parseInt(escolha);
+          const cartoes = aguardandoEdicaoCartao[userId].cartoes;
+          if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
+            await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${cartoes.length} ou "cancelar".` });
+            return;
+          }
+          aguardandoEdicaoCartao[userId].cartaoEscolhido = cartoes[idx - 1];
+          await sock.sendMessage(userId, { text: 'Qual campo deseja editar?\n1. vencimento\n2. fechamento\n3. cancelar' });
+          return;
+        }
+
+        // Fluxo aguardando escolha do campo para editar
+        if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].cartaoEscolhido && !aguardandoEdicaoCartao[userId].campoEscolhido) {
+          const campo = texto.toLowerCase().trim();
+          let campoEscolhido = campo;
+          if (["1", "2", "3"].includes(campo)) {
+            if (campo === "1") campoEscolhido = "vencimento";
+            else if (campo === "2") campoEscolhido = "fechamento";
+            else if (campo === "3") campoEscolhido = "cancelar";
+          }
+          if (campoEscolhido === 'cancelar') {
+            delete aguardandoEdicaoCartao[userId];
+            await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
+            return;
+          }
+          if (!['vencimento', 'fechamento'].includes(campoEscolhido)) {
+            await sock.sendMessage(userId, { text: '❌ Campo inválido. Digite: 1, 2, 3 ou o nome do campo.' });
+            return;
+          }
+          aguardandoEdicaoCartao[userId].campoEscolhido = campoEscolhido;
+          if (campoEscolhido === 'vencimento') {
+            await sock.sendMessage(userId, { text: 'Digite o novo dia de vencimento (1-31):' });
+          } else if (campoEscolhido === 'fechamento') {
+            await sock.sendMessage(userId, { text: 'Digite o novo dia de fechamento (1-31):' });
+          }
+          return;
+        }
+
+        // Fluxo aguardando novo valor de vencimento/fechamento
+        if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].campoEscolhido) {
+          const campo = aguardandoEdicaoCartao[userId].campoEscolhido;
+          const cartao = aguardandoEdicaoCartao[userId].cartaoEscolhido;
+          const valor = texto.toLowerCase().trim();
+          if (campo === 'vencimento') {
+            const dia = parseInt(valor);
+            if (isNaN(dia) || dia < 1 || dia > 31) {
+              await sock.sendMessage(userId, { text: '❌ Dia de vencimento inválido. Digite um número entre 1 e 31.' });
+              return;
+            }
+            aguardandoEdicaoCartao[userId].novoVencimento = dia;
+            // Atualizar só vencimento
+            await atualizarCartaoConfigurado(userId, cartao.nome_cartao, dia, cartao.dia_fechamento);
+            await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nNovo vencimento: dia ${dia}\nFechamento: dia ${cartao.dia_fechamento || 'NÃO INFORMADO'}` });
+            delete aguardandoEdicaoCartao[userId];
+            return;
+          }
+          if (campo === 'fechamento') {
+            const dia = parseInt(valor);
+            if (isNaN(dia) || dia < 1 || dia > 31) {
+              await sock.sendMessage(userId, { text: '❌ Dia de fechamento inválido. Digite um número entre 1 e 31.' });
+              return;
+            }
+            aguardandoEdicaoCartao[userId].novoFechamento = dia;
+            // Atualizar só fechamento
+            await atualizarCartaoConfigurado(userId, cartao.nome_cartao, cartao.dia_vencimento, dia);
+            await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nVencimento: dia ${cartao.dia_vencimento}\nNovo fechamento: dia ${dia}` });
+            delete aguardandoEdicaoCartao[userId];
+            return;
+          }
+        }
+
+
+    console.log('[DEBUG] Antes do parseMessage');
     const parsed = parseMessage(texto);
     console.log('[DEBUG] parsed após parseMessage:', parsed);
 
@@ -2019,10 +2030,10 @@ async function startBot() {
             await appendRowToDatabase(userId, [
               parsed.data.split('/').reverse().join('-'),
               tipoNormalizado,
-              parsed.descricao,
-              parsed.valor,
-              parsed.categoria,
-              parsed.pagamento,
+        parsed.descricao,
+        parsed.valor,
+        parsed.categoria,
+        parsed.pagamento,
               null, // parcelamento_id
               null, // parcela_atual
               null, // total_parcelas
@@ -2390,101 +2401,101 @@ async function startBot() {
         }
       }
 
-      // Comando para iniciar edição de cartão
-      if (/^editar cartao$/i.test(texto.toLowerCase())) {
-        const cartoes = await listarCartoesConfigurados(userId);
-        if (!cartoes || cartoes.length === 0) {
-          await sock.sendMessage(userId, { text: '❌ Nenhum cartão configurado para editar.' });
-          return;
-        }
-        let msgCartoes = 'Qual cartão deseja editar?\n';
-        cartoes.forEach((cartao, idx) => {
-          msgCartoes += `${idx + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento}, fecha dia ${cartao.dia_fechamento || 'NÃO INFORMADO'})\n`;
-        });
-        msgCartoes += '\nDigite o número do cartão ou "cancelar"';
-        aguardandoEdicaoCartao[userId] = { cartoes };
-        await sock.sendMessage(userId, { text: msgCartoes });
-        return;
-      }
+      // // Comando para iniciar edição de cartão
+      // if (/^editar cartao$/i.test(texto.toLowerCase())) {
+      //   const cartoes = await listarCartoesConfigurados(userId);
+      //   if (!cartoes || cartoes.length === 0) {
+      //     await sock.sendMessage(userId, { text: '❌ Nenhum cartão configurado para editar.' });
+      //     return;
+      //   }
+      //   let msgCartoes = 'Qual cartão deseja editar?\n';
+      //   cartoes.forEach((cartao, idx) => {
+      //     msgCartoes += `${idx + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento}, fecha dia ${cartao.dia_fechamento || 'NÃO INFORMADO'})\n`;
+      //   });
+      //   msgCartoes += '\nDigite o número do cartão ou "cancelar"';
+      //   aguardandoEdicaoCartao[userId] = { cartoes };
+      //   await sock.sendMessage(userId, { text: msgCartoes });
+      //   return;
+      // }
 
-      // Fluxo aguardando escolha do cartão para editar
-      if (aguardandoEdicaoCartao[userId] && !aguardandoEdicaoCartao[userId].cartaoEscolhido) {
-        const escolha = texto.toLowerCase().trim();
-        if (escolha === 'cancelar') {
-          delete aguardandoEdicaoCartao[userId];
-          await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
-          return;
-        }
-        const idx = parseInt(escolha);
-        const cartoes = aguardandoEdicaoCartao[userId].cartoes;
-        if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
-          await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${cartoes.length} ou "cancelar".` });
-          return;
-        }
-        aguardandoEdicaoCartao[userId].cartaoEscolhido = cartoes[idx - 1];
-        await sock.sendMessage(userId, { text: 'Qual campo deseja editar?\n1. vencimento\n2. fechamento\n3. cancelar' });
-        return;
-      }
+      // // Fluxo aguardando escolha do cartão para editar
+      // if (aguardandoEdicaoCartao[userId] && !aguardandoEdicaoCartao[userId].cartaoEscolhido) {
+      //   const escolha = texto.toLowerCase().trim();
+      //   if (escolha === 'cancelar') {
+      //     delete aguardandoEdicaoCartao[userId];
+      //     await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
+      //     return;
+      //   }
+      //   const idx = parseInt(escolha);
+      //   const cartoes = aguardandoEdicaoCartao[userId].cartoes;
+      //   if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
+      //     await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${cartoes.length} ou "cancelar".` });
+      //     return;
+      //   }
+      //   aguardandoEdicaoCartao[userId].cartaoEscolhido = cartoes[idx - 1];
+      //   await sock.sendMessage(userId, { text: 'Qual campo deseja editar?\n1. vencimento\n2. fechamento\n3. cancelar' });
+      //   return;
+      // }
 
-      // Fluxo aguardando escolha do campo para editar
-      if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].cartaoEscolhido && !aguardandoEdicaoCartao[userId].campoEscolhido) {
-        const campo = texto.toLowerCase().trim();
-        let campoEscolhido = campo;
-        if (["1", "2", "3"].includes(campo)) {
-          if (campo === "1") campoEscolhido = "vencimento";
-          else if (campo === "2") campoEscolhido = "fechamento";
-          else if (campo === "3") campoEscolhido = "cancelar";
-        }
-        if (campoEscolhido === 'cancelar') {
-          delete aguardandoEdicaoCartao[userId];
-          await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
-          return;
-        }
-        if (!['vencimento', 'fechamento'].includes(campoEscolhido)) {
-          await sock.sendMessage(userId, { text: '❌ Campo inválido. Digite: 1, 2, 3 ou o nome do campo.' });
-          return;
-        }
-        aguardandoEdicaoCartao[userId].campoEscolhido = campoEscolhido;
-        if (campoEscolhido === 'vencimento') {
-          await sock.sendMessage(userId, { text: 'Digite o novo dia de vencimento (1-31):' });
-        } else if (campoEscolhido === 'fechamento') {
-          await sock.sendMessage(userId, { text: 'Digite o novo dia de fechamento (1-31):' });
-        }
-        return;
-      }
+      // // Fluxo aguardando escolha do campo para editar
+      // if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].cartaoEscolhido && !aguardandoEdicaoCartao[userId].campoEscolhido) {
+      //   const campo = texto.toLowerCase().trim();
+      //   let campoEscolhido = campo;
+      //   if (["1", "2", "3"].includes(campo)) {
+      //     if (campo === "1") campoEscolhido = "vencimento";
+      //     else if (campo === "2") campoEscolhido = "fechamento";
+      //     else if (campo === "3") campoEscolhido = "cancelar";
+      //   }
+      //   if (campoEscolhido === 'cancelar') {
+      //     delete aguardandoEdicaoCartao[userId];
+      //     await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
+      //     return;
+      //   }
+      //   if (!['vencimento', 'fechamento'].includes(campoEscolhido)) {
+      //     await sock.sendMessage(userId, { text: '❌ Campo inválido. Digite: 1, 2, 3 ou o nome do campo.' });
+      //     return;
+      //   }
+      //   aguardandoEdicaoCartao[userId].campoEscolhido = campoEscolhido;
+      //   if (campoEscolhido === 'vencimento') {
+      //     await sock.sendMessage(userId, { text: 'Digite o novo dia de vencimento (1-31):' });
+      //   } else if (campoEscolhido === 'fechamento') {
+      //     await sock.sendMessage(userId, { text: 'Digite o novo dia de fechamento (1-31):' });
+      //   }
+      //   return;
+      // }
 
-      // Fluxo aguardando novo valor de vencimento/fechamento
-      if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].campoEscolhido) {
-        const campo = aguardandoEdicaoCartao[userId].campoEscolhido;
-        const cartao = aguardandoEdicaoCartao[userId].cartaoEscolhido;
-        const valor = texto.toLowerCase().trim();
-        if (campo === 'vencimento') {
-          const dia = parseInt(valor);
-          if (isNaN(dia) || dia < 1 || dia > 31) {
-            await sock.sendMessage(userId, { text: '❌ Dia de vencimento inválido. Digite um número entre 1 e 31.' });
-            return;
-          }
-          aguardandoEdicaoCartao[userId].novoVencimento = dia;
-          // Atualizar só vencimento
-          await atualizarCartaoConfigurado(userId, cartao.nome_cartao, dia, cartao.dia_fechamento);
-          await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nNovo vencimento: dia ${dia}\nFechamento: dia ${cartao.dia_fechamento || 'NÃO INFORMADO'}` });
-          delete aguardandoEdicaoCartao[userId];
-          return;
-        }
-        if (campo === 'fechamento') {
-          const dia = parseInt(valor);
-          if (isNaN(dia) || dia < 1 || dia > 31) {
-            await sock.sendMessage(userId, { text: '❌ Dia de fechamento inválido. Digite um número entre 1 e 31.' });
-            return;
-          }
-          aguardandoEdicaoCartao[userId].novoFechamento = dia;
-          // Atualizar só fechamento
-          await atualizarCartaoConfigurado(userId, cartao.nome_cartao, cartao.dia_vencimento, dia);
-          await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nVencimento: dia ${cartao.dia_vencimento}\nNovo fechamento: dia ${dia}` });
-          delete aguardandoEdicaoCartao[userId];
-          return;
-        }
-      }
+      // // Fluxo aguardando novo valor de vencimento/fechamento
+      // if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].campoEscolhido) {
+      //   const campo = aguardandoEdicaoCartao[userId].campoEscolhido;
+      //   const cartao = aguardandoEdicaoCartao[userId].cartaoEscolhido;
+      //   const valor = texto.toLowerCase().trim();
+      //   if (campo === 'vencimento') {
+      //     const dia = parseInt(valor);
+      //     if (isNaN(dia) || dia < 1 || dia > 31) {
+      //       await sock.sendMessage(userId, { text: '❌ Dia de vencimento inválido. Digite um número entre 1 e 31.' });
+      //       return;
+      //     }
+      //     aguardandoEdicaoCartao[userId].novoVencimento = dia;
+      //     // Atualizar só vencimento
+      //     await atualizarCartaoConfigurado(userId, cartao.nome_cartao, dia, cartao.dia_fechamento);
+      //     await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nNovo vencimento: dia ${dia}\nFechamento: dia ${cartao.dia_fechamento || 'NÃO INFORMADO'}` });
+      //     delete aguardandoEdicaoCartao[userId];
+      //     return;
+      //   }
+      //   if (campo === 'fechamento') {
+      //     const dia = parseInt(valor);
+      //     if (isNaN(dia) || dia < 1 || dia > 31) {
+      //       await sock.sendMessage(userId, { text: '❌ Dia de fechamento inválido. Digite um número entre 1 e 31.' });
+      //       return;
+      //     }
+      //     aguardandoEdicaoCartao[userId].novoFechamento = dia;
+      //     // Atualizar só fechamento
+      //     await atualizarCartaoConfigurado(userId, cartao.nome_cartao, cartao.dia_vencimento, dia);
+      //     await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nVencimento: dia ${cartao.dia_vencimento}\nNovo fechamento: dia ${dia}` });
+      //     delete aguardandoEdicaoCartao[userId];
+      //     return;
+      //   }
+      // }
 
       // Dentro do bloco de resposta padrão (mensagem não reconhecida):
       console.log('[DEBUG] Nenhum comando reconhecido, enviando resposta padrão.');
