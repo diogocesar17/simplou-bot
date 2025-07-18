@@ -659,6 +659,16 @@ let aguardandoFormaPagamento = {};
 let aguardandoDataVencimento = {};
 let aguardandoPerguntaInteligente = {};
 
+// Variáveis de status para monitoramento
+let botStatus = {
+  status: 'starting',
+  whatsappConnected: false,
+  databaseConnected: false,
+  lastMessage: null,
+  uptime: null,
+  geminiAvailable: false
+};
+
 // Função utilitária para obter o nome do mês em português
 function getNomeMes(mes) {
   const nomes = [
@@ -668,14 +678,83 @@ function getNomeMes(mes) {
   return nomes[mes] || '';
 }
 
+// Servidor HTTP para monitoramento e healthcheck
+const server = http.createServer((req, res) => {
+  // Atualizar uptime
+  botStatus.uptime = process.uptime();
+  
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(botStatus, null, 2));
+  } else if (req.url === '/') {
+    const uptimeHours = Math.floor(botStatus.uptime / 3600);
+    const uptimeMinutes = Math.floor((botStatus.uptime % 3600) / 60);
+    
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>🤖 Simplou Bot - Status</title>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+          .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+          .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+          .online { background: #d4edda; color: #155724; }
+          .offline { background: #f8d7da; color: #721c24; }
+          .warning { background: #fff3cd; color: #856404; }
+          h1 { color: #333; }
+          .uptime { font-size: 18px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>🤖 Simplou Bot - Status</h1>
+          <div class="status ${botStatus.status === 'running' ? 'online' : 'warning'}">
+            <strong>Status:</strong> ${botStatus.status}
+          </div>
+          <div class="status ${botStatus.whatsappConnected ? 'online' : 'offline'}">
+            <strong>WhatsApp:</strong> ${botStatus.whatsappConnected ? '✅ Conectado' : '❌ Desconectado'}
+          </div>
+          <div class="status ${botStatus.databaseConnected ? 'online' : 'offline'}">
+            <strong>Database:</strong> ${botStatus.databaseConnected ? '✅ Conectado' : '❌ Desconectado'}
+          </div>
+          <div class="status ${botStatus.geminiAvailable ? 'online' : 'warning'}">
+            <strong>Gemini AI:</strong> ${botStatus.geminiAvailable ? '✅ Disponível' : '⚠️ Indisponível'}
+          </div>
+          <div class="uptime">
+            <strong>Uptime:</strong> ${uptimeHours}h ${uptimeMinutes}m
+          </div>
+          ${botStatus.lastMessage ? `<div class="status warning"><strong>Última mensagem:</strong> ${botStatus.lastMessage}</div>` : ''}
+        </div>
+      </body>
+      </html>
+    `);
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
+  }
+});
+
+// Iniciar servidor HTTP
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🚀 Servidor de monitoramento rodando na porta ${PORT}`);
+  console.log(`📊 Healthcheck: http://localhost:${PORT}/health`);
+  console.log(`📱 Status: http://localhost:${PORT}/`);
+});
+
 async function startBot() {
   try {
     // Inicializar banco de dados
     await initializeDatabase();
+    botStatus.databaseConnected = true;
     console.log('✅ Banco de dados inicializado');
 
     // Inicializar Gemini AI
     const geminiInicializado = initializeGemini();
+    botStatus.geminiAvailable = geminiInicializado;
     if (geminiInicializado) {
       console.log('🤖 Gemini AI inicializado com sucesso!');
     } else {
@@ -702,6 +781,9 @@ async function startBot() {
     }
 
     if (connection === 'close') {
+      botStatus.whatsappConnected = false;
+      botStatus.status = 'disconnected';
+      
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
       console.log('⚠️ Conexão encerrada:', lastDisconnect?.error?.message, '| Reconectar?', shouldReconnect);
@@ -712,6 +794,8 @@ async function startBot() {
         console.log('❌ Sessão encerrada. É necessário escanear o QR code novamente.');
       }
     } else if (connection === 'open') {
+      botStatus.whatsappConnected = true;
+      botStatus.status = 'running';
       console.log('✅ Conectado com sucesso ao WhatsApp!');
     }
   });
@@ -725,6 +809,9 @@ async function startBot() {
       const texto = msg.message.conversation.trim();
       const textoLower = texto.toLowerCase().trim();
       const userId = msg.key.remoteJid; // Identificador único do usuário
+      
+      // Atualizar status da última mensagem
+      botStatus.lastMessage = `${new Date().toLocaleTimeString('pt-BR')} - ${userId}: ${texto.substring(0, 50)}${texto.length > 50 ? '...' : ''}`;
 
       // LOGS DE DEBUG PARA DIAGNÓSTICO DE CONTEXTO
       console.log('[DEBUG] Mensagem recebida de userId:', userId);
