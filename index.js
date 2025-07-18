@@ -701,12 +701,18 @@ async function startBot() {
         console.log(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qr)}`);
     }
 
-    if (connection === 'open') {
-      console.log('✅ Conectado ao WhatsApp');
-    }
-
     if (connection === 'close') {
-      console.log('⚠️ Conexão encerrada:', lastDisconnect?.error?.message);
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+      console.log('⚠️ Conexão encerrada:', lastDisconnect?.error?.message, '| Reconectar?', shouldReconnect);
+  
+      if (shouldReconnect) {
+        startBot(); // reconecta
+      } else {
+        console.log('❌ Sessão encerrada. É necessário escanear o QR code novamente.');
+      }
+    } else if (connection === 'open') {
+      console.log('✅ Conectado com sucesso ao WhatsApp!');
     }
   });
 
