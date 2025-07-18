@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const { logger, fileLogger } = require('./logger');
 
 // Configuração otimizada da conexão com PostgreSQL
 const pool = new Pool({
@@ -16,24 +17,24 @@ const pool = new Pool({
 
 // Monitoramento de conexões
 pool.on('connect', (client) => {
-  console.log('🔌 Nova conexão PostgreSQL estabelecida');
+  logger.info('🔌 Nova conexão PostgreSQL estabelecida');
 });
 
 pool.on('error', (err, client) => {
-  console.error('❌ Erro no pool PostgreSQL:', err.message);
+  fileLogger.error('❌ Erro no pool PostgreSQL:', err.message);
 });
 
 // Inicializar tabelas se não existirem
 async function initializeDatabase() {
   try {
-    console.log('🔌 Tentando conectar ao PostgreSQL...');
+    logger.info('🔌 Tentando conectar ao PostgreSQL...');
     
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL não configurada. Verifique as variáveis de ambiente.');
     }
     
     const client = await pool.connect();
-    console.log('✅ Conectado ao PostgreSQL com sucesso');
+    logger.info('✅ Conectado ao PostgreSQL com sucesso');
     
     // Criar tabela de lançamentos
     await client.query(`
@@ -112,13 +113,13 @@ async function initializeDatabase() {
     `);
 
     client.release();
-    console.log('✅ Banco de dados inicializado com sucesso');
+    logger.info('✅ Banco de dados inicializado com sucesso');
   } catch (error) {
-    console.error('❌ Erro ao inicializar banco de dados:', error.message);
-    console.error('🔍 Verifique se:');
-    console.error('   - DATABASE_URL está configurada');
-    console.error('   - PostgreSQL está rodando');
-    console.error('   - Credenciais estão corretas');
+    fileLogger.error('❌ Erro ao inicializar banco de dados:', error.message);
+    logger.error('🔍 Verifique se:');
+    logger.error('   - DATABASE_URL está configurada');
+    logger.error('   - PostgreSQL está rodando');
+    logger.error('   - Credenciais estão corretas');
     throw error;
   }
 }
@@ -148,7 +149,7 @@ async function migrateCartaoColumns(client) {
     const columnsToAdd = newColumns.filter(col => !existingColumns.includes(col));
     
     if (columnsToAdd.length > 0) {
-      console.log('🔄 Migrando colunas de cartão de crédito...');
+      logger.info('🔄 Migrando colunas de cartão de crédito...');
       
       for (const column of columnsToAdd) {
         let columnDefinition = '';
@@ -178,16 +179,16 @@ async function migrateCartaoColumns(client) {
         
         if (columnDefinition) {
           await client.query(`ALTER TABLE lancamentos ${columnDefinition}`);
-          console.log(`✅ Coluna ${column} adicionada`);
+          logger.info(`✅ Coluna ${column} adicionada`);
         }
       }
       
-      console.log('✅ Migração de colunas concluída');
+      logger.info('✅ Migração de colunas concluída');
     } else {
-      console.log('✅ Colunas de cartão já existem');
+      logger.info('✅ Colunas de cartão já existem');
     }
   } catch (error) {
-    console.error('❌ Erro na migração:', error.message);
+    fileLogger.error('❌ Erro na migração:', error.message);
     throw error;
   }
 }
@@ -215,7 +216,7 @@ async function migrateParcelamentoRecorrenteColumns(client) {
     const columnsToAdd = newColumns.filter(col => !existingColumns.includes(col));
     
     if (columnsToAdd.length > 0) {
-      console.log('🔄 Migrando colunas de parcelamento e recorrente...');
+      logger.info('🔄 Migrando colunas de parcelamento e recorrente...');
       
       for (const column of columnsToAdd) {
         let columnDefinition = '';
@@ -242,16 +243,16 @@ async function migrateParcelamentoRecorrenteColumns(client) {
         
         if (columnDefinition) {
           await client.query(`ALTER TABLE lancamentos ${columnDefinition}`);
-          console.log(`✅ Coluna ${column} adicionada`);
+          logger.info(`✅ Coluna ${column} adicionada`);
         }
       }
       
-      console.log('✅ Migração de colunas de parcelamento e recorrente concluída');
+      logger.info('✅ Migração de colunas de parcelamento e recorrente concluída');
     } else {
-      console.log('✅ Colunas de parcelamento e recorrente já existem');
+      logger.info('✅ Colunas de parcelamento e recorrente já existem');
     }
   } catch (error) {
-    console.error('❌ Erro na migração de parcelamento e recorrente:', error.message);
+    fileLogger.error('❌ Erro na migração de parcelamento e recorrente:', error.message);
     throw error;
   }
 }
@@ -267,14 +268,14 @@ async function migrateCartoesConfigTable(client) {
     `);
     
     if (checkColumn.rows.length === 0) {
-      console.log('🔄 Adicionando coluna dia_fechamento à tabela cartoes_config...');
+      logger.info('🔄 Adicionando coluna dia_fechamento à tabela cartoes_config...');
       await client.query(`ALTER TABLE cartoes_config ADD COLUMN dia_fechamento INTEGER`);
-      console.log('✅ Coluna dia_fechamento adicionada à tabela cartoes_config');
+      logger.info('✅ Coluna dia_fechamento adicionada à tabela cartoes_config');
     } else {
-      console.log('✅ Coluna dia_fechamento já existe na tabela cartoes_config');
+      logger.info('✅ Coluna dia_fechamento já existe na tabela cartoes_config');
     }
   } catch (error) {
-    console.error('❌ Erro na migração da tabela cartoes_config:', error.message);
+    fileLogger.error('❌ Erro na migração da tabela cartoes_config:', error.message);
     throw error;
   }
 }
@@ -290,14 +291,14 @@ async function migrateDataVencimentoColumn(client) {
     `);
     
     if (checkColumn.rows.length === 0) {
-      console.log('🔄 Adicionando coluna data_vencimento à tabela lancamentos...');
+      logger.info('🔄 Adicionando coluna data_vencimento à tabela lancamentos...');
       await client.query(`ALTER TABLE lancamentos ADD COLUMN data_vencimento DATE`);
-      console.log('✅ Coluna data_vencimento adicionada à tabela lancamentos');
+      logger.info('✅ Coluna data_vencimento adicionada à tabela lancamentos');
     } else {
-      console.log('✅ Coluna data_vencimento já existe na tabela lancamentos');
+      logger.info('✅ Coluna data_vencimento já existe na tabela lancamentos');
     }
   } catch (error) {
-    console.error('❌ Erro na migração da coluna data_vencimento:', error.message);
+    fileLogger.error('❌ Erro na migração da coluna data_vencimento:', error.message);
     throw error;
   }
 }
@@ -343,7 +344,7 @@ async function salvarConfiguracaoCartao(userId, nomeCartao, diaVencimento, diaFe
     
     return result.rows[0].id;
   } catch (error) {
-    console.error('❌ Erro ao salvar configuração de cartão:', error);
+    fileLogger.error('❌ Erro ao salvar configuração de cartão:', error);
     throw error;
   }
 }
@@ -365,7 +366,7 @@ async function atualizarCartaoConfigurado(userId, nomeCartao, diaVencimento, dia
     
     return result.rows[0]?.id;
   } catch (error) {
-    console.error('❌ Erro ao atualizar configuração de cartão:', error);
+    fileLogger.error('❌ Erro ao atualizar configuração de cartão:', error);
     throw error;
   }
 }
@@ -401,7 +402,7 @@ async function contarLancamentosAssociadosCartao(userId, nomeCartao) {
     const result = await pool.query(query, [userId, nomeCartao]);
     return parseInt(result.rows[0].total);
   } catch (error) {
-    console.error('❌ Erro ao contar lançamentos associados:', error);
+    fileLogger.error('❌ Erro ao contar lançamentos associados:', error);
     throw error;
   }
 }
@@ -431,7 +432,7 @@ async function excluirCartaoConfigurado(userId, nomeCartao) {
       lancamentosAssociados: totalLancamentos
     };
   } catch (error) {
-    console.error('❌ Erro ao excluir cartão:', error);
+    fileLogger.error('❌ Erro ao excluir cartão:', error);
     throw error;
   }
 }
@@ -530,7 +531,7 @@ async function appendRowToDatabase(userId, values) {
     
     return lancamentoId;
   } catch (error) {
-    console.error('❌ Erro ao adicionar lançamento:', error);
+    fileLogger.error('❌ Erro ao adicionar lançamento:', error);
     throw error;
   }
 }
@@ -634,7 +635,7 @@ async function getResumoDoDia(userId) {
 }
 
 async function getResumoPorMes(userId, mes, ano) {
-  console.log('[DEBUG] getResumoPorMes chamada com:', { userId, mes, ano });
+  logger.debug('[DEBUG] getResumoPorMes chamada com:', { userId, mes, ano });
   
   const query = `
     SELECT 
@@ -652,18 +653,18 @@ async function getResumoPorMes(userId, mes, ano) {
   `;
   
   const params = [userId, mes, ano];
-  console.log('[DEBUG] Query params:', params);
-  console.log('[DEBUG] Query SQL:', query);
+  logger.debug('[DEBUG] Query params:', params);
+  logger.debug('[DEBUG] Query SQL:', query);
   
   const result = await pool.query(query, params);
-  console.log('[DEBUG] Resultado da query:', result.rows);
+  logger.debug('[DEBUG] Resultado da query:', result.rows);
   
   let totalReceitas = 0;
   let totalDespesas = 0;
   let totalLancamentos = 0;
   
   result.rows.forEach(row => {
-    console.log('[DEBUG] Processando row:', row);
+    logger.debug('[DEBUG] Processando row:', row);
     if (row.tipo === 'receita') {
       totalReceitas = parseFloat(row.total);
     } else if (row.tipo === 'gasto') {
@@ -674,7 +675,7 @@ async function getResumoPorMes(userId, mes, ano) {
   
   const saldo = totalReceitas - totalDespesas;
   
-  console.log('[DEBUG] Totais calculados:', { totalReceitas, totalDespesas, saldo, totalLancamentos });
+  logger.debug('[DEBUG] Totais calculados:', { totalReceitas, totalDespesas, saldo, totalLancamentos });
   
   return {
     totalReceitas,
@@ -922,8 +923,8 @@ async function atualizarLancamentoPorId(userId, id, novosDados) {
       RETURNING id
     `;
     
-    console.log('[DEBUG] Query de atualização:', query);
-    console.log('[DEBUG] Valores:', valores);
+    logger.debug('[DEBUG] Query de atualização:', query);
+    logger.debug('[DEBUG] Valores:', valores);
     
     const result = await pool.query(query, valores);
     
@@ -957,7 +958,7 @@ async function atualizarLancamentoPorId(userId, id, novosDados) {
     
     return result.rows[0];
   } catch (error) {
-    console.error('❌ Erro ao atualizar lançamento:', error);
+    fileLogger.error('❌ Erro ao atualizar lançamento:', error);
     throw error;
   }
 }
@@ -976,7 +977,7 @@ async function excluirLancamentoPorId(userId, id) {
       await registrarLog(userId, 'EXCLUIR_LANCAMENTO', detalhes);
     }
   } catch (error) {
-    console.error('❌ Erro ao excluir lançamento:', error);
+    fileLogger.error('❌ Erro ao excluir lançamento:', error);
     throw error;
   }
 }
@@ -1030,7 +1031,7 @@ async function excluirParcelamentoPorId(userId, parcelamentoId) {
     
     return deleteResult.rowCount;
   } catch (error) {
-    console.error('❌ Erro ao excluir parcelamento:', error);
+    fileLogger.error('❌ Erro ao excluir parcelamento:', error);
     throw error;
   }
 }
@@ -1062,7 +1063,7 @@ async function excluirRecorrentePorId(userId, recorrenteId) {
     
     return deleteResult.rowCount;
   } catch (error) {
-    console.error('❌ Erro ao excluir recorrente:', error);
+    fileLogger.error('❌ Erro ao excluir recorrente:', error);
     throw error;
   }
 }
@@ -1381,7 +1382,7 @@ async function queryDatabase(query, params = []) {
     const result = await pool.query(query, params);
     return result.rows;
   } catch (error) {
-    console.error('[DATABASE] Erro na query:', error);
+    fileLogger.error('[DATABASE] Erro na query:', error);
     throw error;
   }
 }
@@ -1399,7 +1400,7 @@ async function registrarLog(userId, acao, detalhes = null) {
     `;
     await pool.query(query, [userId, acao, detalhes]);
   } catch (error) {
-    console.error('[LOGS] Erro ao registrar log:', error);
+    fileLogger.error('[LOGS] Erro ao registrar log:', error);
   }
 }
 
@@ -1417,7 +1418,7 @@ async function buscarLogsRecentes(limite = 10) {
     const result = await pool.query(query, [limite]);
     return result.rows;
   } catch (error) {
-    console.error('[LOGS] Erro ao buscar logs:', error);
+    fileLogger.error('[LOGS] Erro ao buscar logs:', error);
     return [];
   }
 }
@@ -1479,7 +1480,7 @@ async function gerarEstatisticasSistema() {
       lancamentosHoje: lancamentosHojeResult.rows[0]?.total || 0
     };
   } catch (error) {
-    console.error('[STATS] Erro ao gerar estatísticas:', error);
+    fileLogger.error('[STATS] Erro ao gerar estatísticas:', error);
     throw error;
   }
 }
@@ -1601,7 +1602,7 @@ async function gerarBackupCSV(userId) {
       tamanho
     };
   } catch (error) {
-    console.error('[BACKUP] Erro ao gerar backup:', error);
+    fileLogger.error('[BACKUP] Erro ao gerar backup:', error);
     throw error;
   }
 }
@@ -1646,7 +1647,7 @@ async function limparDadosAntigos() {
       dataLimite: dataLimite.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
     };
   } catch (error) {
-    console.error('[LIMPEZA] Erro ao limpar dados:', error);
+    fileLogger.error('[LIMPEZA] Erro ao limpar dados:', error);
     throw error;
   }
 }
@@ -1676,7 +1677,7 @@ async function gerarLogAuditoria(limite = 100) {
     });
     return { csv, total: logs.length };
   } catch (error) {
-    console.error('[LOGS] Erro ao gerar log de auditoria:', error);
+    fileLogger.error('[LOGS] Erro ao gerar log de auditoria:', error);
     throw error;
   }
 }

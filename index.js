@@ -46,6 +46,7 @@ const {
   testarConexaoGemini,
   isGeminiAvailable 
 } = require('./geminiService');
+const { logger, fileLogger } = require('./logger');
 
 // Função utilitária para formatar valores de forma segura
 function formatarValor(valor, casasDecimais = 2) {
@@ -685,7 +686,7 @@ const server = http.createServer((req, res) => {
   
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(botStatus, null, 2));
+    res.end(JSON.stringify({ status: 'ok' }));
   } else if (req.url === '/') {
     const uptimeHours = Math.floor(botStatus.uptime / 3600);
     const uptimeMinutes = Math.floor((botStatus.uptime % 3600) / 60);
@@ -1199,7 +1200,8 @@ async function startBot() {
           // Registrar log de auditoria
           await registrarLog(userId, 'COMANDO_ADMIN', 'Status do sistema consultado');
         } catch (error) {
-          console.error('[STATUS] Erro:', error);
+          logger.error('Erro ao verificar status do sistema:', error);
+          fileLogger.error('Erro ao verificar status do sistema:', error);
           await sock.sendMessage(userId, { text: '❌ Erro ao verificar status do sistema.' });
         }
         return;
@@ -1231,7 +1233,8 @@ async function startBot() {
           // Registrar log de auditoria
           await registrarLog(userId, 'COMANDO_ADMIN', `Limpeza executada: ${resultado.lancamentosRemovidos} lançamentos removidos`);
         } catch (error) {
-          console.error('[LIMPAR] Erro:', error);
+          logger.error('Erro ao limpar dados antigos:', error);
+          fileLogger.error('Erro ao limpar dados antigos:', error);
           await sock.sendMessage(userId, { text: '❌ Erro ao limpar dados antigos.' });
         }
         return;
@@ -1268,7 +1271,8 @@ async function startBot() {
           // Registrar log de auditoria
           await registrarLog(userId, 'COMANDO_BACKUP', `Backup gerado: ${fileName}`);
         } catch (error) {
-          console.error('[BACKUP] Erro:', error);
+          logger.error('Erro ao gerar backup:', error);
+          fileLogger.error('Erro ao gerar backup:', error);
           await sock.sendMessage(userId, { text: '❌ Erro ao gerar backup.' });
         }
         return;
@@ -1297,7 +1301,8 @@ async function startBot() {
           // Registrar log de auditoria
           await registrarLog(userId, 'COMANDO_ADMIN', `Logs de auditoria gerados: ${fileName}`);
         } catch (error) {
-          console.error('[LOGS] Erro:', error);
+          logger.error('Erro ao gerar logs de auditoria:', error);
+          fileLogger.error('Erro ao gerar logs de auditoria:', error);
           await sock.sendMessage(userId, { text: '❌ Erro ao gerar logs de auditoria.' });
         }
         return;
@@ -1798,7 +1803,8 @@ async function startBot() {
             });
           }
         } catch (error) {
-          console.error('[ANALISE] Erro:', error);
+          logger.error('Erro ao analisar padrões de gastos:', error);
+          fileLogger.error('Erro ao analisar padrões de gastos:', error);
           await sock.sendMessage(userId, { 
             text: '❌ Erro ao analisar padrões de gastos. Tente novamente.' 
           });
@@ -1847,7 +1853,8 @@ async function startBot() {
             });
           }
         } catch (error) {
-          console.error('[SUGESTOES] Erro:', error);
+          logger.error('Erro ao gerar sugestões de economia:', error);
+          fileLogger.error('Erro ao gerar sugestões de economia:', error);
           await sock.sendMessage(userId, { 
             text: '❌ Erro ao gerar sugestões de economia. Tente novamente.' 
           });
@@ -1897,7 +1904,8 @@ async function startBot() {
             });
           }
         } catch (error) {
-          console.error('[PREVISAO] Erro:', error);
+          logger.error('Erro ao gerar previsões de gastos:', error);
+          fileLogger.error('Erro ao gerar previsões de gastos:', error);
           await sock.sendMessage(userId, { 
             text: '❌ Erro ao gerar previsões de gastos. Tente novamente.' 
           });
@@ -1969,7 +1977,8 @@ async function startBot() {
             });
           }
         } catch (error) {
-          console.error('[PERGUNTA] Erro:', error);
+          logger.error('Erro ao processar pergunta:', error);
+          fileLogger.error('Erro ao processar pergunta:', error);
           await sock.sendMessage(userId, { 
             text: '❌ Erro ao processar pergunta. Tente novamente.' 
           });
@@ -2814,12 +2823,14 @@ async function startBot() {
       try {
         await verificarEEnviarAlertas(sock);
       } catch (error) {
-        console.error('[ALERTAS] Erro ao verificar alertas:', error);
+        logger.error('Erro ao verificar alertas:', error);
+        fileLogger.error('Erro ao verificar alertas:', error);
       }
     }, 60 * 60 * 1000); // 1 hora
     
   } catch (error) {
-    console.error('Erro ao iniciar o bot:', error);
+    logger.error('Erro ao iniciar o bot:', error);
+    fileLogger.error('Erro ao iniciar o bot:', error);
     }
 }
 

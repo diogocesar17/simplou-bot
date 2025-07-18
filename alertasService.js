@@ -1,4 +1,5 @@
 const { appendRowToDatabase, queryDatabase } = require('./databaseService');
+const { logger, fileLogger } = require('./logger');
 
 // Configurações dos alertas
 const CONFIG_ALERTAS = {
@@ -109,7 +110,8 @@ async function buscarCartoesParaAlerta() {
     const cartoes = await queryDatabase(query);
     return cartoes;
   } catch (error) {
-    console.error('[ALERTAS] Erro ao buscar cartões:', error);
+    logger.error('[ALERTAS] Erro ao buscar cartões:', error);
+    fileLogger.error('[ALERTAS] Erro ao buscar cartões:', error);
     return [];
   }
 }
@@ -140,7 +142,8 @@ async function buscarBoletosParaAlerta() {
     
     return boletos;
   } catch (error) {
-    console.error('[ALERTAS] Erro ao buscar boletos:', error);
+    logger.error('[ALERTAS] Erro ao buscar boletos:', error);
+    fileLogger.error('[ALERTAS] Erro ao buscar boletos:', error);
     return [];
   }
 }
@@ -201,7 +204,7 @@ async function verificarEEnviarAlertas(sock) {
   //   return;
   // }
   
-  console.log('[ALERTAS] Iniciando verificação de alertas...');
+  logger.info('[ALERTAS] Iniciando verificação de alertas...');
   
   try {
     // Buscar usuários únicos que têm lançamentos
@@ -223,7 +226,7 @@ async function verificarEEnviarAlertas(sock) {
         if (alertaCartao.deveAlertar) {
           const mensagem = gerarMensagemAlertaCartao(cartao, alertaCartao.tipo, alertaCartao.diasRestantes);
           await sock.sendMessage(userId, { text: mensagem });
-          console.log(`[ALERTAS] Alerta de cartão enviado para ${userId}: ${cartao.nome_cartao}`);
+          logger.info(`[ALERTAS] Alerta de cartão enviado para ${userId}: ${cartao.nome_cartao}`);
         }
       }
       
@@ -234,14 +237,15 @@ async function verificarEEnviarAlertas(sock) {
         if (alertaBoleto.deveAlertar) {
           const mensagem = gerarMensagemAlertaBoleto(boleto, alertaBoleto.tipo, alertaBoleto.diasRestantes);
           await sock.sendMessage(userId, { text: mensagem });
-          console.log(`[ALERTAS] Alerta de boleto enviado para ${userId}: ${boleto.descricao}`);
+          logger.info(`[ALERTAS] Alerta de boleto enviado para ${userId}: ${boleto.descricao}`);
         }
       }
     }
     
-    console.log('[ALERTAS] Verificação de alertas concluída');
+    logger.info('[ALERTAS] Verificação de alertas concluída');
   } catch (error) {
-    console.error('[ALERTAS] Erro ao verificar alertas:', error);
+    logger.error('[ALERTAS] Erro ao verificar alertas:', error);
+    fileLogger.error('[ALERTAS] Erro ao verificar alertas:', error);
   }
 }
 
