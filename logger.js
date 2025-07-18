@@ -1,6 +1,7 @@
 const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
+const rfs = require('rotating-file-stream');
 
 // Diretório de logs
 const logDir = process.env.NODE_ENV === 'production' ? '/app/logs' : path.join(__dirname, 'logs');
@@ -8,17 +9,22 @@ if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
 
-// Caminho do arquivo de log
-const logFile = path.join(logDir, 'app.log');
-
-// Configuração do nível de log para o console
-const level = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
+// Stream rotativo para logs críticos
+const rotatingStream = rfs.createStream('app.log', {
+  interval: '1d', // rotaciona diariamente
+  path: logDir,
+  maxFiles: 14,   // mantém 14 arquivos antigos
+  compress: 'gzip'
+});
 
 // Logger para arquivo: apenas warn e error
 const fileStream = pino(
   { level: 'warn' },
-  pino.destination({ dest: logFile, sync: false })
+  rotatingStream
 );
+
+// Configuração do nível de log para o console
+const level = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug');
 
 // Logger para console (colorido, legível)
 const consoleStream = pino(
@@ -36,17 +42,11 @@ module.exports = {
 
 /*
  * Rotação de logs:
- * Recomenda-se usar logrotate no sistema operacional para rotacionar o arquivo logs/app.log.
- * Exemplo de configuração logrotate:
+ * Agora é feita automaticamente via rotating-file-stream.
+ * - Rotação diária
+ * - Mantém 14 arquivos antigos
+ * - Logs antigos comprimidos (gzip)
  *
- * /app/logs/app.log {
- *   daily
- *   rotate 14
- *   compress
- *   missingok
- *   notifempty
- *   copytruncate
- * }
- *
- * Para ambiente local, ajuste o caminho para ./logs/app.log
+ * Para logs locais, os arquivos ficam em ./logs/app.log, ./logs/app.log.1.gz, etc.
+ * Para produção (Docker), ficam em /app/logs/app.log, etc.
  */ 
