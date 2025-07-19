@@ -47,8 +47,8 @@ async function initializeDatabase() {
         valor DECIMAL(10,2) NOT NULL,
         categoria VARCHAR(50),
         pagamento VARCHAR(20),
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        criado_em TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'),
+        atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'),
         parcelamento_id VARCHAR(100),
         parcela_atual INTEGER,
         total_parcelas INTEGER,
@@ -74,7 +74,7 @@ async function initializeDatabase() {
         nome_cartao VARCHAR(50) NOT NULL,
         dia_vencimento INTEGER NOT NULL CHECK (dia_vencimento >= 1 AND dia_vencimento <= 31),
         dia_fechamento INTEGER,
-        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        criado_em TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'),
         UNIQUE(user_id, nome_cartao)
       )
     `);
@@ -86,7 +86,7 @@ async function initializeDatabase() {
         user_id VARCHAR(50) NOT NULL,
         acao VARCHAR(100) NOT NULL,
         detalhes TEXT,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')
       )
     `);
 
@@ -101,6 +101,9 @@ async function initializeDatabase() {
 
     // Migração: Adicionar coluna data_vencimento para boletos
     await migrateDataVencimentoColumn(client);
+
+    // Migração: Corrigir timezone das colunas de timestamp
+    await migrateTimezoneColumns(client);
 
     // Criar índices para melhor performance
     await client.query(`
@@ -299,6 +302,54 @@ async function migrateDataVencimentoColumn(client) {
     }
   } catch (error) {
     fileLogger.error('❌ Erro na migração da coluna data_vencimento:', error.message);
+    throw error;
+  }
+}
+
+async function migrateTimezoneColumns(client) {
+  try {
+    // Verificar se as colunas de timestamp precisam de correção de timezone
+    const checkColumns = await client.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'lancamentos' 
+      AND column_name IN ('criado_em', 'atualizado_em')
+    `);
+    
+    const existingColumns = checkColumns.rows.map(row => row.column_name);
+    const newColumns = [
+      'criado_em',
+      'atualizado_em'
+    ];
+    
+    const columnsToAdd = newColumns.filter(col => !existingColumns.includes(col));
+    
+    if (columnsToAdd.length > 0) {
+      logger.info('🔄 Migrando colunas de timestamp para correção de timezone...');
+      
+      for (const column of columnsToAdd) {
+        let columnDefinition = '';
+        switch (column) {
+          case 'criado_em':
+            columnDefinition = 'ADD COLUMN criado_em TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE \'America/Sao_Paulo\')';
+            break;
+          case 'atualizado_em':
+            columnDefinition = 'ADD COLUMN atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE \'America/Sao_Paulo\')';
+            break;
+        }
+        
+        if (columnDefinition) {
+          await client.query(`ALTER TABLE lancamentos ${columnDefinition}`);
+          logger.info(`✅ Coluna ${column} adicionada`);
+        }
+      }
+      
+      logger.info('✅ Migração de colunas de timestamp concluída');
+    } else {
+      logger.info('✅ Colunas de timestamp já estão corretas');
+    }
+  } catch (error) {
+    fileLogger.error('❌ Erro na migração de colunas de timestamp:', error.message);
     throw error;
   }
 }
