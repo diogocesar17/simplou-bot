@@ -416,13 +416,7 @@ async function processarLancamento(userId, parsed, sock) {
         const dataContabilizacaoBR = dataContabilizacao.toLocaleDateString('pt-BR');
         const nomeMes = getNomeMes(mesFatura - 1);
         await sock.sendMessage(userId, {
-          text: `✅ Gasto registrado no cartão ${cartao.nome_cartao}!\n\n` +
-            `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
-            `📅 Lançamento: ${parsed.data}\n` +
-            `📂 Categoria: ${parsed.categoria}\n` +
-            `💳 Pagamento: ${parsed.pagamento}\n` +
-            `📝 Descrição: ${parsed.descricao}\n` +
-            `Contabiliza: ${dataContabilizacaoBR} (fatura ${nomeMes}/${anoFatura})`
+          text: gerarMensagemSucesso(parsed) + `\nContabiliza: ${dataContabilizacaoBR} (fatura ${nomeMes}/${anoFatura})`
         });
         return;
       } catch (error) {
@@ -2375,13 +2369,7 @@ async function startBot() {
               parsed.dataVencimento // data_vencimento
             ]);
             await sock.sendMessage(userId, {
-              text: `✅ Gasto registrado com sucesso!\n\n` +
-                `📅 Data: ${parsed.data}\n` +
-                `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
-                `📂 Categoria: ${parsed.categoria}\n` +
-                `💳 Pagamento: ${parsed.pagamento}\n` +
-                `📝 Descrição: ${parsed.descricao}\n\n` +
-                `💡 *Dica:* Para controlar faturas e ter resumos por cartão, use o comando "configurar cartao"!`
+              text: gerarMensagemSucesso(parsed) + `\n\n💡 *Dica:* Para controlar faturas e ter resumos por cartão, use o comando "configurar cartao"!`
             });
             return;
           } catch (error) {
@@ -2484,13 +2472,7 @@ async function startBot() {
             const dataContabilizacaoBR = dataContabilizacao.toLocaleDateString('pt-BR');
             const nomeMes = getNomeMes(mesFatura - 1);
             await sock.sendMessage(userId, {
-              text: `✅ Gasto registrado no cartão ${cartao.nome_cartao}!\n\n` +
-                `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
-                `📅 Lançamento: ${parsed.data}\n` +
-                `📂 Categoria: ${parsed.categoria}\n` +
-                `💳 Pagamento: ${parsed.pagamento}\n` +
-                `📝 Descrição: ${parsed.descricao}\n` +
-                `Contabiliza: ${dataContabilizacaoBR} (fatura ${nomeMes}/${anoFatura})`
+              text: gerarMensagemSucesso(parsed) + `\nContabiliza: ${dataContabilizacaoBR} (fatura ${nomeMes}/${anoFatura})`
             });
             return;
           } catch (error) {
@@ -2721,109 +2703,13 @@ async function startBot() {
         }
       }
 
-      // // Comando para iniciar edição de cartão
-      // if (/^editar cartao$/i.test(texto.toLowerCase())) {
-      //   const cartoes = await listarCartoesConfigurados(userId);
-      //   if (!cartoes || cartoes.length === 0) {
-      //     await sock.sendMessage(userId, { text: '❌ Nenhum cartão configurado para editar.' });
-      //     return;
-      //   }
-      //   let msgCartoes = 'Qual cartão deseja editar?\n';
-      //   cartoes.forEach((cartao, idx) => {
-      //     msgCartoes += `${idx + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento}, fecha dia ${cartao.dia_fechamento || 'NÃO INFORMADO'})\n`;
-      //   });
-      //   msgCartoes += '\nDigite o número do cartão ou "cancelar"';
-      //   aguardandoEdicaoCartao[userId] = { cartoes };
-      //   await sock.sendMessage(userId, { text: msgCartoes });
-      //   return;
-      // }
-
-      // // Fluxo aguardando escolha do cartão para editar
-      // if (aguardandoEdicaoCartao[userId] && !aguardandoEdicaoCartao[userId].cartaoEscolhido) {
-      //   const escolha = texto.toLowerCase().trim();
-      //   if (escolha === 'cancelar') {
-      //     delete aguardandoEdicaoCartao[userId];
-      //     await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
-      //     return;
-      //   }
-      //   const idx = parseInt(escolha);
-      //   const cartoes = aguardandoEdicaoCartao[userId].cartoes;
-      //   if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
-      //     await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${cartoes.length} ou "cancelar".` });
-      //     return;
-      //   }
-      //   aguardandoEdicaoCartao[userId].cartaoEscolhido = cartoes[idx - 1];
-      //   await sock.sendMessage(userId, { text: 'Qual campo deseja editar?\n1. vencimento\n2. fechamento\n3. cancelar' });
-      //   return;
-      // }
-
-      // // Fluxo aguardando escolha do campo para editar
-      // if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].cartaoEscolhido && !aguardandoEdicaoCartao[userId].campoEscolhido) {
-      //   const campo = texto.toLowerCase().trim();
-      //   let campoEscolhido = campo;
-      //   if (["1", "2", "3"].includes(campo)) {
-      //     if (campo === "1") campoEscolhido = "vencimento";
-      //     else if (campo === "2") campoEscolhido = "fechamento";
-      //     else if (campo === "3") campoEscolhido = "cancelar";
-      //   }
-      //   if (campoEscolhido === 'cancelar') {
-      //     delete aguardandoEdicaoCartao[userId];
-      //     await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
-      //     return;
-      //   }
-      //   if (!['vencimento', 'fechamento'].includes(campoEscolhido)) {
-      //     await sock.sendMessage(userId, { text: '❌ Campo inválido. Digite: 1, 2, 3 ou o nome do campo.' });
-      //     return;
-      //   }
-      //   aguardandoEdicaoCartao[userId].campoEscolhido = campoEscolhido;
-      //   if (campoEscolhido === 'vencimento') {
-      //     await sock.sendMessage(userId, { text: 'Digite o novo dia de vencimento (1-31):' });
-      //   } else if (campoEscolhido === 'fechamento') {
-      //     await sock.sendMessage(userId, { text: 'Digite o novo dia de fechamento (1-31):' });
-      //   }
-      //   return;
-      // }
-
-      // // Fluxo aguardando novo valor de vencimento/fechamento
-      // if (aguardandoEdicaoCartao[userId] && aguardandoEdicaoCartao[userId].campoEscolhido) {
-      //   const campo = aguardandoEdicaoCartao[userId].campoEscolhido;
-      //   const cartao = aguardandoEdicaoCartao[userId].cartaoEscolhido;
-      //   const valor = texto.toLowerCase().trim();
-      //   if (campo === 'vencimento') {
-      //     const dia = parseInt(valor);
-      //     if (isNaN(dia) || dia < 1 || dia > 31) {
-      //       await sock.sendMessage(userId, { text: '❌ Dia de vencimento inválido. Digite um número entre 1 e 31.' });
-      //       return;
-      //     }
-      //     aguardandoEdicaoCartao[userId].novoVencimento = dia;
-      //     // Atualizar só vencimento
-      //     await atualizarCartaoConfigurado(userId, cartao.nome_cartao, dia, cartao.dia_fechamento);
-      //     await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nNovo vencimento: dia ${dia}\nFechamento: dia ${cartao.dia_fechamento || 'NÃO INFORMADO'}` });
-      //     delete aguardandoEdicaoCartao[userId];
-      //     return;
-      //   }
-      //   if (campo === 'fechamento') {
-      //     const dia = parseInt(valor);
-      //     if (isNaN(dia) || dia < 1 || dia > 31) {
-      //       await sock.sendMessage(userId, { text: '❌ Dia de fechamento inválido. Digite um número entre 1 e 31.' });
-      //       return;
-      //     }
-      //     aguardandoEdicaoCartao[userId].novoFechamento = dia;
-      //     // Atualizar só fechamento
-      //     await atualizarCartaoConfigurado(userId, cartao.nome_cartao, cartao.dia_vencimento, dia);
-      //     await sock.sendMessage(userId, { text: `✅ Cartão ${cartao.nome_cartao} atualizado!\nVencimento: dia ${cartao.dia_vencimento}\nNovo fechamento: dia ${dia}` });
-      //     delete aguardandoEdicaoCartao[userId];
-      //     return;
-      //   }
-      // }
-
       // Dentro do bloco de resposta padrão (mensagem não reconhecida):
       console.log('[DEBUG] Nenhum comando reconhecido, enviando resposta padrão.');
       await sock.sendMessage(userId, {
         text: '❌ Comando não reconhecido ou valor não encontrado na mensagem.\nDigite *ajuda* para ver a lista de comandos disponíveis.'
       });
       return;
-      });
+    });
 
     // --- AGENDAMENTO DE ALERTAS ---
     console.log('🔔 Configurando sistema de alertas...');
@@ -2841,7 +2727,7 @@ async function startBot() {
   } catch (error) {
     logger.error(error, 'Erro ao iniciar o bot');
     fileLogger.error('Erro ao iniciar o bot:', error);
-    }
+  }
 }
 
 module.exports = {
