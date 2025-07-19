@@ -52,13 +52,7 @@ const {
   isGeminiAvailable 
 } = require('./geminiService');
 const { logger, fileLogger } = require('./logger');
-const { 
-  handleParcelados,
-  handleRecorrentes,
-  handleVencimentos,
-  handleCategoria,
-  handleValorAlto
-} = require('./comandos-especificos');
+
 
 // Função utilitária para formatar valores de forma segura
 function formatarValor(valor, casasDecimais = 2) {
@@ -821,6 +815,14 @@ async function startBot() {
       const texto = msg.message.conversation.trim();
       const textoLower = texto.toLowerCase().trim();
       const userId = msg.key.remoteJid; // Identificador único do usuário
+      
+      // FILTRO DE NÚMERO - APENAS PARA TESTE
+      // Extrair o número do userId (formato: 61981429135@s.whatsapp.net)
+      const numeroWhatsApp = userId.split('@')[0];
+      if (numeroWhatsApp !== '61981429135') {
+        console.log(`[FILTRO] Mensagem ignorada de ${numeroWhatsApp} - Apenas 61981429135 autorizado`);
+        return; // Ignora mensagens de outros números
+      }
       
       // Atualizar status da última mensagem
       botStatus.lastMessage = `${new Date().toLocaleTimeString('pt-BR')} - ${userId}: ${texto.substring(0, 50)}${texto.length > 50 ? '...' : ''}`;
