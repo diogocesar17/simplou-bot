@@ -1682,6 +1682,259 @@ async function gerarLogAuditoria(limite = 100) {
   }
 }
 
+// Função para buscar lançamentos parcelados ativos
+async function buscarParceladosAtivos(userId, limite = 20) {
+  try {
+    const query = `
+      SELECT 
+        l.*,
+        COUNT(*) OVER (PARTITION BY l.parcelamento_id) as total_parcelas,
+        ROW_NUMBER() OVER (PARTITION BY l.parcelamento_id ORDER BY l.data) as parcela_atual
+      FROM lancamentos l
+      WHERE l.user_id = $1 
+        AND l.parcelamento_id IS NOT NULL
+        AND l.data >= CURRENT_DATE - INTERVAL '1 year'
+      ORDER BY l.parcelamento_id, l.data
+      LIMIT $2
+    `;
+    
+    const result = await pool.query(query, [userId, limite]);
+    
+    // Agrupar por parcelamento_id
+    const parcelamentos = {};
+    result.rows.forEach(row => {
+      if (!parcelamentos[row.parcelamento_id]) {
+        parcelamentos[row.parcelamento_id] = {
+          parcelamento_id: row.parcelamento_id,
+          descricao: row.descricao.replace(/ \(\d+\/\d+\)$/, ''), // Remove (1/12) da descrição
+          valor_total: 0,
+          valor_parcela: 0,
+          total_parcelas: row.total_parcelas,
+          parcelas: [],
+          categoria: row.categoria,
+          pagamento: row.pagamento,
+          primeira_parcela: null,
+          ultima_parcela: null
+        };
+      }
+      
+      parcelamentos[row.parcelamento_id].parcelas.push({
+        id: row.id,
+        data: row.data,
+        valor: parseFloat(row.valor),
+        parcela_atual: row.parcela_atual,
+        status: row.data < CURRENT_DATE ? 'paga' : 'pendente'
+      });
+      
+      parcelamentos[row.parcelamento_id].valor_total += parseFloat(row.valor);
+      parcelamentos[row.parcelamento_id].valor_parcela = parseFloat(row.valor);
+      
+      if (!parcelamentos[row.parcelamento_id].primeira_parcela || row.data < parcelamentos[row.parcelamento_id].primeira_parcela) {
+        parcelamentos[row.parcelamento_id].primeira_parcela = row.data;
+      }
+      if (!parcelamentos[row.parcelamento_id].ultima_parcela || row.data > parcelamentos[row.parcelamento_id].ultima_parcela) {
+        parcelamentos[row.parcelamento_id].ultima_parcela = row.data;
+      }
+    });
+    
+    return Object.values(parcelamentos);
+  } catch (error) {
+    fileLogger.error('Erro ao buscar parcelados ativos:', error);
+    throw error;
+  }
+}
+
+// Função para buscar lançamentos recorrentes ativos
+async function buscarRecorrentesAtivos(userId, limite = 20) {
+  try {
+    const query = `
+      SELECT 
+        l.*,
+        COUNT(*) OVER (PARTITION BY l.recorrente_id) as total_recorrencias,
+        ROW_NUMBER() OVER (PARTITION BY l.recorrente_id ORDER BY l.data) as recorrencia_atual
+      FROM lancamentos l
+      WHERE l.user_id = $1 
+        AND l.recorrente_id IS NOT NULL
+        AND l.data >= CURRENT_DATE - INTERVAL '1 year'
+      ORDER BY l.recorrente_id, l.data
+      LIMIT $2
+    `;
+    
+    const result = await pool.query(query, [userId, limite]);
+    
+    // Agrupar por recorrente_id
+    const recorrentes = {};
+    result.rows.forEach(row => {
+      if (!recorrentes[row.recorrente_id]) {
+        recorrentes[row.recorrente_id] = {
+          recorrente_id: row.recorrente_id,
+          descricao: row.descricao,
+          valor: parseFloat(row.valor),
+          total_recorrencias: row.total_recorrencias,
+          recorrencias: [],
+          categoria: row.categoria,
+          pagamento: row.pagamento,
+          primeira_recorrencia: null,
+          ultima_recorrencia: null,
+          recorrente_fim: row.recorrente_fim
+        };
+      }
+      
+      recorrentes[row.recorrente_id].recorrencias.push({
+        id: row.id,
+        data: row.data,
+        recorrencia_atual: row.recorrencia_atual,
+        status: row.data < CURRENT_DATE ? 'paga' : 'pendente'
+      });
+      
+      if (!recorrentes[row.recorrente_id].primeira_recorrencia || row.data < recorrentes[row.recorrente_id].primeira_recorrencia) {
+        recorrentes[row.recorrente_id].primeira_recorrencia = row.data;
+      }
+      if (!recorrentes[row.recorrente_id].ultima_recorrencia || row.data > recorrentes[row.recorrente_id].ultima_recorrencia) {
+        recorrentes[row.recorrente_id].ultima_recorrencia = row.data;
+      }
+    });
+    
+    return Object.values(recorrentes);
+  } catch (error) {
+    fileLogger.error('Erro ao buscar recorrentes ativos:', error);
+    throw error;
+  }
+}
+
+// Função para buscar próximos vencimentos
+async function buscarProximosVencimentos(userId, dias = 30) {
+  try {
+    const query = `
+      SELECT 
+        l.*,
+        CASE 
+          WHEN l.cartao_nome IS NOT NULL THEN 'cartao'
+          WHEN l.data_vencimento IS NOT NULL THEN 'boleto'
+          ELSE 'outro'
+        END as tipo_vencimento,
+        CASE 
+          WHEN l.cartao_nome IS NOT NULL THEN l.data_contabilizacao
+          ELSE l.data_vencimento
+        END as data_vencimento_real
+      FROM lancamentos l
+      WHERE l.user_id = $1 
+        AND (
+          (l.cartao_nome IS NOT NULL AND l.data_contabilizacao >= CURRENT_DATE AND l.data_contabilizacao <= CURRENT_DATE + INTERVAL '1 day' * $2)
+          OR 
+          (l.data_vencimento IS NOT NULL AND l.data_vencimento >= CURRENT_DATE AND l.data_vencimento <= CURRENT_DATE + INTERVAL '1 day' * $2)
+        )
+        AND l.tipo = 'gasto'
+      ORDER BY data_vencimento_real
+    `;
+    
+    const result = await pool.query(query, [userId, dias]);
+    
+    // Agrupar por tipo e data
+    const vencimentos = {
+      cartoes: [],
+      boletos: [],
+      outros: []
+    };
+    
+    result.rows.forEach(row => {
+      const vencimento = {
+        id: row.id,
+        descricao: row.descricao,
+        valor: parseFloat(row.valor),
+        categoria: row.categoria,
+        data_vencimento: row.data_vencimento_real,
+        dias_restantes: Math.ceil((new Date(row.data_vencimento_real) - new Date()) / (1000 * 60 * 60 * 24)),
+        cartao_nome: row.cartao_nome,
+        status: row.status_fatura || 'pendente'
+      };
+      
+      if (row.tipo_vencimento === 'cartao') {
+        vencimentos.cartoes.push(vencimento);
+      } else if (row.tipo_vencimento === 'boleto') {
+        vencimentos.boletos.push(vencimento);
+      } else {
+        vencimentos.outros.push(vencimento);
+      }
+    });
+    
+    return vencimentos;
+  } catch (error) {
+    fileLogger.error('Erro ao buscar próximos vencimentos:', error);
+    throw error;
+  }
+}
+
+// Função para buscar gastos por categoria específica
+async function buscarGastosPorCategoria(userId, categoria, limite = 20, mes = null, ano = null) {
+  try {
+    let query = `
+      SELECT l.*
+      FROM lancamentos l
+      WHERE l.user_id = $1 
+        AND LOWER(l.categoria) = LOWER($2)
+        AND l.tipo = 'gasto'
+    `;
+    
+    const params = [userId, categoria];
+    let paramIndex = 3;
+    
+    if (mes && ano) {
+      query += ` AND EXTRACT(MONTH FROM l.data) = $${paramIndex} AND EXTRACT(YEAR FROM l.data) = $${paramIndex + 1}`;
+      params.push(mes, ano);
+      paramIndex += 2;
+    }
+    
+    query += ` ORDER BY l.data DESC LIMIT $${paramIndex}`;
+    params.push(limite);
+    
+    const result = await pool.query(query, params);
+    
+    return result.rows.map(row => ({
+      ...row,
+      valor: parseFloat(row.valor)
+    }));
+  } catch (error) {
+    fileLogger.error('Erro ao buscar gastos por categoria:', error);
+    throw error;
+  }
+}
+
+// Função para buscar gastos com valor alto
+async function buscarGastosValorAlto(userId, valorMinimo = 100, limite = 20, mes = null, ano = null) {
+  try {
+    let query = `
+      SELECT l.*
+      FROM lancamentos l
+      WHERE l.user_id = $1 
+        AND l.valor >= $2
+        AND l.tipo = 'gasto'
+    `;
+    
+    const params = [userId, valorMinimo];
+    let paramIndex = 3;
+    
+    if (mes && ano) {
+      query += ` AND EXTRACT(MONTH FROM l.data) = $${paramIndex} AND EXTRACT(YEAR FROM l.data) = $${paramIndex + 1}`;
+      params.push(mes, ano);
+      paramIndex += 2;
+    }
+    
+    query += ` ORDER BY l.valor DESC, l.data DESC LIMIT $${paramIndex}`;
+    params.push(limite);
+    
+    const result = await pool.query(query, params);
+    
+    return result.rows.map(row => ({
+      ...row,
+      valor: parseFloat(row.valor)
+    }));
+  } catch (error) {
+    fileLogger.error('Erro ao buscar gastos com valor alto:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   pool,
   initializeDatabase,
@@ -1723,5 +1976,10 @@ module.exports = {
   excluirCartaoConfigurado,
   contarLancamentosAssociadosCartao,
   calcularDataContabilizacao,
-  normalizarTexto
+  normalizarTexto,
+  buscarParceladosAtivos,
+  buscarRecorrentesAtivos,
+  buscarProximosVencimentos,
+  buscarGastosPorCategoria,
+  buscarGastosValorAlto
 }; 
