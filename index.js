@@ -56,6 +56,32 @@ function formatarValor(valor, casasDecimais = 2) {
   return valorNumerico.toFixed(casasDecimais);
 }
 
+// Função para gerar mensagem de sucesso diferenciada por tipo
+function gerarMensagemSucesso(parsed, tipoOperacao = 'normal') {
+  const isReceita = parsed.tipo && parsed.tipo.toLowerCase() === 'receita';
+  const tipoTexto = isReceita ? 'Receita' : 'Gasto';
+  const emoji = isReceita ? '💰' : '💸';
+  
+  let mensagem = `${emoji} ${tipoTexto} registrado com sucesso!\n\n`;
+  mensagem += `📅 Data: ${parsed.data}\n`;
+  mensagem += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+  mensagem += `📂 Categoria: ${parsed.categoria}\n`;
+  
+  // Para receitas, não mostrar forma de pagamento (não faz sentido)
+  if (!isReceita) {
+    mensagem += `💳 Pagamento: ${parsed.pagamento}\n`;
+  }
+  
+  mensagem += `📝 Descrição: ${parsed.descricao}`;
+  
+  // Adicionar validações se houver
+  if (parsed.validacoes && parsed.validacoes.length > 0) {
+    mensagem += `\n\n⚠️ *Avisos:*\n${parsed.validacoes.join('\n')}`;
+  }
+  
+  return mensagem;
+}
+
 // Função para parsear mês/ano
 const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 function parseMesAno(input) {
@@ -287,13 +313,7 @@ async function processarLancamento(userId, parsed, sock) {
           parsed.dataVencimento // data_vencimento
         ]);
         await sock.sendMessage(userId, {
-          text: `✅ Gasto registrado com sucesso!\n\n` +
-            `📅 Data: ${parsed.data}\n` +
-            `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
-            `📂 Categoria: ${parsed.categoria}\n` +
-            `💳 Pagamento: ${parsed.pagamento}\n` +
-            `📝 Descrição: ${parsed.descricao}\n\n` +
-            `💡 *Dica:* Para controlar faturas e ter resumos por cartão, use o comando "configurar cartao"!`
+          text: gerarMensagemSucesso(parsed) + `\n\n💡 *Dica:* Para controlar faturas e ter resumos por cartão, use o comando "configurar cartao"!`
         });
         return;
       } catch (error) {
@@ -509,12 +529,7 @@ async function processarLancamento(userId, parsed, sock) {
         parsedComValor.dataVencimento // data_vencimento
       ]);
       
-      let msg = `⚠️ ${parsed.error}\n\n✅ Lançamento registrado com sucesso!\n\n`;
-      msg += `📅 Data: ${parsedComValor.data}\n`;
-      msg += `💰 Valor: R$ ${formatarValor(parsedComValor.valor)}\n`;
-      msg += `📂 Categoria: ${parsedComValor.categoria}\n`;
-      msg += `💳 Pagamento: ${parsedComValor.pagamento}\n`;
-      msg += `📝 Descrição: ${parsedComValor.descricao}`;
+      let msg = `⚠️ ${parsed.error}\n\n${gerarMensagemSucesso(parsedComValor)}`;
       
       await sock.sendMessage(userId, { text: msg });
       return;
@@ -2582,12 +2597,7 @@ async function startBot() {
             parsedComValor.dataVencimento // data_vencimento
           ]);
           
-          let msg = `⚠️ ${parsed.error}\n\n✅ Lançamento registrado com sucesso!\n\n`;
-          msg += `📅 Data: ${parsedComValor.data}\n`;
-          msg += `💰 Valor: R$ ${formatarValor(parsedComValor.valor)}\n`;
-          msg += `📂 Categoria: ${parsedComValor.categoria}\n`;
-          msg += `💳 Pagamento: ${parsedComValor.pagamento}\n`;
-          msg += `📝 Descrição: ${parsedComValor.descricao}`;
+          let msg = `⚠️ ${parsed.error}\n\n${gerarMensagemSucesso(parsedComValor)}`;
           
           await sock.sendMessage(userId, { text: msg });
           return;
@@ -2829,7 +2839,7 @@ async function startBot() {
     }, 60 * 60 * 1000); // 1 hora
     
   } catch (error) {
-    logger.error('Erro ao iniciar o bot:', error);
+    logger.error(error, 'Erro ao iniciar o bot');
     fileLogger.error('Erro ao iniciar o bot:', error);
     }
 }

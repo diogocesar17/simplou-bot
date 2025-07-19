@@ -35,7 +35,9 @@ const categoriasPrincipais = {
   'Trabalho': [
     'escritório', 'escritorio', 'equipamento', 'computador', 'notebook', 'tablet', 'celular', 'smartphone', 'impressora', 'scanner', 'webcam', 'microfone', 'headset', 'fone', 'mouse', 'teclado',
     'software', 'licença', 'licenca', 'assinatura', 'assinatura', 'domínio', 'dominio', 'hosting', 'servidor', 'cloud', 'backup', 'antivírus', 'antivirus', 'office', 'adobe', 'autocad',
-    'freelance', 'freela', 'projeto', 'cliente', 'reunião', 'reuniao', 'apresentação', 'apresentacao', 'relatório', 'relatorio', 'proposta', 'contrato', 'nota fiscal', 'recibo'
+    'freelance', 'freela', 'projeto', 'cliente', 'reunião', 'reuniao', 'apresentação', 'apresentacao', 'relatório', 'relatorio', 'proposta', 'contrato', 'nota fiscal', 'recibo',
+    'salário', 'salario', 'pagamento', 'remuneração', 'remuneracao', 'proventos', 'ordenado', 'vencimentos', 'bonus', 'bônus', 'comissão', 'comissao', 'adicional', 'hora extra', 'horaextra',
+    'vale refeição', 'valerefeicao', 'vale alimentação', 'valealimentacao', 'vale transporte', 'valetransporte', 'plano de saúde', 'planosaude', 'plano odontológico', 'planoodontologico'
   ]
 };
 
@@ -62,7 +64,7 @@ const limitesCategoria = {
   'Transporte': { min: 1.00, max: 1000, alerta: 500 },
   'Lazer': { min: 1.00, max: 2000, alerta: 500 },
   'Educação': { min: 5.00, max: 5000, alerta: 1000 },
-  'Trabalho': { min: 1.00, max: 3000, alerta: 1000 },
+  'Trabalho': { min: 1.00, max: 10000, alerta: 5000 },
   'Outros': { min: 0.01, max: 2500, alerta: 1000 }
 };
 
@@ -161,7 +163,7 @@ function validarValor(valor, categoria, tipo, texto) {
   }
   
   // Validação de valor máximo por categoria (não aplicar para receitas)
-  if (valor > limites.max && tipo !== 'Receita') {
+  if (valor > limites.max && tipo !== 'receita') {
     return { error: `Valor muito alto para ${categoria}: R$ ${valor.toFixed(2)} (máximo: R$ ${limites.max.toFixed(2)})` };
   }
   
