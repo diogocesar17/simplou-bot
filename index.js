@@ -280,7 +280,7 @@ async function processarLancamento(userId, parsed, sock) {
     parsed &&
     parsed.tipo &&
     parsed.tipo.toLowerCase() === 'gasto' &&
-    pagamentoNormalizado.includes('credito')
+    (pagamentoNormalizado.includes('credito') || pagamentoNormalizado.includes('cartao'))
   ) {
     console.log('[DEBUG] Detecção de gasto no crédito');
     const cartoes = await listarCartoesConfigurados(userId);
@@ -523,7 +523,7 @@ async function processarLancamento(userId, parsed, sock) {
         parsedComValor.dataVencimento // data_vencimento
       ]);
       
-      let msg = `⚠️ ${parsed.error}\n\n${gerarMensagemSucesso(parsedComValor)}`;
+      let msg = gerarMensagemSucesso(parsedComValor);
       
       await sock.sendMessage(userId, { text: msg });
       return;
@@ -625,17 +625,7 @@ async function processarLancamento(userId, parsed, sock) {
         parsed.dataVencimento // data_vencimento
       ]);
       
-      let msg = `✅ Lançamento registrado com sucesso!\n\n`;
-      msg += `📅 Data: ${parsed.data}\n`;
-      msg += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
-      msg += `📂 Categoria: ${parsed.categoria}\n`;
-      msg += `💳 Pagamento: ${parsed.pagamento}\n`;
-      msg += `📝 Descrição: ${parsed.descricao}`;
-      
-      // Adicionar validações se houver
-      if (parsed.validacoes && parsed.validacoes.length > 0) {
-        msg += `\n\n⚠️ *Avisos:*\n${parsed.validacoes.join('\n')}`;
-      }
+      let msg = gerarMensagemSucesso(parsed);
       
       await sock.sendMessage(userId, { text: msg });
       return;
@@ -2336,7 +2326,7 @@ async function startBot() {
         parsed &&
         parsed.tipo &&
         parsed.tipo.toLowerCase() === 'gasto' &&
-        pagamentoNormalizado.includes('credito')
+        (pagamentoNormalizado.includes('credito') || pagamentoNormalizado.includes('cartao'))
       ) {
         console.log('[DEBUG] Detecção de gasto no crédito');
         const cartoes = await listarCartoesConfigurados(userId);
@@ -2579,7 +2569,7 @@ async function startBot() {
             parsedComValor.dataVencimento // data_vencimento
           ]);
           
-          let msg = `⚠️ ${parsed.error}\n\n${gerarMensagemSucesso(parsedComValor)}`;
+          let msg = gerarMensagemSucesso(parsedComValor);
           
           await sock.sendMessage(userId, { text: msg });
           return;
@@ -2681,17 +2671,7 @@ async function startBot() {
             parsed.dataVencimento // data_vencimento
           ]);
           
-          let msg = `✅ Lançamento registrado com sucesso!\n\n`;
-          msg += `📅 Data: ${parsed.data}\n`;
-          msg += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
-          msg += `📂 Categoria: ${parsed.categoria}\n`;
-          msg += `💳 Pagamento: ${parsed.pagamento}\n`;
-          msg += `📝 Descrição: ${parsed.descricao}`;
-          
-          // Adicionar validações se houver
-          if (parsed.validacoes && parsed.validacoes.length > 0) {
-            msg += `\n\n⚠️ *Avisos:*\n${parsed.validacoes.join('\n')}`;
-          }
+          let msg = gerarMensagemSucesso(parsed);
           
           await sock.sendMessage(userId, { text: msg });
           return;
@@ -2732,6 +2712,7 @@ async function startBot() {
 
 module.exports = {
   criarParcelamento,
+  gerarMensagemSucesso,
 };
 
 startBot();
