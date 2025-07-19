@@ -93,22 +93,35 @@ const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','ag
 function parseMesAno(input) {
   if (!input) return null;
   input = input.trim().toLowerCase();
+  
+  // Remover palavras comuns que podem estar no início
+  input = input.replace(/^(resumo|do|de|deste|da|no|em)\s+/i, '');
+  
   let mes = null, ano = null;
+  
+  // Padrão numérico: 03/2024, 3-2024, 3 2024
   const match = input.match(/^([0-9]{1,2})[\/\-\s]?(\d{2,4})?$/);
   if (match) {
     mes = parseInt(match[1]);
     ano = match[2] ? parseInt(match[2]) : (new Date()).getFullYear();
   } else {
-    const partes = input.split(/\s+/);
+    // Padrão textual: julho 2024, julho/2024
+    const partes = input.split(/[\s\/\-]+/);
     let nomeMes = partes[0].normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('ç','c');
     let idx = meses.findIndex(m => m.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('ç','c') === nomeMes);
+    
     console.log('[PARSE MESANO DEBUG] input:', input, 'partes[0]:', partes[0], 'nomeMes:', nomeMes, 'idx:', idx);
+    
+    // Casos especiais
     if (idx === -1 && nomeMes === 'marco') idx = 2; // Aceita 'marco' como 'março'
+    if (idx === -1 && nomeMes === 'dezembro') idx = 11; // Caso especial para dezembro
+    
     if (idx !== -1) {
       mes = idx + 1;
       ano = partes[1] ? parseInt(partes[1]) : (new Date()).getFullYear();
     }
   }
+  
   if (mes && mes >= 1 && mes <= 12) {
     if (!ano || ano < 100) ano = 2000 + (ano || 0);
     return { mes, ano };
@@ -1031,14 +1044,31 @@ async function startBot() {
         let mesAno = textoLower.replace("resumo", "").trim();
         let resumo;
         
-        // Verificar se é resumo do dia
-        if (mesAno === "hoje" || mesAno === "dia" || mesAno === "diario" || mesAno === "diário") {
+        // Verificar se é resumo do dia (várias variações)
+        if (mesAno === "hoje" || 
+            mesAno === "dia" || 
+            mesAno === "diario" || 
+            mesAno === "diário" ||
+            mesAno === "do dia" ||
+            mesAno === "do dia atual" ||
+            mesAno === "do dia de hoje" ||
+            mesAno === "hoje" ||
+            mesAno === "de hoje") {
           resumo = await getResumoDoDia(userId);
           const hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
           await sock.sendMessage(userId, {
             text: `📊 *Resumo de hoje (${hoje})*\nReceitas: R$ ${formatarValor(resumo.totalReceitas)}\nDespesas: R$ ${formatarValor(resumo.totalDespesas)}\nSaldo: R$ ${formatarValor(resumo.saldo)}\nLançamentos: ${resumo.totalLancamentos}`
           });
-        } else if (!mesAno) {
+        } else if (!mesAno || 
+                   mesAno === "do mes atual" || 
+                   mesAno === "do mês atual" ||
+                   mesAno === "mes atual" ||
+                   mesAno === "mês atual" ||
+                   mesAno === "atual" ||
+                   mesAno === "deste mes" ||
+                   mesAno === "deste mês" ||
+                   mesAno === "deste mes atual" ||
+                   mesAno === "deste mês atual") {
           // Resumo do mês atual (comportamento padrão)
           resumo = await getResumoDoMesAtual(userId);
           await sock.sendMessage(userId, {
@@ -1048,7 +1078,9 @@ async function startBot() {
           // Resumo de mês/ano específico
           const parsed = parseMesAno(mesAno);
           if (!parsed) {
-            await sock.sendMessage(userId, { text: '❌ Formato inválido. Use:\n• resumo (mês atual)\n• resumo hoje (dia atual)\n• resumo 03/2024 (mês específico)' });
+            await sock.sendMessage(userId, { 
+              text: '❌ Formato inválido. Use:\n• resumo (mês atual)\n• resumo hoje (dia atual)\n• resumo 03/2024 (mês específico)\n\n💡 *Variações aceitas:*\n• resumo do mes atual\n• resumo do dia\n• resumo atual\n• resumo hoje' 
+            });
             return;
           }
           resumo = await getResumoPorMes(userId, parsed.mes, parsed.ano);
