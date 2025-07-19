@@ -603,9 +603,7 @@ async function getResumoDoDia(userId) {
       COUNT(*) as quantidade
     FROM lancamentos 
     WHERE user_id = $1 
-      AND EXTRACT(DAY FROM data) = EXTRACT(DAY FROM CURRENT_DATE AT TIME ZONE 'America/Sao_Paulo')
-      AND EXTRACT(MONTH FROM data) = EXTRACT(MONTH FROM CURRENT_DATE AT TIME ZONE 'America/Sao_Paulo')
-      AND EXTRACT(YEAR FROM data) = EXTRACT(YEAR FROM CURRENT_DATE AT TIME ZONE 'America/Sao_Paulo')
+      AND DATE(data) = CURRENT_DATE
     GROUP BY tipo
   `;
   
