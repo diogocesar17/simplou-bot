@@ -84,12 +84,15 @@ function detectarCategoria(texto) {
     return { categoria: 'Moradia', confianca: 'alta' };
   }
   
+  // Remove valores monetários do texto para evitar conflitos
+  const textoLimpo = texto.replace(/\d+[.,]\d{2}/g, 'VALOR');
+  
   // Primeiro, tenta encontrar correspondência exata nas categorias principais
   for (const [categoria, palavras] of Object.entries(categoriasPrincipais)) {
     for (const palavra of palavras) {
       // Verifica se a palavra está isolada (não é parte de outra palavra)
       const regex = new RegExp(`\\b${palavra}\\b`, 'i');
-      if (regex.test(texto)) {
+      if (regex.test(textoLimpo)) {
         return { categoria, confianca: 'alta' };
       }
     }
@@ -98,7 +101,7 @@ function detectarCategoria(texto) {
   // Se não encontrou, tenta correspondência parcial
   for (const [categoria, palavras] of Object.entries(categoriasPrincipais)) {
     for (const palavra of palavras) {
-      if (texto.includes(palavra.toLowerCase())) {
+      if (textoLimpo.includes(palavra.toLowerCase())) {
         return { categoria, confianca: 'media' };
       }
     }
