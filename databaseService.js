@@ -1723,7 +1723,7 @@ async function buscarParceladosAtivos(userId, limite = 20) {
         data: row.data,
         valor: parseFloat(row.valor),
         parcela_atual: row.parcela_atual,
-        status: row.data < CURRENT_DATE ? 'paga' : 'pendente'
+        status: new Date(row.data) < new Date() ? 'paga' : 'pendente'
       });
       
       parcelamentos[row.parcelamento_id].valor_total += parseFloat(row.valor);
@@ -1784,7 +1784,7 @@ async function buscarRecorrentesAtivos(userId, limite = 20) {
         id: row.id,
         data: row.data,
         recorrencia_atual: row.recorrencia_atual,
-        status: row.data < CURRENT_DATE ? 'paga' : 'pendente'
+        status: new Date(row.data) < new Date() ? 'paga' : 'pendente'
       });
       
       if (!recorrentes[row.recorrente_id].primeira_recorrencia || row.data < recorrentes[row.recorrente_id].primeira_recorrencia) {
