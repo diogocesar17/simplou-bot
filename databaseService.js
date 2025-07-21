@@ -98,22 +98,45 @@ async function initializeDatabase() {
     
     // Migração: Adicionar coluna dia_fechamento na tabela cartoes_config
     await migrateCartoesConfigTable(client);
-
-    // Migração: Adicionar coluna data_vencimento para boletos
+    
+    // Migração: Adicionar coluna data_vencimento na tabela lancamentos
     await migrateDataVencimentoColumn(client);
 
     // Migração: Corrigir timezone das colunas de timestamp
     await migrateTimezoneColumns(client);
 
     // Criar índices para melhor performance
+    
+    // Criar tabela de usuários
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_lancamentos_user_id ON lancamentos(user_id);
-      CREATE INDEX IF NOT EXISTS idx_lancamentos_data ON lancamentos(data);
-      CREATE INDEX IF NOT EXISTS idx_lancamentos_categoria ON lancamentos(categoria);
-      CREATE INDEX IF NOT EXISTS idx_lancamentos_cartao ON lancamentos(cartao_nome);
-      CREATE INDEX IF NOT EXISTS idx_lancamentos_contabilizacao ON lancamentos(data_contabilizacao);
-      CREATE INDEX IF NOT EXISTS idx_cartoes_config_user_id ON cartoes_config(user_id);
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR(50) NOT NULL UNIQUE,
+        nome VARCHAR(100),
+        telefone VARCHAR(20),
+        plano VARCHAR(20) NOT NULL DEFAULT 'gratuito',
+        status VARCHAR(20) DEFAULT 'ativo',
+        data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        data_ultimo_acesso TIMESTAMP WITH TIME ZONE,
+        data_expiracao_premium TIMESTAMP WITH TIME ZONE,
+        is_admin BOOLEAN DEFAULT FALSE,
+        criado_por VARCHAR(50),
+        observacoes TEXT,
+        criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
     `);
+
+    // Criar índices para tabela de usuários
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_usuarios_user_id ON usuarios(user_id);
+      CREATE INDEX IF NOT EXISTS idx_usuarios_plano ON usuarios(plano);
+      CREATE INDEX IF NOT EXISTS idx_usuarios_status ON usuarios(status);
+      CREATE INDEX IF NOT EXISTS idx_usuarios_admin ON usuarios(is_admin);
+    `);
+
+    // Migração: Migrar usuários do config.js para a tabela
+    await migrarUsuariosConfig(client);
 
     client.release();
     logger.info('✅ Banco de dados inicializado com sucesso');
@@ -1984,6 +2007,285 @@ async function buscarGastosValorAlto(userId, valorMinimo = 100, limite = 20, mes
   }
 }
 
+// ===== FUNÇÕES DE USUÁRIOS =====
+
+// Função para migrar usuários do config.js para a tabela
+async function migrarUsuariosConfig(client) {
+  try {
+    const { ADMIN_USERS, AUTHORIZED_USERS } = require('./config.js');
+    
+    // Verificar se já existem usuários na tabela
+    const checkQuery = 'SELECT COUNT(*) as total FROM usuarios';
+    const checkResult = await client.query(checkQuery);
+    
+    if (parseInt(checkResult.rows[0].total) > 0) {
+      logger.info('✅ Usuários já migrados, pulando migração');
+      return;
+    }
+    
+    logger.info('🔄 Migrando usuários do config.js...');
+    
+    // Migrar administradores
+    for (const adminId of ADMIN_USERS) {
+      await client.query(`
+        INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (user_id) DO NOTHING
+      `, [adminId, 'Administrador', 'premium', 'ativo', true, 'sistema']);
+      
+      logger.info(`✅ Admin migrado: ${adminId}`);
+    }
+    
+    // Migrar usuários autorizados
+    for (const userId of AUTHORIZED_USERS) {
+      if (!ADMIN_USERS.includes(userId)) {
+        await client.query(`
+          INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          ON CONFLICT (user_id) DO NOTHING
+        `, [userId, 'Usuário', 'gratuito', 'ativo', false, 'sistema']);
+        
+        logger.info(`✅ Usuário migrado: ${userId}`);
+      }
+    }
+    
+    logger.info('✅ Migração de usuários concluída');
+  } catch (error) {
+    logger.error('❌ Erro na migração de usuários:', error);
+    throw error;
+  }
+}
+
+// Função para cadastrar novo usuário
+async function cadastrarUsuario(userId, dados) {
+  try {
+    const { nome = 'Usuário', plano = 'gratuito', is_admin = false, criado_por } = dados;
+    
+    const result = await pool.query(`
+      INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [userId, nome, plano, 'ativo', is_admin, criado_por]);
+    
+    // Registrar log de auditoria
+    await registrarLog(criado_por || 'sistema', 'CADASTRO_USUARIO', {
+      usuario_cadastrado: userId,
+      nome: nome,
+      plano: plano,
+      is_admin: is_admin
+    });
+    
+    logger.info(`✅ Usuário cadastrado: ${userId} (${nome})`);
+    return result.rows[0];
+  } catch (error) {
+    if (error.code === '23505') { // Unique violation
+      throw new Error('Usuário já está cadastrado');
+    }
+    logger.error('❌ Erro ao cadastrar usuário:', error);
+    throw error;
+  }
+}
+
+// Função para promover usuário para premium
+async function promoverParaPremium(userId, diasExpiracao = null, promovidoPor) {
+  try {
+    let dataExpiracao = null;
+    if (diasExpiracao) {
+      // Usar timezone do Brasil
+      const agora = new Date();
+      const timezoneOffset = -3 * 60; // UTC-3 (horário de Brasília)
+      dataExpiracao = new Date(agora.getTime() + (diasExpiracao * 24 * 60 * 60 * 1000) + (timezoneOffset * 60 * 1000));
+    }
+    
+    const result = await pool.query(`
+      UPDATE usuarios 
+      SET plano = 'premium', 
+          data_expiracao_premium = $2,
+          atualizado_em = CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'
+      WHERE user_id = $1
+      RETURNING *
+    `, [userId, dataExpiracao]);
+    
+    if (result.rows.length === 0) {
+      throw new Error('Usuário não encontrado');
+    }
+    
+    // Registrar log de auditoria
+    await registrarLog(promovidoPor || 'sistema', 'PROMOCAO_PREMIUM', {
+      usuario_promovido: userId,
+      dias_expiracao: diasExpiracao,
+      data_expiracao: dataExpiracao
+    });
+    
+    logger.info(`✅ Usuário promovido para premium: ${userId}`);
+    return result.rows[0];
+  } catch (error) {
+    logger.error('❌ Erro ao promover usuário:', error);
+    throw error;
+  }
+}
+
+// Função para remover usuário
+async function removerUsuario(userId, removidoPor) {
+  try {
+    // Verificar se usuário existe
+    const checkResult = await pool.query('SELECT * FROM usuarios WHERE user_id = $1', [userId]);
+    if (checkResult.rows.length === 0) {
+      throw new Error('Usuário não encontrado');
+    }
+    
+    const usuario = checkResult.rows[0];
+    
+    // Deletar usuário
+    const result = await pool.query(`
+      DELETE FROM usuarios WHERE user_id = $1
+    `, [userId]);
+    
+    // Registrar log de auditoria
+    await registrarLog(removidoPor || 'sistema', 'EXCLUSAO_USUARIO', {
+      usuario_removido: userId,
+      nome: usuario.nome,
+      plano: usuario.plano,
+      is_admin: usuario.is_admin
+    });
+    
+    logger.info(`✅ Usuário removido: ${userId}`);
+    return usuario;
+  } catch (error) {
+    logger.error('❌ Erro ao remover usuário:', error);
+    throw error;
+  }
+}
+
+// Função para listar usuários
+async function listarUsuarios(filtros = {}) {
+  try {
+    let query = 'SELECT * FROM usuarios WHERE 1=1';
+    const params = [];
+    let paramIndex = 1;
+    
+    if (filtros.plano) {
+      query += ` AND plano = $${paramIndex}`;
+      params.push(filtros.plano);
+      paramIndex++;
+    }
+    
+    if (filtros.status) {
+      query += ` AND status = $${paramIndex}`;
+      params.push(filtros.status);
+      paramIndex++;
+    }
+    
+    if (filtros.is_admin !== undefined) {
+      query += ` AND is_admin = $${paramIndex}`;
+      params.push(filtros.is_admin);
+      paramIndex++;
+    }
+    
+    query += ' ORDER BY criado_em DESC';
+    
+    const result = await pool.query(query, params);
+    return result.rows;
+  } catch (error) {
+    logger.error('❌ Erro ao listar usuários:', error);
+    throw error;
+  }
+}
+
+// Função para buscar usuário específico
+async function buscarUsuario(userId) {
+  try {
+    const result = await pool.query('SELECT * FROM usuarios WHERE user_id = $1', [userId]);
+    return result.rows[0] || null;
+  } catch (error) {
+    logger.error('❌ Erro ao buscar usuário:', error);
+    throw error;
+  }
+}
+
+// Função para verificar acesso do usuário
+async function verificarAcessoUsuario(userId) {
+  try {
+    const usuario = await buscarUsuario(userId);
+    if (!usuario) {
+      return { acesso: false, motivo: 'Usuário não cadastrado' };
+    }
+    
+    if (usuario.status !== 'ativo') {
+      return { acesso: false, motivo: `Usuário ${usuario.status}` };
+    }
+    
+    // Verificar se premium expirou
+    if (usuario.plano === 'premium' && usuario.data_expiracao_premium) {
+      const agora = new Date();
+      const expiracao = new Date(usuario.data_expiracao_premium);
+      
+      if (agora > expiracao) {
+        // Atualizar para gratuito
+        await pool.query(`
+          UPDATE usuarios 
+          SET plano = 'gratuito', 
+              data_expiracao_premium = NULL,
+              atualizado_em = CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'
+          WHERE user_id = $1
+        `, [userId]);
+        
+        return { 
+          acesso: true, 
+          plano: 'gratuito', 
+          motivo: 'Premium expirado, convertido para gratuito' 
+        };
+      }
+    }
+    
+    return { 
+      acesso: true, 
+      plano: usuario.plano, 
+      is_admin: usuario.is_admin 
+    };
+  } catch (error) {
+    logger.error('❌ Erro ao verificar acesso:', error);
+    return { acesso: false, motivo: 'Erro interno' };
+  }
+}
+
+// Função para registrar acesso do usuário
+async function registrarAcesso(userId) {
+  try {
+    await pool.query(`
+      UPDATE usuarios 
+      SET data_ultimo_acesso = CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'
+      WHERE user_id = $1
+    `, [userId]);
+  } catch (error) {
+    logger.error('❌ Erro ao registrar acesso:', error);
+  }
+}
+
+// Função para buscar usuários premium próximos da expiração
+async function buscarUsuariosPremiumExpiracao(diasAntes = 7) {
+  try {
+    // Usar timezone do Brasil
+    const agora = new Date();
+    const timezoneOffset = -3 * 60; // UTC-3 (horário de Brasília)
+    const dataLimite = new Date(agora.getTime() + (diasAntes * 24 * 60 * 60 * 1000) + (timezoneOffset * 60 * 1000));
+    
+    const result = await pool.query(`
+      SELECT * FROM usuarios 
+      WHERE plano = 'premium' 
+        AND data_expiracao_premium IS NOT NULL
+        AND data_expiracao_premium <= $1
+        AND status = 'ativo'
+      ORDER BY data_expiracao_premium ASC
+    `, [dataLimite]);
+    
+    return result.rows;
+  } catch (error) {
+    logger.error('❌ Erro ao buscar usuários premium próximos da expiração:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   pool,
   initializeDatabase,
@@ -2030,5 +2332,14 @@ module.exports = {
   buscarRecorrentesAtivos,
   buscarProximosVencimentos,
   buscarGastosPorCategoria,
-  buscarGastosValorAlto
+  buscarGastosValorAlto,
+  // Funções de usuários
+  cadastrarUsuario,
+  promoverParaPremium,
+  removerUsuario,
+  listarUsuarios,
+  buscarUsuario,
+  verificarAcessoUsuario,
+  registrarAcesso,
+  buscarUsuariosPremiumExpiracao
 }; 

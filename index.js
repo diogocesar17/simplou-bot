@@ -2,9 +2,24 @@ require('dotenv').config();
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const http = require('http');
-const { ADMIN_USERS, AUTHORIZED_USERS, SYSTEM_CONFIG, listUsers } = require('./config.js');
+const { SYSTEM_CONFIG } = require('./config.js');
 const { parseMessage, categoriasCadastradas, isDataMuitoDistante, formasPagamento, mapeamentoFormasPagamento } = require('./messageParser');
 const { analisarMensagemInteligente } = require('./intelligentParser');
+const { 
+  verificarAcessoUsuario, 
+  registrarAcesso,
+  buscarUsuariosPremiumExpiracao
+} = require('./databaseService');
+const {
+  processarComandoCadastrar,
+  processarComandoPremium,
+  processarComandoRemover,
+  processarComandoUsuarios,
+  processarComandoStatus,
+  verificarAdmin,
+  gerarMensagemBoasVindas,
+  gerarMensagemPromocaoPremium
+} = require('./usuariosService');
 const { 
   initializeDatabase,
   appendRowToDatabase, 
@@ -829,6 +844,20 @@ async function startBot() {
       const textoLower = texto.toLowerCase().trim();
       const userId = msg.key.remoteJid; // Identificador único do usuário
       
+      // Verificar acesso do usuário
+      const acesso = await verificarAcessoUsuario(userId);
+      if (!acesso.acesso) {
+        await sock.sendMessage(userId, { 
+          text: `❌ *Acesso Negado*\n\n${acesso.motivo}\n\nEntre em contato com o administrador para solicitar acesso.` 
+        });
+        return;
+      }
+      
+      // Registrar acesso do usuário
+      await registrarAcesso(userId);
+      
+      // Verificar se é admin para comandos administrativos
+      const isAdmin = await verificarAdmin(userId);
       
       // Atualizar status da última mensagem
       botStatus.lastMessage = `${new Date().toLocaleTimeString('pt-BR')} - ${userId}: ${texto.substring(0, 50)}${texto.length > 50 ? '...' : ''}`;
@@ -988,6 +1017,12 @@ async function startBot() {
             "• `logs` - Logs de auditoria (apenas admin)\n" +
             "• `meuid` - Descobrir ID do WhatsApp\n" +
             "• `quemsou` - Verificar permissões\n\n" +
+            "👥 *Gestão de Usuários (apenas admin)*\n" +
+            "• `cadastrar 5511999999999 Nome` - Cadastrar novo usuário\n" +
+            "• `premium 5511999999999 [dias]` - Promover para premium\n" +
+            "• `remover 5511999999999` - Remover usuário\n" +
+            "• `usuarios` - Listar todos os usuários\n" +
+            "• `status 5511999999999` - Status de usuário específico\n\n" +
             "📚 *Ajuda e Informações*\n" +
             "• `ajuda` / `menu` / `help` - Este menu\n" +
             "• `oi` / `olá` - Mensagem de boas-vindas\n\n" +
@@ -1007,6 +1042,50 @@ async function startBot() {
             "💡 *Dúvidas? Digite `ajuda` a qualquer momento!*"
         });
         return;
+      }
+
+      // --- COMANDOS DE ADMINISTRAÇÃO ---
+      if (isAdmin) {
+        // Comando para cadastrar usuário
+        if (textoLower.startsWith('cadastrar ')) {
+          const resultado = await processarComandoCadastrar(texto, userId);
+          await sock.sendMessage(userId, { text: resultado.message });
+          return;
+        }
+
+        // Comando para promover para premium
+        if (textoLower.startsWith('premium ')) {
+          const resultado = await processarComandoPremium(texto, userId);
+          await sock.sendMessage(userId, { text: resultado.message });
+          
+          // Se promovido com sucesso, enviar mensagem para o usuário
+          if (resultado.success && resultado.usuario) {
+            const mensagemPromocao = gerarMensagemPromocaoPremium(resultado.usuario, resultado.usuario.data_expiracao_premium ? 30 : null);
+            await sock.sendMessage(resultado.usuario.user_id, { text: mensagemPromocao });
+          }
+          return;
+        }
+
+        // Comando para remover usuário
+        if (textoLower.startsWith('remover ')) {
+          const resultado = await processarComandoRemover(texto, userId);
+          await sock.sendMessage(userId, { text: resultado.message });
+          return;
+        }
+
+        // Comando para listar usuários
+        if (textoLower === 'usuarios' || textoLower === 'usuários') {
+          const resultado = await processarComandoUsuarios();
+          await sock.sendMessage(userId, { text: resultado.message });
+          return;
+        }
+
+        // Comando para status de usuário específico
+        if (textoLower.startsWith('status ')) {
+          const resultado = await processarComandoStatus(texto);
+          await sock.sendMessage(userId, { text: resultado.message });
+          return;
+        }
       }
 
       // --- MENSAGENS DE BOAS-VINDAS ---
@@ -1481,29 +1560,35 @@ async function startBot() {
       
       // Comando para verificar status do sistema (apenas admin)
       if (textoLower === 'status') {
-        if (!ADMIN_USERS.includes(userId)) {
+        if (!isAdmin) {
           await sock.sendMessage(userId, { text: '❌ Acesso negado. Apenas administradores podem usar este comando.' });
           return;
         }
-        
         try {
-          const { pool, registrarLog } = require('./databaseService');
+          const { pool, registrarLog, listarUsuarios } = require('./databaseService');
           const result = await pool.query('SELECT COUNT(*) as total FROM lancamentos');
           const totalLancamentos = result.rows[0].total;
-          
-          const stats = await listUsers();
+
+          // Buscar usuários do banco
+          const usuarios = await listarUsuarios();
+          const totalUsuarios = usuarios.length;
+          const totalAdmins = usuarios.filter(u => u.is_admin).length;
+          const totalPremium = usuarios.filter(u => u.plano === 'premium').length;
+
           const msg = `📊 *Status do Sistema*\n\n` +
-                     `👥 Usuários: ${stats.total}/${stats.max}\n` +
+                     `👥 Usuários: ${totalUsuarios}\n` +
+                     `👑 Admins: ${totalAdmins}\n` +
+                     `💎 Premium: ${totalPremium}\n` +
                      `📋 Total de lançamentos: ${totalLancamentos}\n` +
                      `🤖 Versão: ${SYSTEM_CONFIG.VERSION}\n` +
-                     `⏰ Última verificação: ${new Date().toLocaleString('pt-BR')}`;
-          
+                     `⏰ Última verificação: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`;
+
           await sock.sendMessage(userId, { text: msg });
-          
+
           // Registrar log de auditoria
           await registrarLog(userId, 'COMANDO_ADMIN', 'Status do sistema consultado');
         } catch (error) {
-          logger.error('Erro ao verificar status do sistema:', error);
+          logger.error(error, 'Erro ao verificar status do sistema');
           fileLogger.error('Erro ao verificar status do sistema:', error);
           await sock.sendMessage(userId, { text: '❌ Erro ao verificar status do sistema.' });
         }
@@ -1512,7 +1597,7 @@ async function startBot() {
 
       // Comando para limpar dados antigos (apenas admin)
       if (textoLower === 'limpar') {
-        if (!ADMIN_USERS.includes(userId)) {
+        if (!isAdmin) {
           await sock.sendMessage(userId, { text: '❌ Acesso negado. Apenas administradores podem usar este comando.' });
           return;
         }
@@ -1545,7 +1630,8 @@ async function startBot() {
 
       // Comando para gerar backup (todos os usuários autorizados)
       if (textoLower === 'backup') {
-        if (!AUTHORIZED_USERS.includes(userId)) {
+        const acesso = await verificarAcessoUsuario(userId);
+        if (!acesso.acesso) {
           await sock.sendMessage(userId, { text: '❌ Acesso negado. Apenas usuários autorizados podem usar este comando.' });
           return;
         }
@@ -1583,7 +1669,7 @@ async function startBot() {
 
       // Comando para logs (admin, aceita maiúsculas/minúsculas)
       if (textoLower === 'logs') {
-        if (!ADMIN_USERS.includes(userId)) {
+        if (!isAdmin) {
           await sock.sendMessage(userId, { text: '❌ Acesso negado. Apenas administradores podem usar este comando.' });
           return;
         }
@@ -1627,28 +1713,18 @@ async function startBot() {
 
       // Comando para verificar quem sou eu
       if (textoLower === 'quemsou') {
-        const isAdmin = ADMIN_USERS.includes(userId);
-        const isAuthorized = AUTHORIZED_USERS.includes(userId);
-        
-        let msg = `👤 *Informações do seu usuário:*\n\n`;
-        msg += `📱 ID: ${userId}\n`;
-        msg += `🔐 Status: `;
-        
-        if (isAdmin) {
-          msg += `👑 *Administrador*\n`;
-          msg += `✅ Acesso total ao sistema\n`;
-          msg += `🔧 Comandos admin disponíveis: status, limpar\n`;
-        } else if (isAuthorized) {
-          msg += `✅ *Usuário autorizado*\n`;
-          msg += `✅ Acesso normal ao sistema\n`;
-        } else {
-          msg += `❌ *Não autorizado*\n`;
-          msg += `❌ Sem acesso ao sistema\n`;
-          msg += `💡 Peça ao administrador para adicionar seu ID`;
-        }
-        
-        msg += `\n📊 Comandos disponíveis: ajuda`;
-        
+        const acesso = await verificarAcessoUsuario(userId);
+        let msg = `👤 *Informações do seu usuário:*
+
+`;
+        msg += `• ID: ${userId}
+`;
+        msg += `• Plano: ${acesso.plano || 'desconhecido'}
+`;
+        msg += `• Admin: ${acesso.is_admin ? 'Sim' : 'Não'}
+`;
+        msg += `• Status: ${acesso.acesso ? 'Ativo' : 'Bloqueado'}
+`;
         await sock.sendMessage(userId, { text: msg });
         return;
       }

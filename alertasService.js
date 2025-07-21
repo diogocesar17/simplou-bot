@@ -1,4 +1,4 @@
-const { appendRowToDatabase, queryDatabase } = require('./databaseService');
+const { appendRowToDatabase, queryDatabase, buscarUsuariosPremiumExpiracao } = require('./databaseService');
 const { logger, fileLogger } = require('./logger');
 
 // Configurações dos alertas
@@ -196,6 +196,28 @@ function gerarMensagemAlertaBoleto(boleto, tipoAlerta, diasRestantes) {
 }
 
 /**
+ * Gera mensagem de alerta para expiração premium
+ */
+function gerarMensagemAlertaPremium(usuario, diasRestantes) {
+  const dataExpiracao = new Date(usuario.data_expiracao_premium);
+  const dataFormatada = dataExpiracao.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  
+  if (diasRestantes === 0) {
+    return `🚨 *PREMIUM EXPIRADO!*\n\n` +
+           `👤 Olá ${usuario.nome}!\n\n` +
+           `💎 Seu plano Premium expirou hoje (${dataFormatada})\n` +
+           `🔄 Você foi automaticamente convertido para o plano Gratuito\n\n` +
+           `📱 Para renovar seu Premium, entre em contato com o administrador.`;
+  } else {
+    return `⏰ *ALERTA PREMIUM*\n\n` +
+           `👤 Olá ${usuario.nome}!\n\n` +
+           `💎 Seu plano Premium expira em ${diasRestantes} dias (${dataFormatada})\n\n` +
+           `📱 Para renovar, entre em contato com o administrador.\n` +
+           `🔄 Após a expiração, você será convertido para o plano Gratuito.`;
+  }
+}
+
+/**
  * Função principal para verificar e enviar alertas
  */
 async function verificarEEnviarAlertas(sock) {
@@ -242,6 +264,21 @@ async function verificarEEnviarAlertas(sock) {
       }
     }
     
+    // Alertas de usuários premium próximos da expiração
+    const usuariosPremium = await buscarUsuariosPremiumExpiracao(7); // 7 dias antes
+    for (const usuario of usuariosPremium) {
+      const dataExpiracao = new Date(usuario.data_expiracao_premium);
+      const agora = new Date();
+      const diasRestantes = Math.ceil((dataExpiracao - agora) / (1000 * 60 * 60 * 24));
+      
+      // Alerta 7 dias antes e no dia da expiração
+      if (diasRestantes <= 7 && diasRestantes >= 0) {
+        const mensagem = gerarMensagemAlertaPremium(usuario, diasRestantes);
+        await sock.sendMessage(usuario.user_id, { text: mensagem });
+        logger.info(`[ALERTAS] Alerta premium enviado para ${usuario.user_id}: ${diasRestantes} dias restantes`);
+      }
+    }
+    
     logger.info('[ALERTAS] Verificação de alertas concluída');
   } catch (error) {
     logger.error('[ALERTAS] Erro ao verificar alertas:', error);
@@ -255,5 +292,6 @@ module.exports = {
   deveAlertarCartao,
   deveAlertarBoleto,
   gerarMensagemAlertaCartao,
-  gerarMensagemAlertaBoleto
+  gerarMensagemAlertaBoleto,
+  gerarMensagemAlertaPremium
 }; 
