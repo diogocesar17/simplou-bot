@@ -66,7 +66,7 @@ const {
   testarConexaoGemini,
   isGeminiAvailable 
 } = require('./geminiService');
-const { logger, fileLogger } = require('./logger');
+const { logger, fileLogger, debug } = require('./logger');
 
 
 // Função utilitária para formatar valores de forma segura
@@ -125,7 +125,7 @@ function parseMesAno(input) {
     let nomeMes = partes[0].normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('ç','c');
     let idx = meses.findIndex(m => m.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('ç','c') === nomeMes);
     
-    console.log('[PARSE MESANO DEBUG] input:', input, 'partes[0]:', partes[0], 'nomeMes:', nomeMes, 'idx:', idx);
+    debug('PARSE MESANO DEBUG: input:', input, 'partes[0]:', partes[0], 'nomeMes:', nomeMes, 'idx:', idx);
     
     // Casos especiais
     if (idx === -1 && nomeMes === 'marco') idx = 2; // Aceita 'marco' como 'março'
@@ -272,11 +272,11 @@ async function criarRecorrente(userId, parsed, cartaoInfo = null) {
 
 // Função para processar lançamento (usada após escolha de forma de pagamento)
 async function processarLancamento(userId, parsed, sock) {
-  console.log('[DEBUG] processarLancamento iniciado com:', parsed);
+  debug('processarLancamento iniciado com:', parsed);
   
   // --- VERIFICAÇÃO DE FALTA DE DATA DE VENCIMENTO PARA BOLETOS ---
   if (parsed && parsed.faltaDataVencimento) {
-    console.log('[DEBUG] Falta data de vencimento para boleto, solicitando ao usuário');
+    debug('Falta data de vencimento para boleto, solicitando ao usuário');
     aguardandoDataVencimento[userId] = { parsed: parsed };
     await sock.sendMessage(userId, {
       text: `📄 *Boleto detectado*\n\n` +
@@ -291,7 +291,7 @@ async function processarLancamento(userId, parsed, sock) {
   
   // --- VERIFICAÇÃO DE FALTA DE FORMA DE PAGAMENTO ---
   if (parsed && parsed.faltaFormaPagamento) {
-    console.log('[DEBUG] Falta forma de pagamento, solicitando ao usuário');
+    debug('Falta forma de pagamento, solicitando ao usuário');
     aguardandoFormaPagamento[userId] = { parsed: parsed };
     let msgFormaPagamento = `💳 *Forma de pagamento não informada*\n\n`;
     msgFormaPagamento += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
@@ -308,7 +308,7 @@ async function processarLancamento(userId, parsed, sock) {
   
   // --- DETECÇÃO DE GASTOS NO CARTÃO DE CRÉDITO (PRIORITÁRIO) ---
   const pagamentoNormalizado = (parsed.pagamento || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  console.log('[DEBUG] pagamentoNormalizado:', pagamentoNormalizado);
+  debug('pagamentoNormalizado:', pagamentoNormalizado);
   
   if (
     parsed &&
@@ -316,12 +316,12 @@ async function processarLancamento(userId, parsed, sock) {
     parsed.tipo.toLowerCase() === 'gasto' &&
     (pagamentoNormalizado.includes('credito') || pagamentoNormalizado.includes('cartao'))
   ) {
-    console.log('[DEBUG] Detecção de gasto no crédito');
+    debug('Detecção de gasto no crédito');
     const cartoes = await listarCartoesConfigurados(userId);
-    console.log('[DEBUG] Cartões encontrados:', cartoes.length, cartoes);
+    debug('Cartões encontrados:', cartoes.length, cartoes);
     
     if (cartoes.length === 0) {
-      console.log('[DEBUG] Nenhum cartão configurado, registrando como gasto comum');
+      debug('Nenhum cartão configurado, registrando como gasto comum');
       try {
         const tipoNormalizado = (parsed.tipo || '').toLowerCase();
         await appendRowToDatabase(userId, [
@@ -359,7 +359,7 @@ async function processarLancamento(userId, parsed, sock) {
     }
     
     if (cartoes.length === 1) {
-      console.log('[DEBUG] Apenas um cartão configurado, vinculando automaticamente:', cartoes[0]);
+      debug('Apenas um cartão configurado, vinculando automaticamente:', cartoes[0]);
       const cartao = cartoes[0];
       const dataLancamento = new Date();
       const dataContabilizacaoInfo = calcularDataContabilizacao(dataLancamento, cartao.dia_vencimento, cartao.dia_fechamento);
@@ -370,7 +370,7 @@ async function processarLancamento(userId, parsed, sock) {
       try {
         // Verificar se é parcelamento
         if (parsed.parcelamento && parsed.numParcelas > 1) {
-          console.log('[DEBUG] Criando parcelamento no cartão:', parsed.numParcelas, 'parcelas');
+          debug('Criando parcelamento no cartão:', parsed.numParcelas, 'parcelas');
           const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed, cartao);
           // Calcular datas de contabilização das parcelas
           const datasFatura = [];
@@ -395,7 +395,7 @@ async function processarLancamento(userId, parsed, sock) {
         
         // Verificar se é recorrente
         if (parsed.recorrente && parsed.recorrenteMeses > 1) {
-          console.log('[DEBUG] Criando recorrente no cartão:', parsed.recorrenteMeses, 'meses');
+          debug('Criando recorrente no cartão:', parsed.recorrenteMeses, 'meses');
           const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed, cartao);
           
           let msgRecorrente = `✅ Lançamento recorrente registrado no cartão ${cartao.nome_cartao}!\n\n`;
@@ -424,7 +424,7 @@ async function processarLancamento(userId, parsed, sock) {
         }
         
         // Gasto normal no cartão (não parcelado, não recorrente)
-        console.log('[DEBUG] Criando gasto normal no cartão');
+        debug('Criando gasto normal no cartão');
         await appendRowToDatabase(userId, [
           parsed.data.split('/').reverse().join('-'),
           parsed.tipo.toLowerCase(),
@@ -454,14 +454,14 @@ async function processarLancamento(userId, parsed, sock) {
         });
         return;
       } catch (error) {
-        console.log('[DEBUG] Erro ao registrar gasto no cartão:', error);
+        debug('Erro ao registrar gasto no cartão:', error);
         await sock.sendMessage(userId, { 
           text: `❌ Erro ao registrar gasto no cartão: ${error.message}` 
         });
         return;
       }
     } else if (cartoes.length > 1) {
-      console.log('[DEBUG] Múltiplos cartões configurados, solicitando escolha do usuário');
+      debug('Múltiplos cartões configurados, solicitando escolha do usuário');
       let msgCartoes = `💳 Qual cartão você usou?\n\n`;
       cartoes.forEach((cartao, index) => {
         msgCartoes += `${index + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento})\n`;
@@ -478,7 +478,7 @@ async function processarLancamento(userId, parsed, sock) {
   }
 
   // --- PARSER DE LANÇAMENTO NORMAL ---
-  console.log('[DEBUG] Processando lançamento normal');
+  debug('Processando lançamento normal');
   
   // Verificar se há erro de validação mas ainda temos os dados necessários
   if (parsed && parsed.error && parsed.valorExtraido) {
@@ -499,7 +499,7 @@ async function processarLancamento(userId, parsed, sock) {
       
       // Verificar se é parcelamento
       if (parsedComValor.parcelamento && parsedComValor.numParcelas > 1) {
-        console.log('[DEBUG] Criando parcelamento com aviso de valor alto:', parsedComValor.numParcelas, 'parcelas');
+        debug('Criando parcelamento com aviso de valor alto:', parsedComValor.numParcelas, 'parcelas');
         const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsedComValor);
         
         let msgParcelamento = `⚠️ ${parsed.error}\n\n✅ Parcelamento registrado com sucesso!\n\n`;
@@ -517,7 +517,7 @@ async function processarLancamento(userId, parsed, sock) {
       
       // Verificar se é recorrente
       if (parsedComValor.recorrente && parsedComValor.recorrenteMeses > 1) {
-        console.log('[DEBUG] Criando recorrente com aviso de valor alto:', parsedComValor.recorrenteMeses, 'meses');
+        debug('Criando recorrente com aviso de valor alto:', parsedComValor.recorrenteMeses, 'meses');
         const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsedComValor);
         
         let msgRecorrente = `⚠️ ${parsed.error}\n\n✅ Lançamento recorrente registrado com sucesso!\n\n`;
@@ -573,7 +573,7 @@ async function processarLancamento(userId, parsed, sock) {
   if (parsed && !parsed.error) {
     // --- VERIFICAÇÃO DE FALTA DE DATA DE VENCIMENTO PARA BOLETOS ---
     if (parsed.faltaDataVencimento) {
-      console.log('[DEBUG] Falta data de vencimento para boleto, solicitando ao usuário');
+      debug('Falta data de vencimento para boleto, solicitando ao usuário');
       aguardandoDataVencimento[userId] = { parsed: parsed };
       await sock.sendMessage(userId, {
         text: `📄 *Boleto detectado*\n\n` +
@@ -591,7 +591,7 @@ async function processarLancamento(userId, parsed, sock) {
       
       // Verificar se é parcelamento
       if (parsed.parcelamento && parsed.numParcelas > 1) {
-        console.log('[DEBUG] Criando parcelamento normal:', parsed.numParcelas, 'parcelas');
+        debug('Criando parcelamento normal:', parsed.numParcelas, 'parcelas');
         const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed);
         
         let msgParcelamento = `✅ Parcelamento registrado com sucesso!\n\n`;
@@ -614,7 +614,7 @@ async function processarLancamento(userId, parsed, sock) {
       
       // Verificar se é recorrente
       if (parsed.recorrente && parsed.recorrenteMeses > 1) {
-        console.log('[DEBUG] Criando recorrente normal:', parsed.recorrenteMeses, 'meses');
+        debug('Criando recorrente normal:', parsed.recorrenteMeses, 'meses');
         const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed);
         
         let msgRecorrente = `✅ Lançamento recorrente registrado com sucesso!\n\n`;
@@ -672,7 +672,7 @@ async function processarLancamento(userId, parsed, sock) {
   }
 
   // Dentro do bloco de resposta padrão (mensagem não reconhecida):
-  console.log('[DEBUG] Nenhum comando reconhecido, enviando resposta padrão.');
+  debug('Nenhum comando reconhecido, enviando resposta padrão.');
   await sock.sendMessage(userId, {
     text: '❌ Comando não reconhecido ou valor não encontrado na mensagem.\nDigite *ajuda* para ver a lista de comandos disponíveis.'
   });
@@ -863,13 +863,13 @@ async function startBot() {
       botStatus.lastMessage = `${new Date().toLocaleTimeString('pt-BR')} - ${userId}: ${texto.substring(0, 50)}${texto.length > 50 ? '...' : ''}`;
 
       // LOGS DE DEBUG PARA DIAGNÓSTICO DE CONTEXTO
-      console.log('[DEBUG] Mensagem recebida de userId:', userId);
-      console.log('[DEBUG] aguardandoDiaVencimento:', JSON.stringify(aguardandoDiaVencimento));
-      console.log('[DEBUG] aguardandoConfiguracaoCartao:', JSON.stringify(aguardandoConfiguracaoCartao));
+      debug('Mensagem recebida de userId:', userId);
+      debug('aguardandoDiaVencimento:', JSON.stringify(aguardandoDiaVencimento));
+      debug('aguardandoConfiguracaoCartao:', JSON.stringify(aguardandoConfiguracaoCartao));
 
       // --- TRATAMENTO DE RESPOSTA DE FORMA DE PAGAMENTO ---
       if (aguardandoFormaPagamento[userId]) {
-        console.log('[DEBUG] Processando resposta de forma de pagamento');
+        debug('Processando resposta de forma de pagamento');
         const contexto = aguardandoFormaPagamento[userId];
         
         if (textoLower === 'cancelar') {
@@ -887,7 +887,7 @@ async function startBot() {
         }
         
         const formaPagamentoEscolhida = mapeamentoFormasPagamento[numeroEscolhido];
-        console.log('[DEBUG] Forma de pagamento escolhida:', formaPagamentoEscolhida);
+        debug('Forma de pagamento escolhida:', formaPagamentoEscolhida);
         
         // Atualizar o parsed com a forma de pagamento escolhida
         const parsedComPagamento = {
@@ -902,7 +902,7 @@ async function startBot() {
         // Verificar se agora é um boleto e se falta data de vencimento
         const pagamentoNormalizado = formaPagamentoEscolhida.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         if (pagamentoNormalizado.includes('boleto') && !parsedComPagamento.dataVencimento) {
-          console.log('[DEBUG] Boleto selecionado sem data de vencimento, solicitando ao usuário');
+          debug('Boleto selecionado sem data de vencimento, solicitando ao usuário');
           parsedComPagamento.faltaDataVencimento = true;
           aguardandoDataVencimento[userId] = { parsed: parsedComPagamento };
           await sock.sendMessage(userId, {
@@ -917,7 +917,7 @@ async function startBot() {
         }
         
         // Reprocessar o lançamento com a forma de pagamento
-        console.log('[DEBUG] Reprocessando lançamento com forma de pagamento:', formaPagamentoEscolhida);
+        debug('Reprocessando lançamento com forma de pagamento:', formaPagamentoEscolhida);
         
         // Continuar com o processamento normal usando parsedComPagamento
         // Vou criar uma função auxiliar para processar o lançamento
@@ -927,7 +927,7 @@ async function startBot() {
 
       // --- TRATAMENTO DE RESPOSTA DE DATA DE VENCIMENTO ---
       if (aguardandoDataVencimento[userId]) {
-        console.log('[DEBUG] Processando resposta de data de vencimento');
+        debug('Processando resposta de data de vencimento');
         const contexto = aguardandoDataVencimento[userId];
         
         if (textoLower === 'cancelar') {
@@ -971,7 +971,7 @@ async function startBot() {
         delete aguardandoDataVencimento[userId];
         
         // Reprocessar o lançamento com a data de vencimento
-        console.log('[DEBUG] Reprocessando lançamento com data de vencimento:', dataVencimento);
+                  debug('Reprocessando lançamento com data de vencimento:', dataVencimento);
         await processarLancamento(userId, parsedComVencimento, sock);
         return;
       }
@@ -1853,9 +1853,9 @@ async function startBot() {
           return;
         }
         const { mes, ano } = parsed;
-        console.log('[FATURA DEBUG] mes:', mes, 'ano:', ano, 'nomeMes:', getNomeMes(mes-1));
+        debug('FATURA DEBUG: mes:', mes, 'ano:', ano, 'nomeMes:', getNomeMes(mes-1));
         const fatura = await buscarFaturaCartao(userId, nomeCartao, mes, ano);
-        console.log('[FATURA DEBUG] fatura retornada:', fatura);
+        debug('FATURA DEBUG: fatura retornada:', fatura);
         const nomeMesFatura = getNomeMes(mes - 1);
         if (!fatura || fatura.length === 0) {
           await sock.sendMessage(userId, { text: `Nenhum lançamento encontrado para o cartão ${nomeCartao} em ${nomeMesFatura}/${ano}.` });
@@ -1879,18 +1879,18 @@ async function startBot() {
 
       // --- TRATAMENTO DE COMANDO CONFIGURAR CARTÃO ---
       const textoNormalizadoConfigurar  = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-      console.log('[DEBUG] texto original:', texto);
-      console.log('[DEBUG] texto normalizado:', textoNormalizadoConfigurar);
+      debug('texto original:', texto);
+      debug('texto normalizado:', textoNormalizadoConfigurar);
       
       // Aceitar variações: "configurar cartao", "configurar cartão", "cadastrar cartao", "cadastrar cartão", etc.
       if (/^(configurar|cadastrar)\s+cart[aã]o$/.test(textoNormalizadoConfigurar) || /^(configurar|cadastrar)\s+cart[aã]o$/.test(textoLower)) {
-        console.log('[DEBUG] Comando CONFIGURAR/CADASTRAR CARTAO reconhecido!');
+        debug('Comando CONFIGURAR/CADASTRAR CARTAO reconhecido!');
         aguardandoConfiguracaoCartao[userId] = {};
         await sock.sendMessage(userId, { text: '💳 Qual o nome do cartão? (Exemplo: Nubank, Itaú, Inter)\n\nDigite "cancelar" para abortar.' });
         return;
       } else {
         if (textoNormalizadoConfigurar.includes('configurar') || textoNormalizadoConfigurar.includes('cadastrar')) {
-          console.log('[DEBUG] Comando configurar/cadastrar detectado mas não bateu regex:', textoNormalizadoConfigurar);
+          debug('Comando configurar/cadastrar detectado mas não bateu regex:', textoNormalizadoConfigurar);
         }
       }
 
@@ -1925,7 +1925,7 @@ async function startBot() {
         try {
           // Verificar se é parcelamento
           if (parsedComValor.parcelamento && parsedComValor.numParcelas > 1) {
-            console.log('[DEBUG] Criando parcelamento no cartão escolhido:', parsedComValor.numParcelas, 'parcelas');
+            debug('Criando parcelamento no cartão escolhido:', parsedComValor.numParcelas, 'parcelas');
             const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsedComValor, cartaoEscolhido);
             
             let msgParcelamento = `✅ Parcelamento registrado no cartão ${cartaoEscolhido.nome_cartao}!\n\n`;
@@ -1945,7 +1945,7 @@ async function startBot() {
           
           // Verificar se é recorrente
           if (parsedComValor.recorrente && parsedComValor.recorrenteMeses > 1) {
-            console.log('[DEBUG] Criando recorrente no cartão escolhido:', parsedComValor.recorrenteMeses, 'meses');
+            debug('Criando recorrente no cartão escolhido:', parsedComValor.recorrenteMeses, 'meses');
             const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsedComValor, cartaoEscolhido);
             
             let msgRecorrente = `✅ Lançamento recorrente registrado no cartão ${cartaoEscolhido.nome_cartao}!\n\n`;
@@ -1964,7 +1964,7 @@ async function startBot() {
           }
 
           // Gasto normal no cartão escolhido (não parcelado, não recorrente)
-          console.log('[DEBUG] Criando gasto normal no cartão escolhido');
+          debug('Criando gasto normal no cartão escolhido');
           await appendRowToDatabase(userId, [
             parsedComValor.data.split('/').reverse().join('-'),
             parsedComValor.tipo.toLowerCase(),
@@ -2370,7 +2370,7 @@ async function startBot() {
 
         // --- NOVO COMANDO: EDITAR LANÇAMENTO DIRETO ---
         if (/^editar\s+(um\s+)?lanc[aã]mentos?((\s+de)?\s+\w+\s*\d{4})?$/i.test(texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())) {
-          console.log('[DEBUG] Comando EDITAR LANÇAMENTO reconhecido!');
+          debug('Comando EDITAR LANÇAMENTO reconhecido!');
           
           // Extrai possível mês/ano
           const partes = texto.trim().split(/\s+/);
@@ -2642,13 +2642,13 @@ async function startBot() {
         }
 
 
-    console.log('[DEBUG] Antes do parseMessage');
+    debug('Antes do parseMessage');
     const parsed = parseMessage(texto);
-    console.log('[DEBUG] parsed após parseMessage:', parsed);
+    debug('parsed após parseMessage:', parsed);
 
     // --- VERIFICAÇÃO DE TIPO 'Outro' (CORREÇÃO INTELIGENTE) ---
     if (parsed && (parsed.tipo === 'outro' || !parsed.tipo)) {
-      console.log('[DEBUG] Tipo é "outro", tentando correção inteligente...');
+      debug('Tipo é "outro", tentando correção inteligente...');
       const analise = await analisarMensagemInteligente(texto, userId);
       if (analise && analise.tipo && (analise.tipo === 'gasto' || analise.tipo === 'receita')) {
         // Substituir os campos principais do parsed pelo resultado do parser inteligente
@@ -2657,11 +2657,11 @@ async function startBot() {
         parsed.categoria = analise.categoria;
         parsed.pagamento = analise.formaPagamento;
         parsed.descricao = analise.descricao;
-        console.log('[DEBUG] Correção inteligente aplicada ao parsed:', parsed);
+        debug('Correção inteligente aplicada ao parsed:', parsed);
         // Reprocessar o lançamento com os dados corrigidos
         return await processarLancamento(userId, parsed, sock);
       } else {
-        console.log('[DEBUG] Parser inteligente não conseguiu identificar o tipo');
+        debug('Parser inteligente não conseguiu identificar o tipo');
         await sock.sendMessage(userId, { text: '❌ Não foi possível identificar se é gasto ou receita. Por favor, especifique na mensagem.' });
         return;
       }
@@ -2669,7 +2669,7 @@ async function startBot() {
 
       // --- VERIFICAÇÃO DE FALTA DE DATA DE VENCIMENTO PARA BOLETOS ---
       if (parsed && parsed.faltaDataVencimento) {
-        console.log('[DEBUG] Falta data de vencimento para boleto, solicitando ao usuário');
+        debug('Falta data de vencimento para boleto, solicitando ao usuário');
         aguardandoDataVencimento[userId] = { parsed: parsed };
         await sock.sendMessage(userId, {
           text: `📄 *Boleto detectado*\n\n` +
@@ -2684,7 +2684,7 @@ async function startBot() {
 
       // --- VERIFICAÇÃO DE FORMA DE PAGAMENTO ---
       if (parsed && parsed.faltaFormaPagamento) {
-        console.log('[DEBUG] Falta forma de pagamento, solicitando ao usuário');
+        debug('Falta forma de pagamento, solicitando ao usuário');
         aguardandoFormaPagamento[userId] = { parsed: parsed };
         let msgFormaPagamento = `💳 *Forma de pagamento não informada*\n\n`;
         msgFormaPagamento += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
@@ -2701,19 +2701,19 @@ async function startBot() {
 
       // --- DETECÇÃO DE GASTOS NO CARTÃO DE CRÉDITO (PRIORITÁRIO) ---
       const pagamentoNormalizado = (parsed.pagamento || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-      console.log('[DEBUG] pagamentoNormalizado:', pagamentoNormalizado);
+      debug('pagamentoNormalizado:', pagamentoNormalizado);
       if (
         parsed &&
         parsed.tipo &&
         parsed.tipo.toLowerCase() === 'gasto' &&
         (pagamentoNormalizado.includes('credito') || pagamentoNormalizado.includes('cartao'))
       ) {
-        console.log('[DEBUG] Detecção de gasto no crédito');
+        debug('Detecção de gasto no crédito');
         const cartoes = await listarCartoesConfigurados(userId);
-        console.log('[DEBUG] Cartões encontrados:', cartoes.length, cartoes);
+        debug('Cartões encontrados:', cartoes.length, cartoes);
         
         if (cartoes.length === 0) {
-          console.log('[DEBUG] Nenhum cartão configurado, registrando como gasto comum');
+          debug('Nenhum cartão configurado, registrando como gasto comum');
           try {
             const tipoNormalizado = (parsed.tipo || '').toLowerCase();
             await appendRowToDatabase(userId, [
@@ -2751,7 +2751,7 @@ async function startBot() {
         }
         
         if (cartoes.length === 1) {
-          console.log('[DEBUG] Apenas um cartão configurado, vinculando automaticamente:', cartoes[0]);
+          debug('Apenas um cartão configurado, vinculando automaticamente:', cartoes[0]);
           const cartao = cartoes[0];
           const dataLancamento = new Date();
           const dataContabilizacaoInfo = calcularDataContabilizacao(dataLancamento, cartao.dia_vencimento, cartao.dia_fechamento);
@@ -2762,7 +2762,7 @@ async function startBot() {
           try {
             // Verificar se é parcelamento
             if (parsed.parcelamento && parsed.numParcelas > 1) {
-              console.log('[DEBUG] Criando parcelamento no cartão:', parsed.numParcelas, 'parcelas');
+              debug('Criando parcelamento no cartão:', parsed.numParcelas, 'parcelas');
               const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed, cartao);
               // Calcular datas de contabilização das parcelas
               const datasFatura = [];
@@ -2787,7 +2787,7 @@ async function startBot() {
             
             // Verificar se é recorrente
             if (parsed.recorrente && parsed.recorrenteMeses > 1) {
-              console.log('[DEBUG] Criando recorrente no cartão:', parsed.recorrenteMeses, 'meses');
+              debug('Criando recorrente no cartão:', parsed.recorrenteMeses, 'meses');
               const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed, cartao);
               
               let msgRecorrente = `✅ Lançamento recorrente registrado no cartão ${cartao.nome_cartao}!\n\n`;
@@ -2816,7 +2816,7 @@ async function startBot() {
             }
             
             // Gasto normal no cartão (não parcelado, não recorrente)
-            console.log('[DEBUG] Criando gasto normal no cartão');
+            debug('Criando gasto normal no cartão');
             await appendRowToDatabase(userId, [
               parsed.data.split('/').reverse().join('-'),
               parsed.tipo.toLowerCase(),
@@ -2846,14 +2846,14 @@ async function startBot() {
             });
             return;
           } catch (error) {
-            console.log('[DEBUG] Erro ao registrar gasto no cartão:', error);
+            debug('Erro ao registrar gasto no cartão:', error);
             await sock.sendMessage(userId, { 
               text: `❌ Erro ao registrar gasto no cartão: ${error.message}` 
             });
             return;
           }
         } else if (cartoes.length > 1) {
-          console.log('[DEBUG] Múltiplos cartões configurados, solicitando escolha do usuário');
+          debug('Múltiplos cartões configurados, solicitando escolha do usuário');
           let msgCartoes = `💳 Qual cartão você usou?\n\n`;
           cartoes.forEach((cartao, index) => {
             msgCartoes += `${index + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento})\n`;
@@ -2870,7 +2870,7 @@ async function startBot() {
       }
 
       // --- PARSER DE LANÇAMENTO NORMAL ---
-      console.log('[DEBUG] Processando lançamento normal');
+      debug('Processando lançamento normal');
       
       // Verificar se há erro de validação mas ainda temos os dados necessários
       if (parsed && parsed.error && parsed.valorExtraido) {
@@ -2891,7 +2891,7 @@ async function startBot() {
           
           // Verificar se é parcelamento
           if (parsedComValor.parcelamento && parsedComValor.numParcelas > 1) {
-            console.log('[DEBUG] Criando parcelamento com aviso de valor alto:', parsedComValor.numParcelas, 'parcelas');
+            debug('Criando parcelamento com aviso de valor alto:', parsedComValor.numParcelas, 'parcelas');
             const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsedComValor);
             
             let msgParcelamento = `⚠️ ${parsed.error}\n\n✅ Parcelamento registrado com sucesso!\n\n`;
@@ -2909,7 +2909,7 @@ async function startBot() {
           
           // Verificar se é recorrente
           if (parsedComValor.recorrente && parsedComValor.recorrenteMeses > 1) {
-            console.log('[DEBUG] Criando recorrente com aviso de valor alto:', parsedComValor.recorrenteMeses, 'meses');
+            debug('Criando recorrente com aviso de valor alto:', parsedComValor.recorrenteMeses, 'meses');
             const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsedComValor);
             
             let msgRecorrente = `⚠️ ${parsed.error}\n\n✅ Lançamento recorrente registrado com sucesso!\n\n`;
@@ -2965,7 +2965,7 @@ async function startBot() {
       if (parsed && !parsed.error) {
         // --- VERIFICAÇÃO DE FALTA DE DATA DE VENCIMENTO PARA BOLETOS ---
         if (parsed.faltaDataVencimento) {
-          console.log('[DEBUG] Falta data de vencimento para boleto, solicitando ao usuário');
+          debug('Falta data de vencimento para boleto, solicitando ao usuário');
           aguardandoDataVencimento[userId] = { parsed: parsed };
           await sock.sendMessage(userId, {
             text: `📄 *Boleto detectado*\n\n` +
@@ -2983,7 +2983,7 @@ async function startBot() {
           
           // Verificar se é parcelamento
           if (parsed.parcelamento && parsed.numParcelas > 1) {
-            console.log('[DEBUG] Criando parcelamento normal:', parsed.numParcelas, 'parcelas');
+            debug('Criando parcelamento normal:', parsed.numParcelas, 'parcelas');
             const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed);
             
             let msgParcelamento = `✅ Parcelamento registrado com sucesso!\n\n`;
@@ -3006,7 +3006,7 @@ async function startBot() {
           
           // Verificar se é recorrente
           if (parsed.recorrente && parsed.recorrenteMeses > 1) {
-            console.log('[DEBUG] Criando recorrente normal:', parsed.recorrenteMeses, 'meses');
+            debug('Criando recorrente normal:', parsed.recorrenteMeses, 'meses');
             const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed);
             
             let msgRecorrente = `✅ Lançamento recorrente registrado com sucesso!\n\n`;
@@ -3064,7 +3064,7 @@ async function startBot() {
       }
 
       // Dentro do bloco de resposta padrão (mensagem não reconhecida):
-      console.log('[DEBUG] Nenhum comando reconhecido, enviando resposta padrão.');
+      debug('Nenhum comando reconhecido, enviando resposta padrão.');
       await sock.sendMessage(userId, {
         text: '❌ Comando não reconhecido ou valor não encontrado na mensagem.\nDigite *ajuda* para ver a lista de comandos disponíveis.'
       });

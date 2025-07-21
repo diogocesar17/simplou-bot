@@ -1,5 +1,6 @@
 const { buscarConfiguracaoCartao, listarCartoesConfigurados } = require('./databaseService');
 const { analisarTransacaoComGemini, isGeminiAvailable } = require('./geminiService');
+const { debug } = require('./logger');
 
 // Palavras-chave para categorias
 const CATEGORIAS_KEYWORDS = {
@@ -88,8 +89,8 @@ async function analisarMensagemInteligente(texto, userId) {
   const precisaUsarGemini = (categoria === 'Outros' || formaPagamento === 'Não especificado' || valorPareceIncorreto) && isGeminiAvailable();
   
   if (precisaUsarGemini) {
-    console.log('[PARSER INTELIGENTE] Parser baseado em regras não conseguiu identificar tudo ou valor parece incorreto, tentando Gemini...');
-    console.log('[PARSER INTELIGENTE] Motivo:', {
+    debug('PARSER INTELIGENTE: Parser baseado em regras não conseguiu identificar tudo ou valor parece incorreto, tentando Gemini...');
+    debug('PARSER INTELIGENTE: Motivo:', {
       categoria: categoria === 'Outros' ? 'categoria não identificada' : 'ok',
       formaPagamento: formaPagamento === 'Não especificado' ? 'forma de pagamento não identificada' : 'ok',
       valorPareceIncorreto: valorPareceIncorreto ? `valor ${valor} parece incorreto` : 'ok'
@@ -98,7 +99,7 @@ async function analisarMensagemInteligente(texto, userId) {
     try {
       const resultadoGemini = await analisarTransacaoComGemini(texto, userId);
       if (resultadoGemini) {
-        console.log('[PARSER INTELIGENTE] Gemini forneceu análise melhor:', resultadoGemini);
+        debug('PARSER INTELIGENTE: Gemini forneceu análise melhor:', resultadoGemini);
         
         // Combinar resultados: usar Gemini para campos que o parser falhou
         return {
@@ -113,7 +114,7 @@ async function analisarMensagemInteligente(texto, userId) {
         };
       }
     } catch (error) {
-      console.log('[PARSER INTELIGENTE] Erro ao usar Gemini como fallback:', error.message);
+      debug('PARSER INTELIGENTE: Erro ao usar Gemini como fallback:', error.message);
     }
   }
   

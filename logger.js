@@ -71,18 +71,15 @@ function createFileLogger() {
 // Criar logger de arquivo
 const fileStream = createFileLogger();
 
+// Função para logs de debug (só em desenvolvimento)
+function debug(message, ...args) {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[DEBUG] ${message}`, ...args);
+  }
+}
+
 module.exports = {
   fileLogger: fileStream,
   logger: consoleStream,
-};
-
-/*
- * Rotação de logs:
- * - Rotação diária e por tamanho (10MB)
- * - Mantém 14 arquivos antigos
- * - Logs antigos comprimidos (gzip)
- * - Fallback para logger simples se houver erro
- *
- * Para logs locais: ./logs/app.log, ./logs/app.log.1.gz, etc.
- * Para produção (Docker): /app/logs/app.log, etc.
- */ 
+  debug
+}; 
