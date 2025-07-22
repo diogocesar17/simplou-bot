@@ -2430,25 +2430,112 @@ async function startBot() {
         // --- FLUXO DE ESCOLHA DO LANÇAMENTO PARA EDITAR ---
         if (aguardandoEdicao[userId] && aguardandoEdicao[userId].etapa === null) {
           const op = texto.trim();
-          if (op.toLowerCase() === 'cancelar') {
+          // Se for comando de edição, segue o fluxo normal
+          if (/^(editar|excluir)\s+\d+$/i.test(op) || op.toLowerCase() === 'cancelar') {
+            // fluxo original
+            if (op.toLowerCase() === 'cancelar') {
+              delete aguardandoEdicao[userId];
+              await sock.sendMessage(userId, { text: '❌ Edição de lançamento cancelada.' });
+              return;
+            }
+            const idx = parseInt(op.match(/\d+/));
+            const lista = aguardandoEdicao[userId].lista;
+            if (isNaN(idx) || idx < 1 || idx > lista.length) {
+              await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${lista.length} ou "cancelar".` });
+              return;
+            }
+            if (/^excluir\s+\d+$/i.test(op)) {
+              // fluxo de exclusão
+              const l = lista[idx - 1];
+              // Excluir parcelado: remove todas as parcelas
+              if (l.tipoAgrupamento === 'parcelado' && l.parcelamento_id) {
+                await excluirParcelamentoPorId(userId, l.parcelamento_id);
+                await sock.sendMessage(userId, { text: '✅ Parcelamento excluído com sucesso! Todas as parcelas foram removidas.' });
+                delete aguardandoEdicao[userId];
+                return;
+              }
+              // Excluir recorrente: remove todas as recorrências futuras
+              if (l.tipoAgrupamento === 'recorrente' && l.recorrente_id) {
+                await excluirRecorrentePorId(userId, l.recorrente_id);
+                await sock.sendMessage(userId, { text: '✅ Lançamento recorrente excluído com sucesso! Todas as recorrências futuras foram removidas.' });
+                delete aguardandoEdicao[userId];
+                return;
+              }
+              // Exclusão simples
+              await excluirLancamentoPorId(userId, l.id);
+              await sock.sendMessage(userId, { text: '✅ Lançamento excluído com sucesso!' });
+              delete aguardandoEdicao[userId];
+              return;
+            } else {
+              // fluxo de edição
+              aguardandoEdicao[userId].indiceSelecionado = idx - 1;
+              aguardandoEdicao[userId].lancamento = lista[idx - 1];
+              aguardandoEdicao[userId].etapa = 'campo';
+              let msg = 'Qual campo deseja editar?\n1. data\n2. valor\n3. categoria\n4. pagamento\n5. descricao\n6. cancelar';
+              await sock.sendMessage(userId, { text: msg });
+              return;
+            }
+          } else if (/^\d+$/.test(op)) {
+            // Se for apenas um número, perguntar se deseja editar ou excluir
+            const idx = parseInt(op);
+            const lista = aguardandoEdicao[userId].lista;
+            if (isNaN(idx) || idx < 1 || idx > lista.length) {
+              await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${lista.length} ou "cancelar".` });
+              return;
+            }
+            aguardandoEdicao[userId].indiceSelecionado = idx - 1;
+            aguardandoEdicao[userId].lancamento = lista[idx - 1];
+            aguardandoEdicao[userId].etapa = 'aguardando-acao';
+            await sock.sendMessage(userId, { text: `Você deseja *editar* ou *excluir* o lançamento ${idx}? Responda "editar" ou "excluir".` });
+            return;
+          } else {
+            // Se não for comando de edição, limpa o estado e segue o fluxo normal
+            delete aguardandoEdicao[userId];
+            // Não retorna, deixa o fluxo seguir para processar como novo lançamento
+          }
+        }
+
+        // Novo fluxo: aguarda resposta de "editar" ou "excluir" após o número
+        if (aguardandoEdicao[userId] && aguardandoEdicao[userId].etapa === 'aguardando-acao') {
+          const acao = texto.trim().toLowerCase();
+          const idx = aguardandoEdicao[userId].indiceSelecionado;
+          const lista = aguardandoEdicao[userId].lista;
+          const l = lista[idx];
+          if (acao === 'editar') {
+            aguardandoEdicao[userId].etapa = 'campo';
+            let msg = `Qual campo deseja editar?\n1. data\n2. valor\n3. categoria\n4. pagamento\n5. descricao\n6. cancelar`;
+            await sock.sendMessage(userId, { text: msg });
+            return;
+          } else if (acao === 'excluir') {
+            // Excluir parcelado: remove todas as parcelas
+            if (l.tipoAgrupamento === 'parcelado' && l.parcelamento_id) {
+              await excluirParcelamentoPorId(userId, l.parcelamento_id);
+              await sock.sendMessage(userId, { text: '✅ Parcelamento excluído com sucesso! Todas as parcelas foram removidas.' });
+              delete aguardandoEdicao[userId];
+              return;
+            }
+            // Excluir recorrente: remove todas as recorrências futuras
+            if (l.tipoAgrupamento === 'recorrente' && l.recorrente_id) {
+              await excluirRecorrentePorId(userId, l.recorrente_id);
+              await sock.sendMessage(userId, { text: '✅ Lançamento recorrente excluído com sucesso! Todas as recorrências futuras foram removidas.' });
+              delete aguardandoEdicao[userId];
+              return;
+            }
+            // Exclusão simples
+            await excluirLancamentoPorId(userId, l.id);
+            await sock.sendMessage(userId, { text: '✅ Lançamento excluído com sucesso!' });
+            delete aguardandoEdicao[userId];
+            return;
+          } else if (acao === 'cancelar') {
             delete aguardandoEdicao[userId];
             await sock.sendMessage(userId, { text: '❌ Edição de lançamento cancelada.' });
             return;
-          }
-          const idx = parseInt(op);
-          const lista = aguardandoEdicao[userId].lista;
-          if (isNaN(idx) || idx < 1 || idx > lista.length) {
-            await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${lista.length} ou "cancelar".` });
+          } else {
+            await sock.sendMessage(userId, { text: '❌ Responda apenas com \"editar\", \"excluir\" ou \"cancelar\".' });
             return;
           }
-          aguardandoEdicao[userId].indiceSelecionado = idx - 1;
-          aguardandoEdicao[userId].lancamento = lista[idx - 1];
-          aguardandoEdicao[userId].etapa = 'campo';
-          let msg = 'Qual campo deseja editar?\n1. data\n2. valor\n3. categoria\n4. pagamento\n5. descricao\n6. cancelar';
-          await sock.sendMessage(userId, { text: msg });
-          return;
         }
-
+        
         // Comando para iniciar edição de cartão
         const textoNormalizado = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
         if (/^editar cartao$/i.test(textoNormalizado)) {
@@ -2643,6 +2730,10 @@ async function startBot() {
 
 
     debug('Antes do parseMessage');
+    // Limpa o estado de edição se o usuário enviar um novo lançamento
+    if (aguardandoEdicao[userId]) {
+      delete aguardandoEdicao[userId];
+    }
     const parsed = parseMessage(texto);
     debug('parsed após parseMessage:', parsed);
 
