@@ -1180,6 +1180,16 @@ async function startBot() {
           mesAno = parseMesAno(resto);
           if (mesAno) limite = 20;
         }
+        // BLOQUEIO DE MESES FUTUROS
+        if (mesAno) {
+          const agora = new Date();
+          const mesAtual = agora.getMonth() + 1;
+          const anoAtual = agora.getFullYear();
+          if (mesAno.ano > anoAtual || (mesAno.ano === anoAtual && mesAno.mes > mesAtual)) {
+            await sock.sendMessage(userId, { text: '❌ O comando Histórico só pode ser usado para meses passados ou o mês atual. Para visualizar previsões futuras, utilize o comando Resumo ou Resumo Detalhado.' });
+            return;
+          }
+        }
         let ultimos;
         if (mesAno) {
           ultimos = await listarLancamentos(userId, limite, mesAno.mes, mesAno.ano);
