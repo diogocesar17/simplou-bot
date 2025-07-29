@@ -35,6 +35,7 @@ const listarUsuariosCommand = require('./commands/listarUsuarios');
 const promoverPremiumCommand = require('./commands/promoverPremium');
 const removerUsuarioCommand = require('./commands/removerUsuario');
 const statusUsuarioCommand = require('./commands/statusUsuario');
+const alertasCommand = require('./commands/alertas');
 const { definirEstado, obterEstado, limparEstado } = require('./configs/stateManager');
 const { logger, fileLogger } = require('./../logger');
 
@@ -64,6 +65,22 @@ async function handleMessage(sock, userId, texto) {
   // Roteamento para o comando de ajuda
   if (["ajuda", "menu", "help"].includes(textoLower)) {
     await ajudaCommand(sock, userId);
+    return;
+  }
+
+  // Roteamento para mensagens de boas-vindas
+  if (["oi", "olá", "ola", "hello", "hi", "ei", "opa"].includes(textoLower)) {
+    await sock.sendMessage(userId, {
+      text: `👋 *Olá! Bem-vindo ao Simplou!*\n\n` +
+            `💰 *Seu assistente financeiro pessoal*\n\n` +
+            `📊 *Comandos principais:*\n` +
+            `• resumo: ver resumo do mês\n` +
+            `• gastei 50 no mercado: registrar gasto\n` +
+            `• recebi 1000 salário: registrar receita\n` +
+            `• histórico: ver últimos lançamentos\n` +
+            `• ajuda: menu completo\n\n` +
+            `💡 *Dica:* Digite *ajuda* para ver todos os comandos disponíveis!`
+    });
     return;
   }
 
@@ -213,6 +230,12 @@ async function handleMessage(sock, userId, texto) {
   }
   if (textoLower === 'quemsou') {
     await quemsouCommand(sock, userId);
+    return;
+  }
+
+  // Roteamento para o comando de alertas
+  if (["alertas", "alerta", "lembretes", "lembrete"].includes(textoLower)) {
+    await alertasCommand(sock, userId);
     return;
   }
 

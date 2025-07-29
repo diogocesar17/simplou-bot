@@ -10,13 +10,14 @@ async function ajudaCommand(sock, userId) {
       "• `historico` - Últimos lançamentos\n" +
       "• `historico [mês/ano]` - Lançamentos do mês (ex: historico julho 2025)\n" +
       "• `fatura [cartão] [mês/ano]` - Fatura de cartão (ex: fatura nubank 08/2025)\n\n" +
-      "📦 *Comandos Específicos*\n" +
-      "• `parcelados` - Listar parcelamentos ativos\n" +
-      "• `recorrentes` / `fixos` - Listar gastos recorrentes/fixos\n" +
-      "• `vencimentos` - Próximos vencimentos (30 dias)\n" +
-      "• `vencimentos [dias]` - Vencimentos em X dias (ex: vencimentos 7)\n" +
-      "• `categoria [nome]` - Gastos por categoria (ex: categoria lazer)\n" +
-      "• `valor alto [valor]` - Gastos acima de X reais (ex: valor alto 200)\n\n" +
+                  "📦 *Comandos Específicos*\n" +
+            "• `parcelados` - Listar parcelamentos ativos\n" +
+            "• `recorrentes` / `fixos` - Listar gastos recorrentes/fixos\n" +
+            "• `vencimentos` - Próximos vencimentos (30 dias)\n" +
+            "• `vencimentos [dias]` - Vencimentos em X dias (ex: vencimentos 7)\n" +
+            "• `categoria [nome]` - Gastos por categoria (ex: categoria lazer)\n" +
+            "• `valor alto [valor]` - Gastos acima de X reais (ex: valor alto 200)\n" +
+            "• `alertas` - Verificar alertas de vencimento e premium\n\n" +
       "💳 *Gestão de Cartões*\n" +
       "• `configurar cartao` - Cadastrar cartão de crédito\n" +
       "• `editar cartao` - Editar vencimento/fechamento\n" +
