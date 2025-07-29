@@ -19,7 +19,7 @@ function limparCacheAlertas() {
   if (ultimaLimpeza !== hoje) {
     alertasEnviadosHoje.clear();
     alertasEnviadosHoje.set('ultima_limpeza', hoje);
-    logger.info('🧹 Cache de alertas limpo para o novo dia');
+    logger.debug('🧹 Cache de alertas limpo para o novo dia');
   }
 }
 
@@ -279,11 +279,11 @@ async function temAlertas(userId) {
  */
 async function verificarEEnviarAlertasAutomaticos(sock, eLembreteFinal = false) {
   try {
-    logger.info(`🔔 Iniciando verificação automática de alertas${eLembreteFinal ? ' (LEMBRETE FINAL)' : ''}...`);
+    logger.debug(`🔔 Iniciando verificação automática de alertas${eLembreteFinal ? ' (LEMBRETE FINAL)' : ''}...`);
     
     // Buscar todos os usuários ativos
     const usuarios = await listarUsuarios({ ativos: true });
-    logger.info(`📊 Verificando alertas para ${usuarios.length} usuários`);
+    logger.debug(`📊 Verificando alertas para ${usuarios.length} usuários`);
     
     let enviados = 0;
     let erros = 0;
@@ -296,7 +296,7 @@ async function verificarEEnviarAlertasAutomaticos(sock, eLembreteFinal = false) 
         if (alertas) {
           await sock.sendMessage(usuario.user_id, { text: alertas });
           enviados++;
-          logger.info(`✅ Alerta enviado para ${usuario.user_id}`);
+          logger.debug(`✅ Alerta enviado para ${usuario.user_id}`);
           
           // Aguardar um pouco para não sobrecarregar
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -307,7 +307,7 @@ async function verificarEEnviarAlertasAutomaticos(sock, eLembreteFinal = false) 
       }
     }
     
-    logger.info(`🎯 Verificação concluída: ${enviados} alertas enviados, ${erros} erros`);
+    logger.warn(`🎯 Verificação concluída: ${enviados} alertas enviados, ${erros} erros`);
     return { enviados, erros };
     
   } catch (error) {
