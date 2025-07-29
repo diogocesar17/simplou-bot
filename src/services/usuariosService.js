@@ -1,14 +1,15 @@
 const { 
-  cadastrarUsuario, 
-  promoverParaPremium, 
-  removerUsuario, 
-  listarUsuarios, 
-  buscarUsuario, 
-  verificarAcessoUsuario,
-  registrarAcesso,
-  buscarUsuariosPremiumExpiracao
-} = require('./databaseService');
-const { logger, fileLogger } = require('./logger');
+  verificarAcessoUsuario: verificarAcessoDB,
+  listarUsuarios: listarUsuariosDB,
+  buscarUsuario: buscarUsuarioDB,
+  cadastrarUsuario: cadastrarUsuarioDB,
+  promoverParaPremium: promoverParaPremiumDB,
+  removerUsuario: removerUsuarioDB,
+  registrarAcesso: registrarAcessoDB,
+  buscarUsuariosPremiumExpiracao: buscarUsuariosPremiumExpiracaoDB
+} = require('../../databaseService');
+
+const { logger } = require('../../logger');
 
 // Função para formatar número de telefone
 function formatarTelefone(numero) {
@@ -151,18 +152,12 @@ async function processarComandoRemover(texto, adminId) {
       throw new Error('Usuário não encontrado');
     }
     
-    // Não permitir remover admins
-    if (usuarioExistente.is_admin) {
-      throw new Error('Não é possível remover um administrador');
-    }
-    
     // Remover usuário
-    const usuario = await removerUsuario(userId, adminId);
+    await removerUsuario(userId, adminId);
     
     return {
       success: true,
-      message: `✅ Usuário removido com sucesso!\n\n👤 Nome: ${usuario.nome}\n📱 Telefone: ${telefone}\n🗑️ Removido em: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
-      usuario: usuario
+      message: `✅ Usuário removido com sucesso!\n\n👤 Nome: ${usuarioExistente.nome}\n📱 Telefone: ${telefone}\n📅 Removido em: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`
     };
     
   } catch (error) {
@@ -174,53 +169,34 @@ async function processarComandoRemover(texto, adminId) {
   }
 }
 
-// Função para processar comando de listagem
+// Função para processar comando de listagem de usuários
 async function processarComandoUsuarios(filtros = {}) {
   try {
     const usuarios = await listarUsuarios(filtros);
     
-    if (usuarios.length === 0) {
+    if (!usuarios || usuarios.length === 0) {
       return {
         success: true,
-        message: '📊 Nenhum usuário encontrado.'
+        message: '📋 Nenhum usuário encontrado.'
       };
     }
     
-    let mensagem = `📊 *Usuários Cadastrados:*\n\n`;
+    let mensagem = `📋 *Lista de Usuários* (${usuarios.length})\n\n`;
     
-    for (const usuario of usuarios) {
-      const emojiPlano = usuario.plano === 'premium' ? '💎' : '🆓';
-      const emojiAdmin = usuario.is_admin ? '👑' : '👤';
-      const status = usuario.status === 'ativo' ? '✅' : '❌';
+    usuarios.forEach((usuario, index) => {
+      const status = usuario.plano === 'premium' ? '💎 Premium' : '🆓 Gratuito';
+      const admin = usuario.is_admin ? ' 👑 Admin' : '';
+      const dataCadastro = new Date(usuario.data_criacao).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
       
-      let linha = `${emojiAdmin} ${usuario.nome} (${usuario.user_id.replace('@s.whatsapp.net', '')})\n`;
-      linha += `   ${emojiPlano} ${usuario.plano.toUpperCase()} - ${status} ${usuario.status}\n`;
-      
-      if (usuario.data_ultimo_acesso) {
-        const ultimoAcesso = new Date(usuario.data_ultimo_acesso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        linha += `   📅 Último acesso: ${ultimoAcesso}\n`;
-      }
-      
-      if (usuario.plano === 'premium' && usuario.data_expiracao_premium) {
-        const expiracao = new Date(usuario.data_expiracao_premium).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-        linha += `   ⏰ Expira em: ${expiracao}\n`;
-      }
-      
-      mensagem += linha + '\n';
-    }
-    
-    const totalAtivos = usuarios.filter(u => u.status === 'ativo').length;
-    const totalPremium = usuarios.filter(u => u.plano === 'premium').length;
-    
-    mensagem += `📈 *Resumo:*\n`;
-    mensagem += `   👥 Total: ${usuarios.length} usuários\n`;
-    mensagem += `   ✅ Ativos: ${totalAtivos}\n`;
-    mensagem += `   💎 Premium: ${totalPremium}`;
+      mensagem += `${index + 1}. *${usuario.nome}*\n`;
+      mensagem += `   📱 ${usuario.user_id.replace('@s.whatsapp.net', '')}\n`;
+      mensagem += `   ${status}${admin}\n`;
+      mensagem += `   📅 ${dataCadastro}\n\n`;
+    });
     
     return {
       success: true,
-      message: mensagem,
-      usuarios: usuarios
+      message: mensagem
     };
     
   } catch (error) {
@@ -254,38 +230,29 @@ async function processarComandoStatus(texto) {
       throw new Error('Usuário não encontrado');
     }
     
-    const emojiPlano = usuario.plano === 'premium' ? '💎' : '🆓';
-    const emojiAdmin = usuario.is_admin ? '👑' : '👤';
-    const status = usuario.status === 'ativo' ? '✅' : '❌';
+    const status = usuario.plano === 'premium' ? '💎 Premium' : '🆓 Gratuito';
+    const admin = usuario.is_admin ? ' 👑 Admin' : '';
+    const dataCadastro = new Date(usuario.data_criacao).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     
-    let mensagem = `📊 *Status do Usuário*\n\n`;
-    mensagem += `${emojiAdmin} **Nome:** ${usuario.nome}\n`;
-    mensagem += `📱 **Telefone:** ${usuario.user_id.replace('@s.whatsapp.net', '')}\n`;
-    mensagem += `${emojiPlano} **Plano:** ${usuario.plano.toUpperCase()}\n`;
-    mensagem += `${status} **Status:** ${usuario.status}\n`;
-    mensagem += `📅 **Cadastrado em:** ${new Date(usuario.data_cadastro).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n`;
+    let mensagem = `👤 *Status do Usuário*\n\n`;
+    mensagem += `📝 Nome: ${usuario.nome}\n`;
+    mensagem += `📱 Telefone: ${telefone}\n`;
+    mensagem += `🎯 Plano: ${status}${admin}\n`;
+    mensagem += `📅 Cadastrado em: ${dataCadastro}\n`;
     
-    if (usuario.data_ultimo_acesso) {
-      mensagem += `🕐 **Último acesso:** ${new Date(usuario.data_ultimo_acesso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n`;
+    if (usuario.data_expiracao_premium) {
+      const dataExpiracao = new Date(usuario.data_expiracao_premium).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+      mensagem += `⏰ Expira em: ${dataExpiracao}\n`;
     }
     
-    if (usuario.plano === 'premium' && usuario.data_expiracao_premium) {
-      const expiracao = new Date(usuario.data_expiracao_premium);
-      const agora = new Date();
-      const diasRestantes = Math.ceil((expiracao - agora) / (1000 * 60 * 60 * 24));
-      
-      mensagem += `⏰ **Expira em:** ${expiracao.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n`;
-      mensagem += `📆 **Dias restantes:** ${diasRestantes}\n`;
-    }
-    
-    if (usuario.criado_por && usuario.criado_por !== 'sistema') {
-      mensagem += `👤 **Cadastrado por:** ${usuario.criado_por.replace('@s.whatsapp.net', '')}\n`;
+    if (usuario.ultimo_acesso) {
+      const ultimoAcesso = new Date(usuario.ultimo_acesso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+      mensagem += `🕐 Último acesso: ${ultimoAcesso}\n`;
     }
     
     return {
       success: true,
-      message: mensagem,
-      usuario: usuario
+      message: mensagem
     };
     
   } catch (error) {
@@ -300,8 +267,8 @@ async function processarComandoStatus(texto) {
 // Função para verificar se usuário é admin
 async function verificarAdmin(userId) {
   try {
-    const acesso = await verificarAcessoUsuario(userId);
-    return acesso.acesso && acesso.is_admin;
+    const usuario = await buscarUsuario(userId);
+    return usuario && usuario.is_admin === true;
   } catch (error) {
     logger.error('Erro ao verificar admin:', error);
     return false;
@@ -310,44 +277,119 @@ async function verificarAdmin(userId) {
 
 // Função para gerar mensagem de boas-vindas
 function gerarMensagemBoasVindas(usuario) {
-  return `🎉 *Bem-vindo ao FinanceBot!*\n\n👤 Olá ${usuario.nome}!\n\n` +
-         `🆓 Você está no plano **Gratuito** com acesso a:\n` +
-         `✅ Registro de gastos e receitas\n` +
-         `✅ Categorização automática\n` +
-         `✅ Resumos mensais\n` +
-         `✅ Gestão de cartões\n` +
-         `✅ Sistema de alertas\n\n` +
-         `💎 Para acessar funcionalidades **Premium** como metas financeiras e análises inteligentes, entre em contato com o administrador.\n\n` +
-         `📱 Digite *ajuda* para ver todos os comandos disponíveis.`;
+  return `🎉 *Bem-vindo ao Simplou!*\n\n` +
+         `👤 Olá ${usuario.nome}!\n\n` +
+         `💰 *Seu assistente financeiro pessoal*\n\n` +
+         `📊 *Comandos principais:*\n` +
+         `• resumo: ver resumo do mês\n` +
+         `• gastei 50 no mercado: registrar gasto\n` +
+         `• recebi 1000 salário: registrar receita\n` +
+         `• histórico: ver últimos lançamentos\n` +
+         `• ajuda: menu completo\n\n` +
+         `💡 *Dica:* Digite *ajuda* para ver todos os comandos disponíveis!`;
 }
 
 // Função para gerar mensagem de promoção premium
 function gerarMensagemPromocaoPremium(usuario, diasExpiracao) {
-  let mensagem = `🎉 *Parabéns! Você foi promovido para Premium!*\n\n` +
-                 `👤 Olá ${usuario.nome}!\n\n` +
-                 `💎 Agora você tem acesso ao plano **Premium** com:\n` +
-                 `✅ Todas as funcionalidades gratuitas\n` +
-                 `🎯 Sistema de metas financeiras\n` +
-                 `🤖 Análises inteligentes com IA\n` +
-                 `📊 Relatórios avançados\n` +
-                 `🔔 Alertas personalizados\n\n`;
+  let mensagem = `🎉 *Parabéns! Você foi promovido para Premium!*\n\n`;
+  mensagem += `👤 ${usuario.nome}\n`;
+  mensagem += `💎 Plano: Premium\n`;
   
   if (diasExpiracao) {
-    const dataExpiracao = new Date();
-    dataExpiracao.setDate(dataExpiracao.getDate() + diasExpiracao);
-    mensagem += `⏰ Seu plano Premium expira em: ${dataExpiracao.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n\n`;
-  } else {
-    mensagem += `⏰ Seu plano Premium não tem prazo de expiração\n\n`;
+    mensagem += `📅 Expira em ${diasExpiracao} dias\n\n`;
   }
   
-  mensagem += `🚀 Comece agora mesmo! Digite *ajuda* para ver os novos comandos disponíveis.`;
+  mensagem += `✨ *Benefícios Premium:*\n`;
+  mensagem += `• Análises inteligentes de gastos\n`;
+  mensagem += `• Sugestões personalizadas\n`;
+  mensagem += `• Previsões financeiras\n`;
+  mensagem += `• Suporte prioritário\n\n`;
+  mensagem += `🚀 Aproveite todos os recursos!`;
   
   return mensagem;
 }
 
+async function verificarAcessoUsuario(userId) {
+  try {
+    return await verificarAcessoDB(userId);
+  } catch (error) {
+    console.error('Erro ao verificar acesso do usuário:', error);
+    throw new Error('Erro ao verificar acesso do usuário');
+  }
+}
+
+async function listarUsuarios(filtros = {}) {
+  try {
+    return await listarUsuariosDB(filtros);
+  } catch (error) {
+    console.error('Erro ao listar usuários:', error);
+    throw new Error('Erro ao listar usuários');
+  }
+}
+
+async function buscarUsuario(userId) {
+  try {
+    return await buscarUsuarioDB(userId);
+  } catch (error) {
+    console.error('Erro ao buscar usuário:', error);
+    throw new Error('Erro ao buscar usuário');
+  }
+}
+
+async function cadastrarUsuario(userId, dados) {
+  try {
+    return await cadastrarUsuarioDB(userId, dados);
+  } catch (error) {
+    console.error('Erro ao cadastrar usuário:', error);
+    throw new Error('Erro ao cadastrar usuário');
+  }
+}
+
+async function promoverParaPremium(userId, diasExpiracao = null, promovidoPor) {
+  try {
+    return await promoverParaPremiumDB(userId, diasExpiracao, promovidoPor);
+  } catch (error) {
+    console.error('Erro ao promover usuário para premium:', error);
+    throw new Error('Erro ao promover usuário para premium');
+  }
+}
+
+async function removerUsuario(userId, removidoPor) {
+  try {
+    return await removerUsuarioDB(userId, removidoPor);
+  } catch (error) {
+    console.error('Erro ao remover usuário:', error);
+    throw new Error('Erro ao remover usuário');
+  }
+}
+
+async function registrarAcesso(userId) {
+  try {
+    return await registrarAcessoDB(userId);
+  } catch (error) {
+    console.error('Erro ao registrar acesso:', error);
+    throw new Error('Erro ao registrar acesso');
+  }
+}
+
+async function buscarUsuariosPremiumExpiracao(diasAntes = 7) {
+  try {
+    return await buscarUsuariosPremiumExpiracaoDB(diasAntes);
+  } catch (error) {
+    console.error('Erro ao buscar usuários premium com expiração:', error);
+    throw new Error('Erro ao buscar usuários premium com expiração');
+  }
+}
+
 module.exports = {
-  formatarTelefone,
-  isValidWhatsAppNumber,
+  verificarAcessoUsuario,
+  listarUsuarios,
+  buscarUsuario,
+  cadastrarUsuario,
+  promoverParaPremium,
+  removerUsuario,
+  registrarAcesso,
+  buscarUsuariosPremiumExpiracao,
   processarComandoCadastrar,
   processarComandoPremium,
   processarComandoRemover,
@@ -355,6 +397,5 @@ module.exports = {
   processarComandoStatus,
   verificarAdmin,
   gerarMensagemBoasVindas,
-  gerarMensagemPromocaoPremium,
-  buscarUsuariosPremiumExpiracao
+  gerarMensagemPromocaoPremium
 }; 
