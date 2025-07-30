@@ -1,15 +1,15 @@
-require('dotenv').config();
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
-const { handleMessage } = require('./src/index');
-const { 
+import 'dotenv/config';
+import { default as makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
+import qrcode from 'qrcode-terminal';
+import { handleMessage } from './src/index';
+import { 
   verificarEEnviarAlertasAutomaticos, 
   estaNoHorarioAlertas,
   ePrimeiraVerificacaoDoDia,
   eVerificacaoFinalDoDia
-} = require('./src/services/alertasService');
+} from './src/services/alertasService';
 
-async function startBot() {
+async function startBot(): Promise<void> {
     // Persistência local de sessão WhatsApp
     const { state, saveCreds } = await useMultiFileAuthState('auth');
   const sock = makeWASocket({
@@ -25,7 +25,7 @@ async function startBot() {
       qrcode.generate(qr, { small: true });
     }
     if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
       console.log('⚠️ Conexão encerrada:', lastDisconnect?.error?.message, '| Reconectar?', shouldReconnect);
       if (shouldReconnect) {
@@ -45,8 +45,13 @@ async function startBot() {
     if (type !== 'notify') return;
     const msg = messages[0];
     if (!msg.message || !msg.message.conversation) return;
-      const texto = msg.message.conversation.trim();
+    const texto = msg.message.conversation.trim();
     const userId = msg.key.remoteJid;
+    if (!userId) return;
+
+    if(userId !== '556181429135@s.whatsapp.net') return
+
+    console.log('🔔 Mensagem recebida:', texto);
     // Delegar para o roteador modularizado
     await handleMessage(sock, userId, texto);
   });
@@ -54,9 +59,9 @@ async function startBot() {
 
 /**
  * Inicia o sistema de alertas automáticos
- * @param {object} sock - Socket do WhatsApp
+ * @param sock - Socket do WhatsApp
  */
-function iniciarSistemaAlertas(sock) {
+function iniciarSistemaAlertas(sock: any): void {
   console.log('🔔 Sistema de alertas automáticos iniciado');
   
   // Verificar alertas a cada hora (8h, 9h, 10h, 11h)
@@ -82,9 +87,9 @@ function iniciarSistemaAlertas(sock) {
         console.log('📋 Verificação intermediária - enviando novos alertas');
         await verificarEEnviarAlertasAutomaticos(sock, false);
       }
-      }
-    }, 60 * 60 * 1000); // 1 hora
-    
+    }
+  }, 60 * 60 * 1000); // 1 hora
+  
   // Verificar alertas imediatamente se estiver no horário
   if (estaNoHorarioAlertas()) {
     console.log('🚀 Verificação inicial de alertas...');
@@ -94,4 +99,4 @@ function iniciarSistemaAlertas(sock) {
   }
 }
 
-startBot();
+startBot(); 
