@@ -55,15 +55,15 @@ services:
       - "5432:5432"
     networks:
       - simplou-network
-    redis:
-      image: redis:latest
-      container_name: simplou-redis
-      restart: always
-      volumes:
-        - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
-      command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
-      networks:
-        - simplou-network
+  redis:
+    image: redis:latest
+    container_name: simplou-redis
+    restart: always
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    networks:
+      - simplou-network
 
 
 volumes:
