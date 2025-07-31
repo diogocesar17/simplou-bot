@@ -35,27 +35,50 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 // @ts-nocheck
 const lancamentosService = __importStar(require("../services/lancamentosService"));
+const stateManager_1 = require("../configs/stateManager");
 async function excluirLancamentoCommand(sock, userId, texto) {
     const match = texto.toLowerCase().match(/^excluir\s+(\d+)$/i);
     if (!match) {
         await sock.sendMessage(userId, { text: '❌ Use: excluir [número]. Exemplo: excluir 3' });
         return;
     }
+    // Verificar se há um histórico exibido no estado
+    const estado = await (0, stateManager_1.obterEstado)(userId);
+    if (!estado || estado.etapa !== 'historico_exibido') {
+        await sock.sendMessage(userId, {
+            text: '❌ Execute "histórico" primeiro para ver a lista de lançamentos disponíveis para exclusão.'
+        });
+        return;
+    }
+    // Verificar se o estado não expirou (mais de 10 minutos)
+    const agora = Date.now();
+    const tempoExpiracao = 10 * 60 * 1000; // 10 minutos
+    if (agora - estado.dadosParciais.timestamp > tempoExpiracao) {
+        await (0, stateManager_1.limparEstado)(userId);
+        await sock.sendMessage(userId, {
+            text: '❌ A lista expirou. Execute "histórico" novamente para ver os lançamentos.'
+        });
+        return;
+    }
     const idx = parseInt(match[1], 10) - 1;
-    // Buscar lista de lançamentos do usuário (mock: buscar últimos 10)
-    const lista = await lancamentosService.listarLancamentos(userId, 10);
+    const lista = estado.dadosParciais.lista;
     if (!lista || !lista[idx]) {
         await sock.sendMessage(userId, { text: '❌ Índice inválido. Envie "histórico" para listar novamente.' });
         return;
     }
     const lancamento = lista[idx];
-    // Chamar serviço para excluir
-    const ok = await lancamentosService.excluirLancamentoPorId(userId, lancamento.id);
-    if (ok) {
-        await sock.sendMessage(userId, { text: '✅ Lançamento excluído com sucesso!' });
+    try {
+        // Chamar serviço para excluir
+        await lancamentosService.excluirLancamentoPorId(userId, lancamento.id);
+        // Limpar estado após exclusão bem-sucedida
+        await (0, stateManager_1.limparEstado)(userId);
+        await sock.sendMessage(userId, {
+            text: `✅ *Lançamento excluído com sucesso!*\n\n📝 Descrição: ${lancamento.descricao}\n💰 Valor: R$ ${lancamento.valor}\n📂 Categoria: ${lancamento.categoria}`
+        });
     }
-    else {
-        await sock.sendMessage(userId, { text: '❌ Erro ao excluir lançamento.' });
+    catch (error) {
+        console.error('Erro ao excluir lançamento:', error);
+        await sock.sendMessage(userId, { text: '❌ Erro ao excluir lançamento. Tente novamente.' });
     }
 }
 exports.default = excluirLancamentoCommand;

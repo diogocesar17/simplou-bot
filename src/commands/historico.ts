@@ -2,6 +2,7 @@
 import { formatarValor } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
+import { definirEstado, limparEstado } from '../configs/stateManager';
 
 async function historicoCommand(sock, userId, texto) {
   const textoLower = texto.toLowerCase().trim();
@@ -47,7 +48,14 @@ async function historicoCommand(sock, userId, texto) {
     if (l.descricao) msgHist += ` | 📝 ${l.descricao}`;
     msgHist += '\n';
   });
-  let msgFinal = msgHist + '\nPara editar, envie: Editar <número>';
+  // Salvar lista no estado para permitir exclusão
+  await definirEstado(userId, 'historico_exibido', { 
+    lista: ultimos, 
+    mesAno: mesAno,
+    timestamp: Date.now()
+  });
+  
+  let msgFinal = msgHist + '\nPara editar, envie: Editar <número>\nPara excluir, envie: Excluir <número>';
   if (!mesAno) {
     msgFinal += '\n\n💡 *Dica:* Para ver todos os lançamentos de um mês específico, envie:\n"Histórico [mês] [ano]" (ex: "Histórico julho 2025")';
   }

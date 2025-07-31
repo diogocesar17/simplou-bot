@@ -37,6 +37,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const formatUtils_1 = require("../utils/formatUtils");
 const dataUtils_1 = require("../utils/dataUtils");
 const lancamentosService = __importStar(require("../services/lancamentosService"));
+const stateManager_1 = require("../configs/stateManager");
 async function historicoCommand(sock, userId, texto) {
     const textoLower = texto.toLowerCase().trim();
     // Extrai o possível período após o comando
@@ -84,7 +85,13 @@ async function historicoCommand(sock, userId, texto) {
             msgHist += ` | 📝 ${l.descricao}`;
         msgHist += '\n';
     });
-    let msgFinal = msgHist + '\nPara editar, envie: Editar <número>';
+    // Salvar lista no estado para permitir exclusão
+    await (0, stateManager_1.definirEstado)(userId, 'historico_exibido', {
+        lista: ultimos,
+        mesAno: mesAno,
+        timestamp: Date.now()
+    });
+    let msgFinal = msgHist + '\nPara editar, envie: Editar <número>\nPara excluir, envie: Excluir <número>';
     if (!mesAno) {
         msgFinal += '\n\n💡 *Dica:* Para ver todos os lançamentos de um mês específico, envie:\n"Histórico [mês] [ano]" (ex: "Histórico julho 2025")';
     }

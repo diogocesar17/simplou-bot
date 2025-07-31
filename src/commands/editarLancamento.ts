@@ -122,8 +122,28 @@ async function editarLancamentoCommand(sock, userId, texto) {
     return;
   }
   
+  // Verificar se há um histórico exibido no estado
+  const estadoHistorico = await obterEstado(userId);
+  if (!estadoHistorico || estadoHistorico.etapa !== 'historico_exibido') {
+    await sock.sendMessage(userId, { 
+      text: '❌ Execute "histórico" primeiro para ver a lista de lançamentos disponíveis para edição.' 
+    });
+    return;
+  }
+  
+  // Verificar se o estado não expirou (mais de 10 minutos)
+  const agora = Date.now();
+  const tempoExpiracao = 10 * 60 * 1000; // 10 minutos
+  if (agora - estadoHistorico.dadosParciais.timestamp > tempoExpiracao) {
+    await limparEstado(userId);
+    await sock.sendMessage(userId, { 
+      text: '❌ A lista expirou. Execute "histórico" novamente para ver os lançamentos.' 
+    });
+    return;
+  }
+  
   const idx = parseInt(match[1], 10) - 1;
-  const lista = await lancamentosService.listarLancamentos(userId, 10);
+  const lista = estadoHistorico.dadosParciais.lista;
   
   if (!lista || !lista[idx]) {
     await sock.sendMessage(userId, { text: '❌ Índice inválido. Envie "histórico" para listar novamente.' });
