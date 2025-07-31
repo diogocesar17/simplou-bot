@@ -49,8 +49,6 @@ async function startBot(): Promise<void> {
     const userId = msg.key.remoteJid;
     if (!userId) return;
 
-    if(userId !== '556181429135@s.whatsapp.net') return
-
     console.log('🔔 Mensagem recebida:', texto);
     // Delegar para o roteador modularizado
     await handleMessage(sock, userId, texto);
