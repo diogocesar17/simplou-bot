@@ -69,6 +69,7 @@ auth_info_baileys.json
 
 # Redis dump
 dump.rdb
+redis.conf
 
 # Temporary files
 tmp/
