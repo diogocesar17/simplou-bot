@@ -8,8 +8,19 @@ import {
   ePrimeiraVerificacaoDoDia,
   eVerificacaoFinalDoDia
 } from './src/services/alertasService';
+import { initializeDatabase } from './databaseService';
 
 async function startBot(): Promise<void> {
+    // Inicializar banco de dados
+    try {
+      console.log('🔌 Inicializando banco de dados...');
+      await initializeDatabase();
+      console.log('✅ Banco de dados inicializado com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro ao inicializar banco de dados:', error);
+      process.exit(1);
+    }
+
     // Persistência local de sessão WhatsApp
     const { state, saveCreds } = await useMultiFileAuthState('auth');
   const sock = makeWASocket({

@@ -196,7 +196,7 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   // Controle de contexto para pergunta inteligente
   if (global.aguardandoPerguntaInteligente[userId]) {
     delete global.aguardandoPerguntaInteligente[userId];
-    const geminiService = require('./services/geminiService');
+    const geminiService = require('../services/geminiService');
     const lancamentosService = require('./services/lancamentosService');
     
     // Buscar dados do usuário para contexto
