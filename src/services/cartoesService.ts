@@ -4,8 +4,8 @@ import * as databaseService from '../../databaseService';
 // TODO: Tipar corretamente. Usar any onde necessário.
 
 // Funções para configurar cartões
-export async function salvarConfiguracaoCartao(userId: string, dados: any): Promise<any> {
-  return await databaseService.salvarConfiguracaoCartao(userId, dados);
+export async function salvarConfiguracaoCartao(userId: string, nomeCartao: string, diaVencimento: number, diaFechamento: number = null): Promise<any> {
+  return await databaseService.salvarConfiguracaoCartao(userId, nomeCartao, diaVencimento, diaFechamento);
 }
 
 export async function buscarConfiguracaoCartao(userId: string, nomeCartao: string): Promise<any> {

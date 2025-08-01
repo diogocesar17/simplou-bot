@@ -48,6 +48,8 @@ import alertasCommand from './commands/alertas';
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
 import { logger, fileLogger } from '../logger';
+import * as geminiService from './services/geminiService';
+import * as lancamentosService from './services/lancamentosService';
 
 // Exemplo de função de roteamento (simples)
 async function handleMessage(sock: any, userId: string, texto: string): Promise<void> {
@@ -196,8 +198,6 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   // Controle de contexto para pergunta inteligente
   if (global.aguardandoPerguntaInteligente[userId]) {
     delete global.aguardandoPerguntaInteligente[userId];
-    const geminiService = require('../services/geminiService');
-    const lancamentosService = require('./services/lancamentosService');
     
     // Buscar dados do usuário para contexto
     const dados = await lancamentosService.buscarDadosParaAnalise(userId, 3);
