@@ -22,6 +22,9 @@ credentials/
 logs
 *.log
 
+# Build output
+dist/
+
 # Runtime data
 pids
 *.pid
