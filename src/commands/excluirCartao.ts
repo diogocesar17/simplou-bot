@@ -1,20 +1,26 @@
 // @ts-nocheck
 import * as cartoesService from '../services/cartoesService';
+import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
+
 
 // Contexto simples em memória
 const aguardandoExclusaoCartao = {};
 
 async function excluirCartaoCommand(sock, userId, texto) {
+  const textoLimpo = texto.trim().toLowerCase();
+  const estado = await obterEstado(userId);
+
   // 1. Se está aguardando escolha do cartão
-  if (aguardandoExclusaoCartao[userId] && !aguardandoExclusaoCartao[userId].cartaoEscolhido) {
+  if (estado?.etapa === 'aguardando_escolha_exclusao_cartao') {
     const escolha = texto.trim();
     if (escolha.toLowerCase() === 'cancelar') {
-      delete aguardandoExclusaoCartao[userId];
+      await limparEstado(userId);
       await sock.sendMessage(userId, { text: '❌ Exclusão de cartão cancelada.' });
       return;
     }
     const idx = parseInt(escolha);
-    const cartoes = aguardandoExclusaoCartao[userId].cartoes;
+    const cartoes = estado.dadosParciais.cartoes;
+    
     if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
       await sock.sendMessage(userId, { text: `❌ Escolha inválida. Digite um número entre 1 e ${cartoes.length} ou "cancelar".` });
       return;
@@ -34,16 +40,15 @@ async function excluirCartaoCommand(sock, userId, texto) {
       msgConfirmacao += `Os lançamentos continuarão existindo, mas ficarão sem referência ao cartão.\n\n`;
     }
     msgConfirmacao += `❓ Confirma a exclusão?\nDigite "sim" para confirmar ou "cancelar" para abortar.`;
-    aguardandoExclusaoCartao[userId].cartaoEscolhido = cartaoEscolhido;
-    aguardandoExclusaoCartao[userId].totalLancamentos = totalLancamentos;
+    await definirEstado(userId, 'aguardando_confirmacao_exclusao_cartao', { cartaoEscolhido, totalLancamentos });
     await sock.sendMessage(userId, { text: msgConfirmacao });
     return;
   }
   // 2. Se está aguardando confirmação
-  if (aguardandoExclusaoCartao[userId] && aguardandoExclusaoCartao[userId].cartaoEscolhido) {
+  if (estado?.etapa === 'aguardando_confirmacao_exclusao_cartao') {
     const confirmacao = texto.trim().toLowerCase();
     if (confirmacao === 'cancelar') {
-      delete aguardandoExclusaoCartao[userId];
+      await limparEstado(userId);
       await sock.sendMessage(userId, { text: '❌ Exclusão de cartão cancelada.' });
       return;
     }
@@ -51,8 +56,8 @@ async function excluirCartaoCommand(sock, userId, texto) {
       await sock.sendMessage(userId, { text: '❌ Confirmação inválida. Digite "sim" para confirmar ou "cancelar" para abortar.' });
       return;
     }
-    const cartao = aguardandoExclusaoCartao[userId].cartaoEscolhido;
-    const totalLancamentos = aguardandoExclusaoCartao[userId].totalLancamentos;
+    const cartao = estado.dadosParciais.cartaoEscolhido;
+    const totalLancamentos = estado.dadosParciais.totalLancamentos;
     await cartoesService.excluirCartaoConfigurado(userId, cartao.nome_cartao);
     let msgSucesso = `✅ Cartão excluído com sucesso!\n\n`;
     msgSucesso += `💳 Cartão: ${cartao.nome_cartao}\n`;
@@ -62,7 +67,7 @@ async function excluirCartaoCommand(sock, userId, texto) {
       msgSucesso += `Para limpar completamente, você pode editar os lançamentos individualmente.`;
     }
     await sock.sendMessage(userId, { text: msgSucesso });
-    delete aguardandoExclusaoCartao[userId];
+    await limparEstado(userId);
     return;
   }
   // 3. Início do fluxo: listar cartões
@@ -76,7 +81,7 @@ async function excluirCartaoCommand(sock, userId, texto) {
     msgCartoes += `${idx + 1}. ${cartao.nome_cartao} (vence dia ${cartao.dia_vencimento}, fecha dia ${cartao.dia_fechamento || 'NÃO INFORMADO'})\n`;
   });
   msgCartoes += '\nDigite o número do cartão ou "cancelar"';
-  aguardandoExclusaoCartao[userId] = { cartoes };
+  await definirEstado(userId, 'aguardando_escolha_exclusao_cartao', { cartoes });
   await sock.sendMessage(userId, { text: msgCartoes });
 }
 

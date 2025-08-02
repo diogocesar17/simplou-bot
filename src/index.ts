@@ -26,7 +26,9 @@ import editarLancamentoCommand from './commands/editarLancamento';
 import listarCartoesCommand from './commands/listarCartoes';
 import configurarCartaoCommand from './commands/configurarCartao';
 import editarCartaoCommand from './commands/editarCartao';
+import editarComMenuCommand from './commands/editarComMenu';
 import excluirCartaoCommand from './commands/excluirCartao';
+import excluirComMenuCommand from './commands/excluirComMenu';
 import statusCommand from './commands/status';
 import limparCommand from './commands/limpar';
 import backupCommand from './commands/backup';
@@ -75,6 +77,21 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
       return;
     }
   
+    if(estado.etapa.includes('tipo_edicao')) {
+      await editarComMenuCommand(sock, userId, texto);
+      return;
+    }
+
+    if(estado.etapa.includes('tipo_exclusao')) {
+      await excluirComMenuCommand(sock, userId, texto);
+      return;
+    }
+
+    if(estado.etapa.includes('exclusao_cartao')) {
+      await excluirCartaoCommand(sock, userId, texto);
+      return;
+    }
+
     if (estado.etapa.includes('cartao')) {
       await configurarCartaoCommand(sock, userId, texto);
       return;
@@ -159,15 +176,15 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     return;
   }
 
-  // Roteamento para o comando de exclusão de lançamento
-  if (/^excluir\s+\d+$/i.test(textoLower)) {
-    await excluirLancamentoCommand(sock, userId, texto);
+  // Roteamento para o comando de excluir (menu inteligente)
+  if (textoLower.startsWith('excluir')) {
+    await excluirComMenuCommand(sock, userId, texto);
     return;
   }
 
-  // Roteamento para o comando de edição de lançamento
-  if (/^editar\s+\d+$/i.test(textoLower)) {
-    await editarLancamentoCommand(sock, userId, texto);
+  // Roteamento para o comando de editar (menu inteligente)
+  if (textoLower.startsWith('editar')) {
+    await editarComMenuCommand(sock, userId, texto);
     return;
   }
 
@@ -181,19 +198,8 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     await configurarCartaoCommand(sock, userId, texto);
     return;
   }
-  
 
-  // Roteamento para o comando de editar cartão
-  if (["editar cartao", "editar cartão"].includes(textoLower)) {
-    await editarCartaoCommand(sock, userId, texto);
-    return;
-  }
 
-  // Roteamento para o comando de excluir cartão
-  if (["excluir cartao", "excluir cartão"].includes(textoLower)) {
-    await excluirCartaoCommand(sock, userId, texto);
-    return;
-  }
 
   // Controle de contexto para pergunta inteligente
   if (global.aguardandoPerguntaInteligente[userId]) {
