@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import * as cartoesService from '../services/cartoesService';
+import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/errorMessages';
 
 async function configurarCartaoCommand(sock, userId, texto) {
   const textoLimpo = texto.trim().toLowerCase();
@@ -10,12 +11,12 @@ async function configurarCartaoCommand(sock, userId, texto) {
   if (estado?.etapa === 'aguardando_nome_cartao') {
     if (textoLimpo === 'cancelar') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: '❌ Configuração de cartão cancelada.' });
+      await sock.sendMessage(userId, { text: ERROR_MESSAGES.OPERACAO_CANCELADA('Configuração de cartão') });
       return;
     }
 
     if (texto.length < 2 || texto.length > 20) {
-      await sock.sendMessage(userId, { text: '❌ Nome do cartão inválido. Digite um nome entre 2 e 20 caracteres ou "cancelar".' });
+      await sock.sendMessage(userId, { text: ERROR_MESSAGES.VALOR_INVALIDO('Nome do cartão', 'Entre 2 e 20 caracteres\nExemplo: Nubank, Itaú, Inter') });
       return;
     }
 
@@ -29,13 +30,13 @@ async function configurarCartaoCommand(sock, userId, texto) {
   if (estado?.etapa === 'aguardando_vencimento_cartao') {
     if (textoLimpo === 'cancelar') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: '❌ Configuração de cartão cancelada.' });
+      await sock.sendMessage(userId, { text: ERROR_MESSAGES.OPERACAO_CANCELADA('Configuração de cartão') });
       return;
     }
 
     const dia = parseInt(texto.trim());
     if (isNaN(dia) || dia < 1 || dia > 31) {
-      await sock.sendMessage(userId, { text: '❌ Dia inválido. Digite um número entre 1 e 31 ou "cancelar".' });
+      await sock.sendMessage(userId, { text: ERROR_MESSAGES.VALOR_INVALIDO('Dia de vencimento', 'Número entre 1 e 31\nExemplo: 15') });
       return;
     }
 
@@ -54,7 +55,7 @@ async function configurarCartaoCommand(sock, userId, texto) {
   if (estado?.etapa === 'aguardando_fechamento_cartao') {
     if (textoLimpo === 'cancelar') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: '❌ Configuração de cartão cancelada.' });
+      await sock.sendMessage(userId, { text: ERROR_MESSAGES.OPERACAO_CANCELADA('Configuração de cartão') });
       return;
     }
 
@@ -66,7 +67,7 @@ async function configurarCartaoCommand(sock, userId, texto) {
       diaFechamento = parseInt(texto);
       if (isNaN(diaFechamento) || diaFechamento < 1 || diaFechamento > 31) {
         await sock.sendMessage(userId, {
-          text: '❌ Dia de fechamento inválido. Digite um número entre 1 e 31, ou "padrão".'
+          text: ERROR_MESSAGES.VALOR_INVALIDO('Dia de fechamento', 'Número entre 1 e 31\nOu digite "padrão" para usar 7 dias antes do vencimento')
         });
         return;
       }
@@ -77,7 +78,7 @@ async function configurarCartaoCommand(sock, userId, texto) {
     await limparEstado(userId);
 
     await sock.sendMessage(userId, {
-      text: `✅ Cartão ${nomeCartao} configurado com sucesso!\n\n💳 Vencimento: dia ${diaVencimento}\n📅 Fechamento: dia ${diaFechamento}`
+      text: SUCCESS_MESSAGES.CARTAO_CONFIGURADO(nomeCartao, diaVencimento, diaFechamento)
     });
     return;
   }

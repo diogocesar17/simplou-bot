@@ -2,6 +2,7 @@
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import editarLancamentoCommand from './editarLancamento';
 import editarCartaoCommand from './editarCartao';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function editarComMenuCommand(sock, userId, texto) {
   const textoLower = texto.toLowerCase().trim();
@@ -11,7 +12,7 @@ async function editarComMenuCommand(sock, userId, texto) {
   if (estado?.etapa === 'aguardando_tipo_edicao') {
     if (textoLower === 'cancelar') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: '❌ Edição cancelada.' });
+      await sock.sendMessage(userId, { text: ERROR_MESSAGES.OPERACAO_CANCELADA('Edição') });
       return;
     }
 
@@ -32,7 +33,7 @@ async function editarComMenuCommand(sock, userId, texto) {
         
       default:
         await sock.sendMessage(userId, { 
-          text: '❌ Opção inválida. Digite:\n• 1 - para editar lançamento\n• 2 - para editar cartão\n• cancelar - para cancelar' 
+          text: ERROR_MESSAGES.VALOR_INVALIDO('Opção', '1 - para editar lançamento\n2 - para editar cartão\ncancelar - para cancelar') 
         });
         return;
     }

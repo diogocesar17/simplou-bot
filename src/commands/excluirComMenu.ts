@@ -2,6 +2,7 @@
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import excluirLancamentoCommand from './excluirLancamento';
 import excluirCartaoCommand from './excluirCartao';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function excluirComMenuCommand(sock, userId, texto) {
   const textoLower = texto.toLowerCase().trim();
@@ -11,7 +12,7 @@ async function excluirComMenuCommand(sock, userId, texto) {
   if (estado?.etapa === 'aguardando_tipo_exclusao') {
     if (textoLower === 'cancelar') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: '❌ Exclusão cancelada.' });
+      await sock.sendMessage(userId, { text: ERROR_MESSAGES.OPERACAO_CANCELADA('Exclusão') });
       return;
     }
 
@@ -32,7 +33,7 @@ async function excluirComMenuCommand(sock, userId, texto) {
         
       default:
         await sock.sendMessage(userId, { 
-          text: '❌ Opção inválida. Digite:\n• 1 - para excluir lançamento\n• 2 - para excluir cartão\n• cancelar - para cancelar' 
+          text: ERROR_MESSAGES.VALOR_INVALIDO('Opção', '1 - para excluir lançamento\n2 - para excluir cartão\ncancelar - para cancelar') 
         });
         return;
     }
