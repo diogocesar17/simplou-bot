@@ -2,6 +2,8 @@
 import { formatarValor } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
+import { formatarMensagem } from '../utils/formatMessages';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function resumoDetalhadoCommand(sock, userId, texto) {
     const textoLower = texto.toLowerCase().trim();
@@ -17,28 +19,33 @@ async function resumoDetalhadoCommand(sock, userId, texto) {
     
     if (!parsed) {
         await sock.sendMessage(userId, {
-            text: '❌ Formato inválido. Use:\n• resumo detalhado (mês atual)\n• resumo detalhado agosto\n• resumo detalhado 03/2024\n\n💡 *Variações aceitas:*\n• resumo detalhado do mes atual\n• resumo detalhado agosto 2023'
+            text: ERROR_MESSAGES.FORMATO_INVALIDO('Formato de data', 'resumo detalhado 03/2024', 'resumo detalhado, resumo detalhado agosto, resumo detalhado 12/2024')
         });
         return;
     }
 
-    // Validar se não é mês futuro
-    const agora = new Date();
-    const mesAtual = agora.getMonth() + 1;
-    const anoAtual = agora.getFullYear();
-    
-    if (parsed.ano > anoAtual || (parsed.ano === anoAtual && parsed.mes > mesAtual)) {
-        await sock.sendMessage(userId, {
-            text: `❌ Não é possível gerar resumo para meses futuros.\n\n💡 Use um mês passado ou atual:\n• resumo detalhado (mês atual)\n• resumo detalhado ${getNomeMes(mesAtual - 1)}\n• resumo detalhado ${getNomeMes(mesAtual - 2)}`
-        });
-        return;
-    }
+    // NOTA: Resumo detalhado permite meses futuros para planejamento
+    // Apenas histórico bloqueia meses futuros
 
     // Buscar todos os lançamentos do mês
     const todos = await lancamentosService.listarLancamentos(userId, 9999, parsed.mes, parsed.ano);
     if (!todos || todos.length === 0) {
         await sock.sendMessage(userId, { 
-            text: `📭 *Nenhum lançamento encontrado*\n\n📅 Período: ${getNomeMes(parsed.mes - 1)}/${parsed.ano}\n\n💡 *Dica:* Registre seus primeiros lançamentos para ver o resumo detalhado!` 
+            text: formatarMensagem({
+                titulo: 'Nenhum lançamento encontrado',
+                emojiTitulo: '📭',
+                secoes: [
+                    {
+                        titulo: 'Período',
+                        itens: [`${getNomeMes(parsed.mes - 1)}/${parsed.ano}`],
+                        emoji: '📅'
+                    }
+                ],
+                dicas: [
+                    { texto: 'Registre seus primeiros lançamentos', comando: 'gastei 50 no mercado' },
+                    { texto: 'Ver histórico geral', comando: 'historico' }
+                ]
+            })
         });
         return;
     }
