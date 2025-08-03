@@ -101,6 +101,15 @@ export const ERROR_MESSAGES = {
     dica: 'Use o mês atual ou meses anteriores'
   }),
 
+  // Erros de mês futuro para histórico (com dica sobre resumo detalhado)
+  HISTORICO_MES_FUTURO: (comando: string) => gerarMensagemErro({
+    titulo: 'Mês futuro não permitido',
+    causa: `Não é possível ${comando} para meses futuros`,
+    solucao: 'Use um mês passado ou atual',
+    exemplo: `${comando} agosto`,
+    dica: 'Para visualizar meses futuros, use "resumo detalhado <mês>"'
+  }),
+
   // Erros de cartão
   CARTAO_NAO_ENCONTRADO: (nomeCartao: string) => gerarMensagemErro({
     titulo: 'Cartão não encontrado',

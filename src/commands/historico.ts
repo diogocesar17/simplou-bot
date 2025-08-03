@@ -27,7 +27,7 @@ async function historicoCommand(sock, userId, texto) {
     
     if (mesAno.ano > anoAtual || (mesAno.ano === anoAtual && mesAno.mes > mesAtual)) {
       await sock.sendMessage(userId, {
-        text: ERROR_MESSAGES.MES_FUTURO('histórico', 'histórico, histórico julho 2024, histórico agosto')
+        text: ERROR_MESSAGES.HISTORICO_MES_FUTURO('histórico')
       });
       return;
     }
