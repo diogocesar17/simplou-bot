@@ -1,0 +1,163 @@
+// @ts-nocheck
+
+/**
+ * Utilitário para formatação padronizada de mensagens
+ */
+
+interface Secao {
+  titulo: string;
+  itens: string[];
+  emoji?: string;
+}
+
+interface Dica {
+  texto: string;
+  comando?: string;
+}
+
+interface MensagemConfig {
+  titulo: string;
+  secoes?: Secao[];
+  dicas?: Dica[];
+  ajuda?: string;
+  emojiTitulo?: string;
+}
+
+/**
+ * Gera uma mensagem formatada padronizada
+ */
+export function formatarMensagem(config: MensagemConfig): string {
+  let msg = '';
+  
+  // Título principal
+  const emoji = config.emojiTitulo || '📊';
+  msg += `${emoji} *${config.titulo}*\n\n`;
+  
+  // Seções
+  if (config.secoes && config.secoes.length > 0) {
+    config.secoes.forEach(secao => {
+      const emojiSecao = secao.emoji || '📋';
+      msg += `${emojiSecao} *${secao.titulo}:*\n`;
+      
+      secao.itens.forEach(item => {
+        msg += `• ${item}\n`;
+      });
+      
+      msg += '\n';
+    });
+  }
+  
+  // Dicas
+  if (config.dicas && config.dicas.length > 0) {
+    msg += `💡 *Dicas:*\n`;
+    config.dicas.forEach(dica => {
+      if (dica.comando) {
+        msg += `• ${dica.texto} (${dica.comando})\n`;
+      } else {
+        msg += `• ${dica.texto}\n`;
+      }
+    });
+    msg += '\n';
+  }
+  
+  // Ajuda
+  if (config.ajuda) {
+    msg += `📚 *Ajuda:* ${config.ajuda}\n`;
+  }
+  
+  return msg.trim();
+}
+
+/**
+ * Funções auxiliares para formatação específica
+ */
+
+/**
+ * Formata uma lista simples
+ */
+export function formatarLista(titulo: string, itens: string[], emoji: string = '📋'): string {
+  let msg = `${emoji} *${titulo}:*\n`;
+  itens.forEach((item, index) => {
+    msg += `${index + 1}. ${item}\n`;
+  });
+  return msg;
+}
+
+/**
+ * Formata estatísticas
+ */
+export function formatarEstatisticas(titulo: string, stats: Record<string, string>, emoji: string = '📊'): string {
+  let msg = `${emoji} *${titulo}:*\n`;
+  Object.entries(stats).forEach(([key, value]) => {
+    msg += `• ${key}: ${value}\n`;
+  });
+  return msg;
+}
+
+/**
+ * Formata uma mensagem de sucesso
+ */
+export function formatarSucesso(titulo: string, detalhes: string[], dica?: string): string {
+  let msg = `✅ *${titulo}*\n\n`;
+  
+  detalhes.forEach(detalhe => {
+    msg += `• ${detalhe}\n`;
+  });
+  
+  if (dica) {
+    msg += `\n💡 *Dica:* ${dica}`;
+  }
+  
+  return msg;
+}
+
+/**
+ * Formata uma mensagem de informação
+ */
+export function formatarInformacao(titulo: string, conteudo: string[], dica?: string): string {
+  let msg = `ℹ️ *${titulo}*\n\n`;
+  
+  conteudo.forEach(item => {
+    msg += `• ${item}\n`;
+  });
+  
+  if (dica) {
+    msg += `\n💡 *Dica:* ${dica}`;
+  }
+  
+  return msg;
+}
+
+/**
+ * Formata uma mensagem de instrução
+ */
+export function formatarInstrucao(titulo: string, passos: string[], exemplo?: string): string {
+  let msg = `📝 *${titulo}*\n\n`;
+  
+  passos.forEach((passo, index) => {
+    msg += `${index + 1}️⃣ ${passo}\n`;
+  });
+  
+  if (exemplo) {
+    msg += `\n📋 *Exemplo:* ${exemplo}`;
+  }
+  
+  return msg;
+}
+
+/**
+ * Formata uma mensagem de menu
+ */
+export function formatarMenu(titulo: string, opcoes: string[], dica?: string): string {
+  let msg = `🎯 *${titulo}*\n\n`;
+  
+  opcoes.forEach((opcao, index) => {
+    msg += `${index + 1}️⃣ ${opcao}\n`;
+  });
+  
+  if (dica) {
+    msg += `\n💡 *Dica:* ${dica}`;
+  }
+  
+  return msg;
+} 
