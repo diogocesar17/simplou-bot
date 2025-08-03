@@ -1,5 +1,7 @@
 // @ts-nocheck
 import * as sistemaService from '../services/sistemaService';
+import { formatarMensagem } from '../utils/formatMessages';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function logsCommand(sock, userId) {
   try {
@@ -7,23 +9,49 @@ async function logsCommand(sock, userId) {
     const resultado = await sistemaService.gerarLogAuditoria(userId, 'recentes');
     
     if (resultado && resultado.sucesso) {
-      let msg = '📄 *Logs de Auditoria gerados com sucesso!*\n\n';
-      msg += `📁 Arquivo: ${resultado.nomeArquivo}\n`;
-      msg += `📊 Total de registros: ${resultado.total}\n`;
-      msg += `📏 Tamanho: ${resultado.tamanho} KB\n\n`;
-      msg += '📥 *Arquivo salvo em:*\n';
-      msg += `\`${resultado.caminhoArquivo}\`\n\n`;
-      msg += '💡 *Conteúdo:*\n';
-      msg += 'Logs de auditoria com todas as ações realizadas no sistema.';
-      
-      await sock.sendMessage(userId, { text: msg });
+      await sock.sendMessage(userId, { 
+        text: formatarMensagem({
+          titulo: 'Logs de Auditoria gerados com sucesso',
+          emojiTitulo: '📄',
+          secoes: [
+            {
+              titulo: 'Detalhes do Arquivo',
+              itens: [
+                `Arquivo: ${resultado.nomeArquivo}`,
+                `Total de registros: ${resultado.total}`,
+                `Tamanho: ${resultado.tamanho} KB`
+              ],
+              emoji: '📁'
+            },
+            {
+              titulo: 'Localização',
+              itens: [`${resultado.caminhoArquivo}`],
+              emoji: '📥'
+            }
+          ],
+          dicas: [
+            { texto: 'Ver status do sistema', comando: 'status' },
+            { texto: 'Gerar backup', comando: 'backup' }
+          ],
+          ajuda: 'Logs de auditoria com todas as ações realizadas no sistema'
+        })
+      });
     } else {
-      await sock.sendMessage(userId, { text: '📄 Nenhum log de auditoria encontrado.' });
+      await sock.sendMessage(userId, { 
+        text: formatarMensagem({
+          titulo: 'Nenhum log de auditoria encontrado',
+          emojiTitulo: '📄',
+          dicas: [
+            { texto: 'Ver status do sistema', comando: 'status' },
+            { texto: 'Gerar backup', comando: 'backup' }
+          ]
+        })
+      });
     }
   } catch (error) {
     console.error('Erro ao gerar logs:', error);
     await sock.sendMessage(userId, { 
-      text: '❌ Erro ao gerar logs de auditoria. Tente novamente.' 
+      text: ERROR_MESSAGES.ERRO_INTERNO('Gerar logs de auditoria', 'Tente novamente em alguns instantes')
     });
   }
 }

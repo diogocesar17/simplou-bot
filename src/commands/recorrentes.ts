@@ -1,30 +1,53 @@
 // @ts-nocheck
 import { formatarValor } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
+import { formatarMensagem } from '../utils/formatMessages';
 
 async function recorrentesCommand(sock, userId) {
   const recorrentes = await lancamentosService.buscarRecorrentesAtivos(userId, 20);
+  
   if (!recorrentes || recorrentes.length === 0) {
-    await sock.sendMessage(userId, { text: '🔄 Nenhum gasto recorrente/fixo encontrado.' });
+    await sock.sendMessage(userId, { 
+      text: formatarMensagem({
+        titulo: 'Nenhum gasto recorrente/fixo encontrado',
+        emojiTitulo: '🔄',
+        dicas: [
+          { texto: 'Ver histórico de lançamentos', comando: 'historico' },
+          { texto: 'Ver resumo do mês', comando: 'resumo' }
+        ]
+      })
+    });
     return;
   }
-  let msgRecorrentes = '🔄 *Gastos Recorrentes/Fixos:*\n\n';
-  recorrentes.forEach((recorrente, idx) => {
+  
+  const itensRecorrentes = recorrentes.map((recorrente, idx) => {
     const recorrenciasPagas = recorrente.recorrencias.filter(r => r.status === 'paga').length;
     const recorrenciasPendentes = recorrente.total_recorrencias - recorrenciasPagas;
-    msgRecorrentes += `${idx + 1}. *${recorrente.descricao}*\n`;
-    msgRecorrentes += `   💰 Valor: R$ ${formatarValor(recorrente.valor)}\n`;
-    msgRecorrentes += `   🔄 ${recorrente.total_recorrencias} meses\n`;
-    msgRecorrentes += `   ✅ Pagas: ${recorrenciasPagas} | ⏳ Pendentes: ${recorrenciasPendentes}\n`;
-    msgRecorrentes += `   📂 ${recorrente.categoria} | 💳 ${recorrente.pagamento}\n`;
-    msgRecorrentes += `   📅 ${recorrente.primeira_recorrencia} a ${recorrente.ultima_recorrencia}\n`;
+    let item = `${idx + 1}. *${recorrente.descricao}*\n   💰 Valor: R$ ${formatarValor(recorrente.valor)}\n   🔄 ${recorrente.total_recorrencias} meses\n   ✅ Pagas: ${recorrenciasPagas} | ⏳ Pendentes: ${recorrenciasPendentes}\n   📂 ${recorrente.categoria} | 💳 ${recorrente.pagamento}\n   📅 ${recorrente.primeira_recorrencia} a ${recorrente.ultima_recorrencia}`;
     if (recorrente.recorrente_fim) {
-      msgRecorrentes += `   🛑 Fim: ${recorrente.recorrente_fim}\n`;
+      item += `\n   🛑 Fim: ${recorrente.recorrente_fim}`;
     }
-    msgRecorrentes += '\n';
+    return item;
   });
-  msgRecorrentes += '💡 Para excluir um recorrente, use "excluir [número]" no histórico.';
-  await sock.sendMessage(userId, { text: msgRecorrentes });
+
+  await sock.sendMessage(userId, { 
+    text: formatarMensagem({
+      titulo: 'Gastos Recorrentes/Fixos',
+      emojiTitulo: '🔄',
+      secoes: [
+        {
+          titulo: 'Recorrentes',
+          itens: itensRecorrentes,
+          emoji: '📊'
+        }
+      ],
+      dicas: [
+        { texto: 'Excluir recorrente', comando: 'excluir <número>' },
+        { texto: 'Ver histórico detalhado', comando: 'historico' },
+        { texto: 'Ver resumo do mês', comando: 'resumo' }
+      ]
+    })
+  });
 }
 
 export default recorrentesCommand; 

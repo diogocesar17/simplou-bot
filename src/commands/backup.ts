@@ -1,32 +1,51 @@
 // @ts-nocheck
 import * as sistemaService from '../services/sistemaService';
+import { formatarMensagem } from '../utils/formatMessages';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function backupCommand(sock, userId) {
   try {
     const resultado = await sistemaService.gerarBackupCSV(userId);
     
     if (resultado && resultado.sucesso) {
-      let msg = '💾 *Backup gerado com sucesso!*\n\n';
-      msg += `📁 Arquivo: ${resultado.nomeArquivo}\n`;
-      msg += `📊 Lançamentos: ${resultado.totalLancamentos}\n`;
-      msg += `📅 Período: ${resultado.periodo}\n`;
-      msg += `📏 Tamanho: ${resultado.tamanho} KB\n\n`;
-      msg += '📥 *Arquivo salvo em:*\n';
-      msg += `\`${resultado.caminhoArquivo}\`\n\n`;
-      msg += '💡 *Para baixar:*\n';
-      msg += 'O arquivo foi salvo no servidor. Você pode acessá-lo via FTP ou solicitar ao administrador.';
-      
-      await sock.sendMessage(userId, { text: msg });
+      await sock.sendMessage(userId, { 
+        text: formatarMensagem({
+          titulo: 'Backup gerado com sucesso',
+          emojiTitulo: '💾',
+          secoes: [
+            {
+              titulo: 'Detalhes do Arquivo',
+              itens: [
+                `Arquivo: ${resultado.nomeArquivo}`,
+                `Lançamentos: ${resultado.totalLancamentos}`,
+                `Período: ${resultado.periodo}`,
+                `Tamanho: ${resultado.tamanho} KB`
+              ],
+              emoji: '📁'
+            },
+            {
+              titulo: 'Localização',
+              itens: [`${resultado.caminhoArquivo}`],
+              emoji: '📥'
+            }
+          ],
+          dicas: [
+            { texto: 'Ver status do sistema', comando: 'status' },
+            { texto: 'Ver logs do sistema', comando: 'logs' }
+          ],
+          ajuda: 'O arquivo foi salvo no servidor. Você pode acessá-lo via FTP ou solicitar ao administrador'
+        })
+      });
     } else {
       const erroMsg = resultado?.erro || 'Erro desconhecido';
       await sock.sendMessage(userId, { 
-        text: `❌ Erro ao gerar backup: ${erroMsg}\n\nTente novamente mais tarde.` 
+        text: ERROR_MESSAGES.ERRO_BANCO('Gerar backup', erroMsg)
       });
     }
   } catch (error) {
     console.error('Erro ao gerar backup:', error);
     await sock.sendMessage(userId, { 
-      text: '❌ Erro interno ao gerar backup. Tente novamente.' 
+      text: ERROR_MESSAGES.ERRO_INTERNO('Gerar backup', 'Tente novamente em alguns instantes')
     });
   }
 }

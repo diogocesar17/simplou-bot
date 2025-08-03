@@ -1,41 +1,82 @@
 // @ts-nocheck
 import { formatarValor } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
+import { formatarMensagem } from '../utils/formatMessages';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function vencimentosCommand(sock, userId, texto) {
   const match = texto.toLowerCase().match(/^vencimentos\s*(\d+)?$/i);
   const dias = match && match[1] ? parseInt(match[1]) : 30;
   if (dias < 1 || dias > 365) {
-    await sock.sendMessage(userId, { text: '❌ Período inválido. Use entre 1 e 365 dias.' });
+    await sock.sendMessage(userId, { 
+      text: ERROR_MESSAGES.VALOR_INVALIDO('Período', 'Entre 1 e 365 dias', 'vencimentos 7, vencimentos 30, vencimentos 90') 
+    });
     return;
   }
   const vencimentos = await lancamentosService.buscarProximosVencimentos(userId, dias);
-  let msgVencimentos = `📅 *Próximos Vencimentos (${dias} dias):*\n\n`;
-  let temVencimentos = false;
+  
+  if ((!vencimentos.cartoes || vencimentos.cartoes.length === 0) && 
+      (!vencimentos.boletos || vencimentos.boletos.length === 0)) {
+    await sock.sendMessage(userId, { 
+      text: formatarMensagem({
+        titulo: 'Nenhum vencimento encontrado',
+        emojiTitulo: '📅',
+        secoes: [
+          {
+            titulo: 'Período',
+            itens: [`Próximos ${dias} dias`],
+            emoji: '⏰'
+          }
+        ],
+        dicas: [
+          { texto: 'Ver histórico de lançamentos', comando: 'historico' },
+          { texto: 'Ver resumo do mês', comando: 'resumo' }
+        ]
+      })
+    });
+    return;
+  }
+
+  const secoes = [];
+  
   // Cartões
   if (vencimentos.cartoes && vencimentos.cartoes.length > 0) {
-    msgVencimentos += '💳 *Faturas de Cartão:*\n';
-    vencimentos.cartoes.forEach((venc) => {
+    const itensCartoes = vencimentos.cartoes.map((venc) => {
       const emoji = venc.dias_restantes <= 3 ? '🚨' : venc.dias_restantes <= 7 ? '⚠️' : '📅';
-      msgVencimentos += `${emoji} ${venc.cartao_nome}: R$ ${formatarValor(venc.valor)} (${venc.dias_restantes} dias)\n`;
-      msgVencimentos += `   📝 ${venc.descricao} | 📂 ${venc.categoria}\n\n`;
+      return `${emoji} ${venc.cartao_nome}: R$ ${formatarValor(venc.valor)} (${venc.dias_restantes} dias)\n   📝 ${venc.descricao} | 📂 ${venc.categoria}`;
     });
-    temVencimentos = true;
+    secoes.push({
+      titulo: 'Faturas de Cartão',
+      itens: itensCartoes,
+      emoji: '💳'
+    });
   }
+  
   // Boletos
   if (vencimentos.boletos && vencimentos.boletos.length > 0) {
-    msgVencimentos += '📄 *Boletos:*\n';
-    vencimentos.boletos.forEach((venc) => {
+    const itensBoletos = vencimentos.boletos.map((venc) => {
       const emoji = venc.dias_restantes <= 3 ? '🚨' : venc.dias_restantes <= 7 ? '⚠️' : '📅';
-      msgVencimentos += `${emoji} R$ ${formatarValor(venc.valor)} (${venc.dias_restantes} dias)\n`;
-      msgVencimentos += `   📝 ${venc.descricao} | 📂 ${venc.categoria}\n\n`;
+      return `${emoji} R$ ${formatarValor(venc.valor)} (${venc.dias_restantes} dias)\n   📝 ${venc.descricao} | 📂 ${venc.categoria}`;
     });
-    temVencimentos = true;
+    secoes.push({
+      titulo: 'Boletos',
+      itens: itensBoletos,
+      emoji: '📄'
+    });
   }
-  if (!temVencimentos) {
-    msgVencimentos = `📅 Nenhum vencimento nos próximos ${dias} dias.`;
-  }
-  await sock.sendMessage(userId, { text: msgVencimentos });
+
+  await sock.sendMessage(userId, { 
+    text: formatarMensagem({
+      titulo: `Próximos Vencimentos (${dias} dias)`,
+      emojiTitulo: '📅',
+      secoes: secoes,
+      dicas: [
+        { texto: 'Ver vencimentos em 7 dias', comando: 'vencimentos 7' },
+        { texto: 'Ver vencimentos em 90 dias', comando: 'vencimentos 90' },
+        { texto: 'Ver histórico geral', comando: 'historico' }
+      ]
+    })
+  });
 }
 
 export default vencimentosCommand; 
