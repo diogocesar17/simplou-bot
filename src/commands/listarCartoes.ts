@@ -1,6 +1,6 @@
 // @ts-nocheck
 import * as cartoesService from '../services/cartoesService';
-import { formatarMensagem, formatarLista } from '../utils/formatMessages';
+import { formatarMensagem, formatarLista, gerarDicasContextuais } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function listarCartoesCommand(sock, userId) {
@@ -11,9 +11,7 @@ async function listarCartoesCommand(sock, userId) {
       text: formatarMensagem({
         titulo: 'Nenhum cartão configurado',
         emojiTitulo: '❌',
-        dicas: [
-          { texto: 'Configure seu primeiro cartão', comando: 'configurar cartão' }
-        ]
+        dicas: gerarDicasContextuais('cartoes')
       })
     });
     return;
@@ -35,10 +33,7 @@ async function listarCartoesCommand(sock, userId) {
           emoji: '📋'
         }
       ],
-      dicas: [
-        { texto: 'Editar vencimento ou fechamento', comando: 'editar cartão' },
-        { texto: 'Configurar novo cartão', comando: 'configurar cartão' }
-      ]
+      dicas: gerarDicasContextuais('cartoes')
     })
   });
 }

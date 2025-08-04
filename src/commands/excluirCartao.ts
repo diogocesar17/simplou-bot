@@ -1,7 +1,7 @@
 // @ts-nocheck
 import * as cartoesService from '../services/cartoesService';
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
-import { formatarMensagem, formatarConfirmacao } from '../utils/formatMessages';
+import { formatarMensagem, formatarConfirmacao, gerarDicasContextuais } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 
@@ -87,10 +87,7 @@ async function excluirCartaoCommand(sock, userId, texto) {
               emoji: '🛑'
             }
           ],
-          dicas: [
-            { texto: 'Ver cartões', comando: 'cartoes' },
-            { texto: 'Configurar cartão', comando: 'configurar cartao' }
-          ]
+          dicas: gerarDicasContextuais('cartoes')
         })
       });
       return;
@@ -127,10 +124,7 @@ async function excluirCartaoCommand(sock, userId, texto) {
             emoji: 'ℹ️'
           } : null
         ].filter(Boolean),
-        dicas: [
-          { texto: 'Ver cartões restantes', comando: 'cartoes' },
-          { texto: 'Configurar novo cartão', comando: 'configurar cartao' }
-        ]
+                  dicas: gerarDicasContextuais('cartoes')
       })
     });
     await limparEstado(userId);

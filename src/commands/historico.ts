@@ -3,7 +3,7 @@ import { formatarValor } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { definirEstado, limparEstado } from '../configs/stateManager';
-import { formatarMensagem } from '../utils/formatMessages';
+import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function historicoCommand(sock, userId, texto) {
@@ -48,10 +48,7 @@ async function historicoCommand(sock, userId, texto) {
               emoji: '📅'
             }
           ],
-          dicas: [
-            { texto: 'Registre seus primeiros lançamentos', comando: 'gastei 50 no mercado' },
-            { texto: 'Ver histórico geral', comando: 'historico' }
-          ]
+          dicas: gerarDicasContextuais('historico')
         })
       });
       return;
@@ -63,10 +60,7 @@ async function historicoCommand(sock, userId, texto) {
         text: formatarMensagem({
           titulo: 'Nenhum lançamento encontrado',
           emojiTitulo: '📭',
-          dicas: [
-            { texto: 'Registre seu primeiro lançamento', comando: 'gastei 50 no mercado' },
-            { texto: 'Ver exemplos de lançamentos', comando: 'ajuda' }
-          ]
+          dicas: gerarDicasContextuais('historico')
         })
       });
       return;

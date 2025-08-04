@@ -47,7 +47,9 @@ export const ERROR_MESSAGES = {
     causa: 'O formato do comando não está correto',
     solucao: `Use o formato correto para ${comando}`,
     exemplo: exemplo,
-    dica: 'Digite "ajuda" para ver todos os comandos disponíveis'
+    dica: comando.includes('excluir') ? 
+      'Use "historico" primeiro, depois "excluir 1"' : 
+      'Digite "ajuda" para ver todos os comandos disponíveis'
   }),
 
   // Erros de dados não encontrados
@@ -56,7 +58,9 @@ export const ERROR_MESSAGES = {
     causa: period ? `Nenhum ${tipo.toLowerCase()} encontrado para ${period}` : `Nenhum ${tipo.toLowerCase()} encontrado`,
     solucao: 'Registre alguns dados primeiro',
     exemplo: tipo === 'Lançamento' ? 'gastei 50 no mercado no pix' : 'configurar cartão',
-    dica: 'Use "histórico" para ver seus dados existentes'
+    dica: tipo === 'Lançamento' ? 
+      'Registre seu primeiro gasto com "mercado 50" ou "uber 25"' : 
+      'Configure seu primeiro cartão com "configurar cartao"'
   }),
 
   // Erros de validação
@@ -89,7 +93,9 @@ export const ERROR_MESSAGES = {
     titulo: 'Estado inválido',
     causa: `Não é possível ${acao} no momento atual`,
     solucao: 'Complete a operação anterior ou digite "cancelar"',
-    dica: 'Use "cancelar" para sair da operação atual'
+    dica: acao.includes('excluir') || acao.includes('editar') ? 
+      'Use "histórico" primeiro para ver os lançamentos disponíveis' : 
+      'Use "cancelar" para sair da operação atual'
   }),
 
   // Erros de mês futuro

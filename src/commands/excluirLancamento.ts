@@ -1,7 +1,7 @@
 // @ts-nocheck
 import * as lancamentosService from '../services/lancamentosService';
 import { obterEstado, limparEstado, definirEstado } from '../configs/stateManager';
-import { formatarMensagem, formatarConfirmacao } from '../utils/formatMessages';
+import { formatarMensagem, formatarConfirmacao, gerarDicasContextuais } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function excluirLancamentoCommand(sock, userId, texto) {
@@ -39,10 +39,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
                 emoji: '📝'
               }
             ],
-            dicas: [
-              { texto: 'Ver histórico atualizado', comando: 'historico' },
-              { texto: 'Ver resumo do mês', comando: 'resumo' }
-            ]
+            dicas: gerarDicasContextuais('excluir')
           })
         });
       } catch (error) {
@@ -66,10 +63,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
               emoji: '🛑'
             }
           ],
-          dicas: [
-            { texto: 'Ver histórico', comando: 'historico' },
-            { texto: 'Ver resumo do mês', comando: 'resumo' }
-          ]
+          dicas: gerarDicasContextuais('excluir')
         })
       });
     } else {
