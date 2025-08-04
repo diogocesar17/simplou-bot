@@ -160,4 +160,33 @@ export function formatarMenu(titulo: string, opcoes: string[], dica?: string): s
   }
   
   return msg;
+}
+
+/**
+ * Formata uma mensagem de confirmação
+ */
+export function formatarConfirmacao(titulo: string, detalhes: string[], opcoes: string[], tituloDetalhes?: string): string {
+  let msg = `🗑️ *${titulo}*\n\n`;
+  
+  // Título dos detalhes (se fornecido)
+  if (tituloDetalhes) {
+    msg += `📝 *${tituloDetalhes}:*\n`;
+  }
+  
+  // Detalhes do item
+  detalhes.forEach(detalhe => {
+    msg += `• ${detalhe}\n`;
+  });
+  
+  msg += `\n⚠️ *Atenção:* Esta ação não pode ser desfeita!\n\n`;
+  
+  // Opções de confirmação
+  msg += `💡 *Confirma a exclusão:*\n`;
+  opcoes.forEach((opcao, index) => {
+    const emoji = index === 0 ? '✅' : '❌';
+    const texto = index === 0 ? 'Confirmar' : 'Cancelar';
+    msg += `${emoji} ${index + 1} - ${texto}\n`;
+  });
+  
+  return msg;
 } 

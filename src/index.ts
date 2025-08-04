@@ -87,6 +87,11 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
       return;
     }
 
+    if(estado.etapa.includes('confirmacao_exclusao_lancamento')) {
+      await excluirLancamentoCommand(sock, userId, texto);
+      return;
+    }
+
     if(estado.etapa.includes('exclusao_cartao')) {
       await excluirCartaoCommand(sock, userId, texto);
       return;
