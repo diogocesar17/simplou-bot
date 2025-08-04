@@ -68,8 +68,7 @@ async function resumoDetalhadoCommand(sock, userId, texto) {
     const categoriasOrdenadas = Object.entries(categoriasGastos)
         .sort(([,a], [,b]) => b.total - a.total);
 
-    let msg = `📋 *Resumo Detalhado - ${getNomeMes(parsed.mes - 1)}/${parsed.ano}*\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    let msg = `📋 *Resumo Detalhado - ${getNomeMes(parsed.mes - 1)}/${parsed.ano}*\n\n`;
 
     // Estatísticas gerais
     const totalEntradas = entradas.reduce((acc, l) => acc + parseFloat(l.valor), 0);
@@ -119,8 +118,7 @@ async function resumoDetalhadoCommand(sock, userId, texto) {
     }
 
     // Lista detalhada de lançamentos
-    msg += `📝 *Lançamentos Detalhados:*\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    msg += `📝 *Lançamentos Detalhados:*\n\n`;
 
     const formatLancamento = (l) => {
         const dataBR = (l.data instanceof Date)
