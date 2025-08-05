@@ -1,26 +1,50 @@
 // @ts-nocheck
 import * as sistemaService from '../services/sistemaService';
+import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
 
 async function limparCommand(sock, userId) {
   // Limpar dados antigos reais
   const resultado = await sistemaService.limparDadosAntigos();
   if (resultado.sucesso) {
-    let msg = '🧹 *Limpeza de dados antigos concluída!*\n\n';
+    const itens = [];
     if (resultado.lancamentosRemovidos > 0) {
-      msg += `📋 Lançamentos removidos: ${resultado.lancamentosRemovidos}\n`;
+      itens.push(`Lançamentos removidos: ${resultado.lancamentosRemovidos}`);
     }
     if (resultado.logsRemovidos > 0) {
-      msg += `📄 Logs removidos: ${resultado.logsRemovidos}\n`;
+      itens.push(`Logs removidos: ${resultado.logsRemovidos}`);
     }
     if (resultado.arquivosRemovidos > 0) {
-      msg += `📁 Arquivos temporários removidos: ${resultado.arquivosRemovidos}\n`;
+      itens.push(`Arquivos temporários removidos: ${resultado.arquivosRemovidos}`);
     }
     if (resultado.lancamentosRemovidos === 0 && resultado.logsRemovidos === 0 && resultado.arquivosRemovidos === 0) {
-      msg += 'ℹ️ Nenhum dado antigo foi encontrado para remoção.';
+      itens.push('Nenhum dado antigo foi encontrado para remoção');
     }
-    await sock.sendMessage(userId, { text: msg });
+    
+    await sock.sendMessage(userId, { 
+      text: formatarMensagem({
+        titulo: 'Limpeza concluída',
+        emojiTitulo: '🧹',
+        secoes: [{
+          titulo: 'Resultado da Limpeza',
+          itens: itens,
+          emoji: '📋'
+        }],
+        dicas: gerarDicasContextuais('limpar')
+      })
+    });
   } else {
-    await sock.sendMessage(userId, { text: '❌ Erro ao limpar dados antigos. Tente novamente.' });
+    await sock.sendMessage(userId, { 
+      text: formatarMensagem({
+        titulo: 'Erro na limpeza',
+        emojiTitulo: '❌',
+        secoes: [{
+          titulo: 'Solução',
+          itens: ['Tente novamente em alguns instantes'],
+          emoji: '💡'
+        }],
+        dicas: gerarDicasContextuais('limpar')
+      })
+    });
   }
 }
 

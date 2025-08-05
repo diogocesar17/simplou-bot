@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import * as cartoesService from '../services/cartoesService';
+import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function editarCartaoCommand(sock, userId, texto) {
   const textoLimpo = texto.trim().toLowerCase();
@@ -10,7 +12,18 @@ async function editarCartaoCommand(sock, userId, texto) {
   if (estado?.etapa === 'aguardando_escolha_edicao_cartao') {
     if (textoLimpo === 'cancelar') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
+      await sock.sendMessage(userId, { 
+        text: formatarMensagem({
+          titulo: 'Edição cancelada',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Status',
+            itens: ['Operação cancelada pelo usuário'],
+            emoji: '🛑'
+          }],
+          dicas: gerarDicasContextuais('cartoes')
+        })
+      });
       return;
     }
 
@@ -19,7 +32,16 @@ async function editarCartaoCommand(sock, userId, texto) {
 
     if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
       await sock.sendMessage(userId, {
-        text: `❌ Escolha inválida. Digite um número entre 1 e ${cartoes.length} ou "cancelar".`
+        text: formatarMensagem({
+          titulo: 'Escolha inválida',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Solução',
+            itens: [`Digite um número entre 1 e ${cartoes.length} ou "cancelar"`],
+            emoji: '💡'
+          }],
+          dicas: gerarDicasContextuais('cartoes')
+        })
       });
       return;
     }
@@ -27,7 +49,23 @@ async function editarCartaoCommand(sock, userId, texto) {
     const cartaoEscolhido = cartoes[idx - 1];
     await definirEstado(userId, 'aguardando_campo_edicao_cartao', { cartaoEscolhido });
     await sock.sendMessage(userId, {
-      text: 'Qual campo deseja editar?\n1. vencimento\n2. fechamento\n3. cancelar'
+      text: formatarMensagem({
+        titulo: 'Editar Cartão',
+        emojiTitulo: '💳',
+        secoes: [{
+          titulo: 'Opções de Edição',
+          itens: [
+            '1. Vencimento',
+            '2. Fechamento',
+            '3. Cancelar'
+          ],
+          emoji: '⚙️'
+        }],
+        dicas: [
+          { texto: 'Digite o número da opção', comando: '1, 2 ou 3' },
+          { texto: 'Cancelar edição', comando: 'cancelar' }
+        ]
+      })
     });
     return;
   }
@@ -41,13 +79,33 @@ async function editarCartaoCommand(sock, userId, texto) {
 
     if (campo === 'cancelar') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: '❌ Edição de cartão cancelada.' });
+      await sock.sendMessage(userId, { 
+        text: formatarMensagem({
+          titulo: 'Edição cancelada',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Status',
+            itens: ['Operação cancelada pelo usuário'],
+            emoji: '🛑'
+          }],
+          dicas: gerarDicasContextuais('cartoes')
+        })
+      });
       return;
     }
 
     if (!['vencimento', 'fechamento'].includes(campo)) {
       await sock.sendMessage(userId, {
-        text: '❌ Campo inválido. Digite: 1, 2, 3 ou o nome do campo.'
+        text: formatarMensagem({
+          titulo: 'Campo inválido',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Solução',
+            itens: ['Digite: 1, 2, 3 ou o nome do campo'],
+            emoji: '💡'
+          }],
+          dicas: gerarDicasContextuais('cartoes')
+        })
       });
       return;
     }
@@ -59,7 +117,19 @@ async function editarCartaoCommand(sock, userId, texto) {
 
     await definirEstado(userId, 'aguardando_novo_valor_edicao_cartao', dados);
     await sock.sendMessage(userId, {
-      text: `Digite o novo dia de ${campo} (1-31):`
+      text: formatarMensagem({
+        titulo: 'Editar Cartão',
+        emojiTitulo: '💳',
+        secoes: [{
+          titulo: 'Instrução',
+          itens: [`Digite o novo dia de ${campo} (1-31)`],
+          emoji: '📝'
+        }],
+        dicas: [
+          { texto: 'Digite um número entre 1 e 31', comando: 'exemplo: 15' },
+          { texto: 'Cancelar edição', comando: 'cancelar' }
+        ]
+      })
     });
     return;
   }
@@ -72,7 +142,16 @@ async function editarCartaoCommand(sock, userId, texto) {
     const dia = parseInt(texto);
     if (isNaN(dia) || dia < 1 || dia > 31) {
       await sock.sendMessage(userId, {
-        text: `❌ Dia de ${campo} inválido. Digite um número entre 1 e 31.`
+        text: formatarMensagem({
+          titulo: 'Dia inválido',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Solução',
+            itens: [`Digite um número entre 1 e 31 para ${campo}`],
+            emoji: '💡'
+          }],
+          dicas: gerarDicasContextuais('cartoes')
+        })
       });
       return;
     }
@@ -87,7 +166,20 @@ async function editarCartaoCommand(sock, userId, texto) {
 
     await limparEstado(userId);
     await sock.sendMessage(userId, {
-      text: `✅ Cartão ${cartao.nome_cartao} atualizado!\n💳 Vencimento: dia ${novoVencimento}\n📅 Fechamento: dia ${novoFechamento}`
+      text: formatarMensagem({
+        titulo: 'Cartão atualizado com sucesso',
+        emojiTitulo: '✅',
+        secoes: [{
+          titulo: 'Detalhes do Cartão',
+          itens: [
+            `Cartão: ${cartao.nome_cartao}`,
+            `Vencimento: dia ${novoVencimento}`,
+            `Fechamento: dia ${novoFechamento}`
+          ],
+          emoji: '💳'
+        }],
+        dicas: gerarDicasContextuais('cartoes')
+      })
     });
     return;
   }
@@ -95,7 +187,18 @@ async function editarCartaoCommand(sock, userId, texto) {
   // 4. Início do fluxo: listar cartões
   const cartoes = await cartoesService.listarCartoesConfigurados(userId);
   if (!cartoes || cartoes.length === 0) {
-    await sock.sendMessage(userId, { text: '❌ Nenhum cartão configurado para editar.' });
+    await sock.sendMessage(userId, { 
+      text: formatarMensagem({
+        titulo: 'Nenhum cartão configurado',
+        emojiTitulo: '❌',
+        secoes: [{
+          titulo: 'Solução',
+          itens: ['Configure um cartão primeiro'],
+          emoji: '💡'
+        }],
+        dicas: gerarDicasContextuais('cartoes')
+      })
+    });
     return;
   }
 

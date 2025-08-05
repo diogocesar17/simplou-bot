@@ -2,6 +2,8 @@
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarValor } from '../utils/formatUtils';
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
+import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 
 async function editarLancamentoCommand(sock, userId, texto) {
@@ -38,7 +40,18 @@ async function editarLancamentoCommand(sock, userId, texto) {
         instrucao = '📅 Digite a nova data (dd/mm/aaaa):';
         break;
       default:
-        await sock.sendMessage(userId, { text: '❌ Opção inválida. Digite um número entre 1 e 5.' });
+        await sock.sendMessage(userId, { 
+          text: formatarMensagem({
+            titulo: 'Opção inválida',
+            emojiTitulo: '❌',
+            secoes: [{
+              titulo: 'Solução',
+              itens: ['Digite um número entre 1 e 5'],
+              emoji: '💡'
+            }],
+            dicas: gerarDicasContextuais('editar')
+          })
+        });
         return;
     }
     
@@ -65,7 +78,18 @@ async function editarLancamentoCommand(sock, userId, texto) {
       case 'valor':
         const novoValor = parseFloat(texto.replace(/[^\d,.-]/g, '').replace(',', '.'));
         if (isNaN(novoValor) || novoValor <= 0) {
-          await sock.sendMessage(userId, { text: '❌ Valor inválido. Digite um número positivo.' });
+          await sock.sendMessage(userId, { 
+            text: formatarMensagem({
+              titulo: 'Valor inválido',
+              emojiTitulo: '❌',
+              secoes: [{
+                titulo: 'Solução',
+                itens: ['Digite um número positivo'],
+                emoji: '💡'
+              }],
+              dicas: gerarDicasContextuais('editar')
+            })
+          });
           return;
         }
         novosDados.valor = novoValor;
@@ -86,14 +110,36 @@ async function editarLancamentoCommand(sock, userId, texto) {
       case 'data':
         const dataRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
         if (!dataRegex.test(texto)) {
-          await sock.sendMessage(userId, { text: '❌ Data inválida. Use o formato dd/mm/aaaa' });
+          await sock.sendMessage(userId, { 
+            text: formatarMensagem({
+              titulo: 'Data inválida',
+              emojiTitulo: '❌',
+              secoes: [{
+                titulo: 'Solução',
+                itens: ['Use o formato dd/mm/aaaa'],
+                emoji: '💡'
+              }],
+              dicas: gerarDicasContextuais('editar')
+            })
+          });
           return;
         }
         novosDados.data = texto.split('/').reverse().join('-');
         break;
         
       default:
-        await sock.sendMessage(userId, { text: '❌ Campo inválido para edição.' });
+        await sock.sendMessage(userId, { 
+          text: formatarMensagem({
+            titulo: 'Campo inválido',
+            emojiTitulo: '❌',
+            secoes: [{
+              titulo: 'Solução',
+              itens: ['Campo não permitido para edição'],
+              emoji: '💡'
+            }],
+            dicas: gerarDicasContextuais('editar')
+          })
+        });
         return;
     }
     
@@ -102,15 +148,36 @@ async function editarLancamentoCommand(sock, userId, texto) {
       await lancamentosService.atualizarLancamentoPorId(userId, contexto.lancamentoId, novosDados);
       
       await sock.sendMessage(userId, { 
-        text: `✅ Lançamento editado com sucesso!\n\n` +
-          `📅 Data: ${novosDados.data}\n` +
-          `💰 Valor: R$ ${formatarValor(novosDados.valor)}\n` +
-          `📂 Categoria: ${novosDados.categoria}\n` +
-          `💳 Pagamento: ${novosDados.pagamento}\n` +
-          `📝 Descrição: ${novosDados.descricao}`
+        text: formatarMensagem({
+          titulo: 'Lançamento editado com sucesso',
+          emojiTitulo: '✅',
+          secoes: [{
+            titulo: 'Detalhes do Lançamento',
+            itens: [
+              `Data: ${novosDados.data}`,
+              `Valor: R$ ${formatarValor(novosDados.valor)}`,
+              `Categoria: ${novosDados.categoria}`,
+              `Pagamento: ${novosDados.pagamento}`,
+              `Descrição: ${novosDados.descricao}`
+            ],
+            emoji: '📝'
+          }],
+          dicas: gerarDicasContextuais('editar')
+        })
       });
     } catch (error) {
-      await sock.sendMessage(userId, { text: '❌ Erro ao editar lançamento. Tente novamente.' });
+      await sock.sendMessage(userId, { 
+        text: formatarMensagem({
+          titulo: 'Erro ao editar lançamento',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Solução',
+            itens: ['Tente novamente em alguns instantes'],
+            emoji: '💡'
+          }],
+          dicas: gerarDicasContextuais('editar')
+        })
+      });
     }
     return;
   }
@@ -118,7 +185,21 @@ async function editarLancamentoCommand(sock, userId, texto) {
   // Comando inicial: editar [número]
   const match = texto.toLowerCase().match(/^editar\s+(\d+)$/i);
   if (!match) {
-    await sock.sendMessage(userId, { text: '❌ Use: editar [número]. Exemplo: editar 2' });
+    await sock.sendMessage(userId, { 
+      text: formatarMensagem({
+        titulo: 'Formato inválido',
+        emojiTitulo: '❌',
+        secoes: [{
+          titulo: 'Solução',
+          itens: ['Use: editar [número]'],
+          emoji: '💡'
+        }],
+        dicas: [
+          { texto: 'Ver histórico', comando: 'historico' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
+        ]
+      })
+    });
     return;
   }
   
@@ -126,7 +207,16 @@ async function editarLancamentoCommand(sock, userId, texto) {
   const estadoHistorico = await obterEstado(userId);
   if (!estadoHistorico || estadoHistorico.etapa !== 'historico_exibido') {
     await sock.sendMessage(userId, { 
-      text: '❌ Execute "histórico" primeiro para ver a lista de lançamentos disponíveis para edição.' 
+      text: formatarMensagem({
+        titulo: 'Estado inválido',
+        emojiTitulo: '❌',
+        secoes: [{
+          titulo: 'Solução',
+          itens: ['Execute "histórico" primeiro para ver os lançamentos'],
+          emoji: '💡'
+        }],
+        dicas: gerarDicasContextuais('editar')
+      })
     });
     return;
   }
@@ -137,7 +227,16 @@ async function editarLancamentoCommand(sock, userId, texto) {
   if (agora - estadoHistorico.dadosParciais.timestamp > tempoExpiracao) {
     await limparEstado(userId);
     await sock.sendMessage(userId, { 
-      text: '❌ A lista expirou. Execute "histórico" novamente para ver os lançamentos.' 
+      text: formatarMensagem({
+        titulo: 'Lista expirada',
+        emojiTitulo: '❌',
+        secoes: [{
+          titulo: 'Solução',
+          itens: ['Execute "histórico" novamente para ver os lançamentos'],
+          emoji: '💡'
+        }],
+        dicas: gerarDicasContextuais('editar')
+      })
     });
     return;
   }
@@ -146,26 +245,58 @@ async function editarLancamentoCommand(sock, userId, texto) {
   const lista = estadoHistorico.dadosParciais.lista;
   
   if (!lista || !lista[idx]) {
-    await sock.sendMessage(userId, { text: '❌ Índice inválido. Envie "histórico" para listar novamente.' });
+    await sock.sendMessage(userId, { 
+      text: formatarMensagem({
+        titulo: 'Índice inválido',
+        emojiTitulo: '❌',
+        secoes: [{
+          titulo: 'Solução',
+          itens: ['Envie "histórico" para listar novamente'],
+          emoji: '💡'
+        }],
+        dicas: gerarDicasContextuais('editar')
+      })
+    });
     return;
   }
   
   const lancamento = lista[idx];
   
   // Mostrar lançamento e opções de edição
-  let msg = `📝 *Editar Lançamento ${idx + 1}*\n\n`;
-  msg += `📅 Data: ${lancamento.data}\n`;
-  msg += `💰 Valor: R$ ${formatarValor(lancamento.valor)}\n`;
-  msg += `📂 Categoria: ${lancamento.categoria}\n`;
-  msg += `💳 Pagamento: ${lancamento.pagamento}\n`;
-  msg += `📝 Descrição: ${lancamento.descricao}\n\n`;
-  msg += `*O que você quer editar?*\n\n`;
-  msg += `1. Valor\n`;
-  msg += `2. Categoria\n`;
-  msg += `3. Descrição\n`;
-  msg += `4. Forma de pagamento\n`;
-  msg += `5. Data\n\n`;
-  msg += `Digite o número da opção:`;
+  await sock.sendMessage(userId, { 
+    text: formatarMensagem({
+      titulo: `Editar Lançamento ${idx + 1}`,
+      emojiTitulo: '📝',
+      secoes: [
+        {
+          titulo: 'Detalhes do Lançamento',
+          itens: [
+            `Data: ${lancamento.data}`,
+            `Valor: R$ ${formatarValor(lancamento.valor)}`,
+            `Categoria: ${lancamento.categoria}`,
+            `Pagamento: ${lancamento.pagamento}`,
+            `Descrição: ${lancamento.descricao}`
+          ],
+          emoji: '📋'
+        },
+        {
+          titulo: 'Opções de Edição',
+          itens: [
+            '1. Valor',
+            '2. Categoria', 
+            '3. Descrição',
+            '4. Forma de pagamento',
+            '5. Data'
+          ],
+          emoji: '⚙️'
+        }
+      ],
+      dicas: [
+        { texto: 'Digite o número da opção', comando: '1, 2, 3, 4 ou 5' },
+        { texto: 'Cancelar edição', comando: 'cancelar' }
+      ]
+    })
+  });
   
   console.log('lancamento: ', lancamento.id);
 
@@ -174,8 +305,6 @@ async function editarLancamentoCommand(sock, userId, texto) {
     lancamento: lancamento,
     campo: null
   });
-  
-  await sock.sendMessage(userId, { text: msg });
   
   // // Aguardar escolha do campo
   // const aguardandoEscolha = {};
