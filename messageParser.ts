@@ -60,7 +60,7 @@ const mapeamentoFormasPagamento = {
 // Limites de valores por categoria (em reais)
 const limitesCategoria = {
   'Alimentação': { min: 0.50, max: 500, alerta: 200 },
-  'Saúde': { min: 1.00, max: 2000, alerta: 1000 },
+  'Saúde': { min: 1.00, max: 5000, alerta: 2000 },
   'Moradia': { min: 10.00, max: 10000, alerta: 5000 },
   'Transporte': { min: 1.00, max: 1000, alerta: 500 },
   'Lazer': { min: 1.00, max: 2000, alerta: 500 },

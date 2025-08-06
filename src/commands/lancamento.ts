@@ -138,7 +138,7 @@ Mensagem para analisar: "${texto}"
 Data atual: ${new Date().toLocaleDateString('pt-BR')}
 `;
 
-    const resposta = await geminiService.responderPerguntaInteligente(userId, prompt, []);
+    const resposta = await geminiService.responderPerguntaFinanceira(prompt, []);
     console.log(`[IA_ANALISE] Resposta da IA: ${resposta}`);
     
     // Tentar extrair JSON da resposta
