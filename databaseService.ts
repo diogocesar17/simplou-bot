@@ -49,8 +49,8 @@ async function initializeDatabase() {
         valor DECIMAL(10,2) NOT NULL,
         categoria VARCHAR(50),
         pagamento VARCHAR(20),
-        criado_em TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'),
-        atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'),
+        criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         parcelamento_id VARCHAR(100),
         parcela_atual INTEGER,
         total_parcelas INTEGER,
@@ -76,7 +76,7 @@ async function initializeDatabase() {
         nome_cartao VARCHAR(50) NOT NULL,
         dia_vencimento INTEGER NOT NULL CHECK (dia_vencimento >= 1 AND dia_vencimento <= 31),
         dia_fechamento INTEGER,
-        criado_em TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'),
+        criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, nome_cartao)
       )
     `);
@@ -88,7 +88,7 @@ async function initializeDatabase() {
         user_id VARCHAR(50) NOT NULL,
         acao VARCHAR(100) NOT NULL,
         detalhes TEXT,
-        timestamp TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo')
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -356,10 +356,10 @@ async function migrateTimezoneColumns(client) {
         let columnDefinition = '';
         switch (column) {
           case 'criado_em':
-            columnDefinition = 'ADD COLUMN criado_em TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE \'America/Sao_Paulo\')';
+            columnDefinition = 'ADD COLUMN criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP';
             break;
           case 'atualizado_em':
-            columnDefinition = 'ADD COLUMN atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE \'America/Sao_Paulo\')';
+            columnDefinition = 'ADD COLUMN atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP';
             break;
         }
         
@@ -2260,7 +2260,7 @@ async function promoverParaPremium(userId, diasExpiracao = null, promovidoPor) {
       UPDATE usuarios 
       SET plano = 'premium', 
           data_expiracao_premium = $2,
-          atualizado_em = CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'
+          atualizado_em = CURRENT_TIMESTAMP
       WHERE user_id = $1
       RETURNING *
     `, [userId, dataExpiracao]);
@@ -2385,7 +2385,7 @@ async function verificarAcessoUsuario(userId) {
           UPDATE usuarios 
           SET plano = 'gratuito', 
               data_expiracao_premium = NULL,
-              atualizado_em = CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'
+              atualizado_em = CURRENT_TIMESTAMP
           WHERE user_id = $1
         `, [userId]);
         
@@ -2413,7 +2413,7 @@ async function registrarAcesso(userId) {
   try {
     await pool.query(`
       UPDATE usuarios 
-      SET data_ultimo_acesso = CURRENT_TIMESTAMP AT TIME ZONE 'America/Sao_Paulo'
+      SET data_ultimo_acesso = CURRENT_TIMESTAMP
       WHERE user_id = $1
     `, [userId]);
   } catch (error) {
