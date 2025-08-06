@@ -37,8 +37,13 @@ const categoriasPrincipais = {
     'escritório', 'escritorio', 'equipamento', 'computador', 'notebook', 'tablet', 'celular', 'smartphone', 'impressora', 'scanner', 'webcam', 'microfone', 'headset', 'fone', 'mouse', 'teclado',
     'software', 'licença', 'licenca', 'assinatura', 'assinatura', 'domínio', 'dominio', 'hosting', 'servidor', 'cloud', 'backup', 'antivírus', 'antivirus', 'office', 'adobe', 'autocad',
     'freelance', 'freela', 'projeto', 'cliente', 'reunião', 'reuniao', 'apresentação', 'apresentacao', 'relatório', 'relatorio', 'proposta', 'contrato', 'nota fiscal', 'recibo',
-    'salário', 'salario', 'pagamento', 'remuneração', 'remuneracao', 'proventos', 'ordenado', 'vencimentos', 'bonus', 'bônus', 'comissão', 'comissao', 'adicional', 'hora extra', 'horaextra',
     'vale refeição', 'valerefeicao', 'vale alimentação', 'valealimentacao', 'vale transporte', 'valetransporte', 'plano de saúde', 'planosaude', 'plano odontológico', 'planoodontologico'
+  ],
+  'Renda': [
+    'salário', 'salario', 'pagamento', 'remuneração', 'remuneracao', 'proventos', 'ordenado', 'vencimentos', 'bonus', 'bônus', 'comissão', 'comissao', 'adicional', 'hora extra', 'horaextra',
+    'parcela', 'lote', 'venda', 'aluguel recebido', 'dividendo', 'rendimento', 'investimento', 'aplicação', 'aplicacao', 'cdb', 'lci', 'lca', 'tesouro', 'ações', 'acoes', 'fii', 'fundo',
+    'freela', 'freelance', 'bico', 'trabalho extra', 'consultoria', 'palestra', 'curso ministrado', 'aula particular', 'tutoria', 'mentoria', 'coaching', 'venda online', 'ecommerce',
+    'recebimento', 'transferência recebida', 'transferencia recebida', 'depósito', 'deposito', 'pix recebido', 'boleto recebido'
   ]
 };
 
@@ -66,6 +71,7 @@ const limitesCategoria = {
   'Lazer': { min: 1.00, max: 2000, alerta: 500 },
   'Educação': { min: 5.00, max: 5000, alerta: 1000 },
   'Trabalho': { min: 1.00, max: 10000, alerta: 5000 },
+  'Renda': { min: 1.00, max: 50000, alerta: 10000 },
   'Outros': { min: 0.01, max: 2500, alerta: 1000 }
 };
 
@@ -87,6 +93,11 @@ function detectarCategoria(texto) {
   
   if (texto.includes('manutencao') && (texto.includes('casa') || texto.includes('apartamento') || texto.includes('imovel') || texto.includes('imóvel'))) {
     return { categoria: 'Moradia', confianca: 'alta' };
+  }
+  
+  // Verificações específicas para receitas
+  if (texto.includes('parcela') || texto.includes('lote') || texto.includes('venda') || texto.includes('aluguel recebido') || texto.includes('dividendo') || texto.includes('rendimento')) {
+    return { categoria: 'Renda', confianca: 'alta' };
   }
   
   // Remove valores monetários do texto para evitar conflitos

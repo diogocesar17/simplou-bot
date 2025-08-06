@@ -38,6 +38,10 @@ async function initializeDatabase() {
     const client = await pool.connect();
     logger.info('✅ Conectado ao PostgreSQL com sucesso');
     
+    // Configurar timezone do PostgreSQL
+    await client.query(`SET timezone = 'America/Sao_Paulo'`);
+    logger.info('🕐 Timezone configurado para America/Sao_Paulo');
+    
     // Criar tabela de lançamentos
     await client.query(`
       CREATE TABLE IF NOT EXISTS lancamentos (
