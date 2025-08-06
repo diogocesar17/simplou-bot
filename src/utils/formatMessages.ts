@@ -306,6 +306,28 @@ export function gerarDicasContextuais(comando: string, contexto?: any): Array<{t
       );
       break;
       
+    case 'limpar':
+      dicas.push(
+        { texto: 'Ver status do sistema', comando: 'status' },
+        { texto: 'Ver logs do sistema', comando: 'logs' }
+      );
+      break;
+      
+    case 'sugestoes':
+      dicas.push(
+        { texto: 'Registrar lançamentos', comando: 'mercado 50' },
+        { texto: 'Ver histórico', comando: 'historico' }
+      );
+      break;
+      
+    case 'relatorio':
+      dicas.push(
+        { texto: 'Relatório do mês atual', comando: 'relatorio' },
+        { texto: 'Relatório de agosto', comando: 'relatorio agosto' },
+        { texto: 'Ver resumo do mês', comando: 'resumo' }
+      );
+      break;
+      
     default:
       dicas.push(
         { texto: 'Ver ajuda', comando: 'ajuda' },

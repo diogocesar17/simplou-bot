@@ -1740,13 +1740,145 @@ async function limparDadosAntigos() {
     const espacoLiberado = Math.round(lancamentosParaRemover * 0.1); // ~100 bytes por registro
     
     return {
+      sucesso: true,
       lancamentosRemovidos: lancamentosParaRemover,
+      logsRemovidos: 0, // Por enquanto não removemos logs
+      arquivosRemovidos: 0, // Por enquanto não removemos arquivos
       espacoLiberado,
       tempoProcessamento,
       dataLimite: dataLimite.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
     };
   } catch (error) {
     fileLogger.error('[LIMPEZA] Erro ao limpar dados:', error);
+    throw error;
+  }
+}
+
+/**
+ * Gera relatório CSV personalizado para usuário
+ */
+async function gerarRelatorioCSV(userId, mes, ano) {
+  console.log(`[DATABASE_SERVICE] gerarRelatorioCSV iniciado: userId=${userId}, mes=${mes}, ano=${ano}`);
+  
+  try {
+    // Buscar lançamentos do mês/ano específico
+    const query = `
+      SELECT 
+        data,
+        tipo,
+        descricao,
+        valor,
+        categoria,
+        pagamento,
+        cartao_nome,
+        data_contabilizacao,
+        mes_fatura,
+        ano_fatura,
+        parcelamento_id,
+        parcela_atual,
+        total_parcelas,
+        recorrente,
+        recorrente_fim,
+        data_lancamento,
+        status_fatura,
+        data_vencimento
+      FROM lancamentos 
+      WHERE user_id = $1 
+        AND EXTRACT(MONTH FROM data) = $2 
+        AND EXTRACT(YEAR FROM data) = $3
+      ORDER BY data ASC, id ASC
+    `;
+    
+    console.log(`[DATABASE_SERVICE] Executando query com parâmetros:`, [userId, mes, ano]);
+    const result = await pool.query(query, [userId, mes, ano]);
+    const lancamentos = result.rows;
+    console.log(`[DATABASE_SERVICE] Lançamentos encontrados:`, lancamentos.length);
+    
+    if (lancamentos.length === 0) {
+      return {
+        sucesso: false,
+        mensagem: 'Nenhum lançamento encontrado para o período'
+      };
+    }
+    
+    // Criar diretório de relatórios se não existir
+    const fs = require('fs').promises;
+    const path = require('path');
+    
+    const relatoriosDir = path.join(process.cwd(), 'relatorios');
+    try {
+      await fs.mkdir(relatoriosDir, { recursive: true });
+    } catch (error) {
+      // Diretório já existe ou erro de permissão
+    }
+    
+    // Gerar nome do arquivo com timestamp
+    const mesNome = new Date(ano, mes - 1).toLocaleDateString('pt-BR', { month: 'long' });
+    const nomeArquivo = `relatorio_${userId}_${mesNome}_${ano}.csv`;
+    const caminhoArquivo = path.join(relatoriosDir, nomeArquivo);
+    
+    // Cabeçalhos do CSV
+    const headers = [
+      'Data',
+      'Tipo',
+      'Descrição',
+      'Valor',
+      'Categoria',
+      'Forma de Pagamento',
+      'Cartão',
+      'Data Contabilização',
+      'Mês Fatura',
+      'Ano Fatura',
+      'Parcelamento ID',
+      'Parcela Atual',
+      'Total Parcelas',
+      'Recorrente',
+      'Fim Recorrente',
+      'Data Lançamento',
+      'Status Fatura',
+      'Data Vencimento'
+    ];
+    
+    let csv = headers.join(',') + '\n';
+    
+    // Adicionar dados
+    lancamentos.forEach(lancamento => {
+      const row = [
+        lancamento.data ? new Date(lancamento.data).toLocaleDateString('pt-BR') : '',
+        lancamento.tipo || '',
+        '"' + (lancamento.descricao ? lancamento.descricao.replace(/"/g, '""') : '') + '"',
+        lancamento.valor ? formatarValor(lancamento.valor) : '',
+        lancamento.categoria || '',
+        lancamento.pagamento || '',
+        lancamento.cartao_nome || '',
+        lancamento.data_contabilizacao ? new Date(lancamento.data_contabilizacao).toLocaleDateString('pt-BR') : '',
+        lancamento.mes_fatura || '',
+        lancamento.ano_fatura || '',
+        lancamento.parcelamento_id || '',
+        lancamento.parcela_atual || '',
+        lancamento.total_parcelas || '',
+        lancamento.recorrente ? 'Sim' : 'Não',
+        lancamento.recorrente_fim ? new Date(lancamento.recorrente_fim).toLocaleDateString('pt-BR') : '',
+        lancamento.data_lancamento ? new Date(lancamento.data_lancamento).toLocaleDateString('pt-BR') : '',
+        lancamento.status_fatura || '',
+        lancamento.data_vencimento ? new Date(lancamento.data_vencimento).toLocaleDateString('pt-BR') : ''
+      ];
+      csv += row.join(',') + '\n';
+    });
+    
+    // Salvar arquivo CSV
+    await fs.writeFile(caminhoArquivo, csv, 'utf8');
+    
+    return {
+      sucesso: true,
+      nomeArquivo,
+      caminhoArquivo,
+      totalLancamentos: lancamentos.length,
+      tamanho: Math.round(csv.length / 1024),
+      periodo: `${mes}/${ano}`
+    };
+  } catch (error) {
+    fileLogger.error('[RELATORIO] Erro ao gerar relatório CSV:', error);
     throw error;
   }
 }
@@ -2368,5 +2500,6 @@ export {
   buscarUsuario,
   verificarAcessoUsuario,
   registrarAcesso,
-  buscarUsuariosPremiumExpiracao
+  buscarUsuariosPremiumExpiracao,
+  gerarRelatorioCSV
 }; 

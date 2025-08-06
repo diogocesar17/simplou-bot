@@ -121,4 +121,9 @@ export async function buscarProximosVencimentos(userId: string, dias: number = 7
 // Funções para exclusão em lote
 export async function buscarLancamentosParaExclusao(userId: string, filtros: any): Promise<any[]> {
   return await databaseService.buscarLancamentosParaExclusao(userId, filtros);
+}
+
+// Função para gerar relatório CSV
+export async function gerarRelatorioCSV(userId: string, mes: number, ano: number): Promise<any> {
+  return await databaseService.gerarRelatorioCSV(userId, mes, ano);
 } 

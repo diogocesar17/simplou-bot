@@ -46,6 +46,7 @@ import promoverPremiumCommand from './commands/promoverPremium';
 import removerUsuarioCommand from './commands/removerUsuario';
 import statusUsuarioCommand from './commands/statusUsuario';
 import alertasCommand from './commands/alertas';
+import relatorioCommand from './commands/relatorio';
 
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
@@ -244,6 +245,10 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   }
   if (textoLower === 'limpar') {
     await limparCommand(sock, userId);
+    return;
+  }
+  if (textoLower.startsWith('relatorio')) {
+    await relatorioCommand(sock, userId, texto);
     return;
   }
   if (textoLower === 'backup') {

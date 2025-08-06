@@ -3,6 +3,7 @@
 import { parseMessage } from '../utils/parseUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import * as cartoesService from '../services/cartoesService';
+import * as geminiService from '../services/geminiService';
 import { formatarValor } from '../utils/formatUtils';
 import { converterDataParaISO } from '../utils/dataUtils';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
@@ -10,6 +11,173 @@ import { definirEstado, obterEstado, limparEstado } from '../configs/stateManage
 // Função para gerar ID único
 function gerarIdUnico() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// Função para categorização baseada em palavras-chave
+function categorizarPorPalavrasChave(texto) {
+  console.log(`[CATEGORIZACAO] Analisando texto: "${texto}"`);
+  const textoLower = texto.toLowerCase();
+  console.log(`[CATEGORIZACAO] Texto em lowercase: "${textoLower}"`);
+  
+  // Mapeamento de palavras-chave para categorias
+  const categorias = {
+    'Alimentação': [
+      'mercado', 'supermercado', 'restaurante', 'lanche', 'delivery', 'ifood', 'rappi', 'uber eats',
+      'comida', 'almoço', 'jantar', 'café', 'padaria', 'açougue', 'hortifruti', 'feira'
+    ],
+    'Transporte': [
+      'uber', '99', 'taxi', 'combustível', 'gasolina', 'etanol', 'ônibus', 'metrô', 'trem',
+      'transporte público', 'estacionamento', 'pedágio', 'uber eats', 'rappi'
+    ],
+    'Saúde': [
+      'médico', 'farmácia', 'plano de saúde', 'consulta', 'exame', 'laboratório', 'hospital',
+      'dentista', 'psicólogo', 'fisioterapeuta', 'remédio', 'medicamento'
+    ],
+    'Educação': [
+      'curso', 'faculdade', 'universidade', 'escola', 'livro', 'material escolar', 'mensalidade',
+      'matrícula', 'apostila', 'workshop', 'treinamento'
+    ],
+    'Moradia': [
+      'aluguel', 'condomínio', 'conta de luz', 'energia elétrica', 'água', 'gás', 'internet',
+      'telefone', 'iptu', 'seguro residencial'
+    ],
+    'Lazer': [
+      'cinema', 'teatro', 'show', 'viagem', 'passeio', 'entretenimento', 'bar', 'balada',
+      'academia', 'esporte', 'hobby', 'jogo', 'netflix', 'spotify'
+    ],
+    'Vestuário': [
+      'roupa', 'calçado', 'acessório', 'loja de roupas', 'sapato', 'tenis', 'camisa', 'calça',
+      'vestido', 'bolsa', 'carteira', 'relógio'
+    ],
+    'Serviços': [
+      'manutenção', 'conserto', 'limpeza', 'beleza', 'barbearia', 'salão', 'cabeleireiro',
+      'manicure', 'pedicure', 'lavanderia', 'oficina'
+    ],
+    'Casa': [
+      'móveis', 'eletrodomésticos', 'decoração', 'material de construção', 'construção',
+      'reforma', 'ferramenta', 'tinta', 'cimento', 'areia', 'tijolo', 'telha', 'canos',
+      'fiação', 'lâmpada', 'sofa', 'cama', 'mesa', 'geladeira', 'fogão', 'microondas',
+      'tv', 'computador', 'notebook', 'celular', 'smartphone'
+    ],
+    'Trabalho': [
+      'material de escritório', 'equipamento profissional', 'ferramenta profissional',
+      'computador', 'notebook', 'impressora', 'papel', 'caneta', 'lápis', 'mochila',
+      'uniforme', 'epi', 'equipamento de proteção'
+    ],
+    'Renda': [
+      'salário', 'freela', 'bônus', 'comissão', 'renda extra', 'pagamento', 'recebimento',
+      'transferência recebida', 'depósito'
+    ]
+  };
+  
+  // Verificar cada categoria
+  for (const [categoria, palavrasChave] of Object.entries(categorias)) {
+    console.log(`[CATEGORIZACAO] Verificando categoria: ${categoria}`);
+    for (const palavra of palavrasChave) {
+      if (textoLower.includes(palavra)) {
+        console.log(`[CATEGORIZACAO] ✅ Encontrou palavra-chave: "${palavra}" → Categoria: ${categoria}`);
+        return categoria;
+      }
+    }
+  }
+  
+  console.log(`[CATEGORIZACAO] ❌ Nenhuma palavra-chave encontrada`);
+  return null; // Não encontrou correspondência
+}
+
+// Função para análise inteligente com IA
+async function analisarLancamentoComIA(userId, texto) {
+  try {
+    console.log(`[IA_ANALISE] Iniciando análise para: "${texto}"`);
+    
+    // Primeiro, tentar categorizar por palavras-chave
+    const categoriaPorPalavrasChave = categorizarPorPalavrasChave(texto);
+    console.log(`[IA_ANALISE] Categoria por palavras-chave: ${categoriaPorPalavrasChave}`);
+    
+    const prompt = `
+Analise a seguinte mensagem e extraia informações de um lançamento financeiro.
+Retorne APENAS um JSON válido com a seguinte estrutura:
+
+{
+  "tipo": "gasto" ou "receita",
+  "valor": número (apenas números, sem R$),
+  "descricao": "descrição do lançamento",
+  "categoria": "categoria mais apropriada",
+  "pagamento": "pix", "dinheiro", "credito", "debito", "boleto", "transferencia" ou "NÃO INFORMADO",
+  "data": "dd/mm/aaaa" (data atual se não especificada),
+  "confianca": número de 0 a 1 (confiança na análise)
+}
+
+CATEGORIAS DISPONÍVEIS (use exatamente estas):
+- Alimentação (comida, restaurante, mercado, lanche, delivery)
+- Transporte (uber, 99, combustível, transporte público, taxi)
+- Saúde (médico, farmácia, plano de saúde, consulta, exame)
+- Educação (curso, faculdade, escola, livro, material escolar)
+- Moradia (aluguel, condomínio, conta de luz, água, gás, internet)
+- Lazer (cinema, teatro, show, viagem, passeio, entretenimento)
+- Vestuário (roupa, calçado, acessórios, loja de roupas)
+- Serviços (manutenção, conserto, limpeza, beleza, barbearia)
+- Casa (móveis, eletrodomésticos, decoração, material de construção)
+- Trabalho (material de escritório, equipamentos, ferramentas)
+- Renda (salário, freela, bônus, comissão, renda extra)
+- Outros (quando não se encaixa nas categorias acima)
+
+Exemplos de análise:
+- "Gasto de 2619,92 com Plano de Saúde no pix" → {"tipo": "gasto", "valor": 2619.92, "descricao": "Plano de Saúde", "categoria": "Saúde", "pagamento": "pix", "data": "06/08/2025", "confianca": 0.95}
+- "Paguei 2619,92 do plano de saúde no pix" → {"tipo": "gasto", "valor": 2619.92, "descricao": "Plano de Saúde", "categoria": "Saúde", "pagamento": "pix", "data": "06/08/2025", "confianca": 0.9}
+- "Gastei 78,80 na loja de materiais de construção no pix" → {"tipo": "gasto", "valor": 78.80, "descricao": "Loja de Materiais de Construção", "categoria": "Casa", "pagamento": "pix", "data": "06/08/2025", "confianca": 0.95}
+- "Recebi 5000 de salário" → {"tipo": "receita", "valor": 5000, "descricao": "Salário", "categoria": "Renda", "pagamento": "transferencia", "data": "06/08/2025", "confianca": 0.95}
+
+IMPORTANTE: Para materiais de construção, ferramentas, móveis, eletrodomésticos → use "Casa"
+Para material de escritório, equipamentos profissionais → use "Trabalho"
+
+${categoriaPorPalavrasChave ? `CATEGORIA DETECTADA: "${categoriaPorPalavrasChave}" - Use esta categoria se for apropriada.` : ''}
+
+Mensagem para analisar: "${texto}"
+
+Data atual: ${new Date().toLocaleDateString('pt-BR')}
+`;
+
+    const resposta = await geminiService.responderPerguntaInteligente(userId, prompt, []);
+    console.log(`[IA_ANALISE] Resposta da IA: ${resposta}`);
+    
+    // Tentar extrair JSON da resposta
+    const jsonMatch = resposta.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log(`[IA_ANALISE] ❌ Não conseguiu extrair JSON da resposta`);
+      return null;
+    }
+    
+    const parsed = JSON.parse(jsonMatch[0]);
+    console.log(`[IA_ANALISE] JSON parseado:`, parsed);
+    
+    // Validar se tem os campos essenciais
+    if (!parsed.tipo || !parsed.valor || !parsed.descricao || parsed.confianca < 0.7) {
+      console.log(`[IA_ANALISE] ❌ Campos essenciais faltando ou confiança baixa`);
+      return null;
+    }
+    
+    const resultado = {
+      tipo: parsed.tipo,
+      valor: parsed.valor,
+      descricao: parsed.descricao,
+      categoria: categoriaPorPalavrasChave || parsed.categoria || 'Outros',
+      pagamento: parsed.pagamento || 'NÃO INFORMADO',
+      data: parsed.data || new Date().toLocaleDateString('pt-BR'),
+      faltaFormaPagamento: parsed.pagamento === 'NÃO INFORMADO',
+      faltaDataVencimento: false,
+      parcelamento: false,
+      recorrente: false
+    };
+    
+    console.log(`[IA_ANALISE] Resultado final:`, resultado);
+    console.log(`[IA_ANALISE] Categoria final: ${resultado.categoria} (palavras-chave: ${categoriaPorPalavrasChave}, IA: ${parsed.categoria})`);
+    
+    return resultado;
+  } catch (error) {
+    console.error('Erro na análise com IA:', error);
+    return null;
+  }
 }
 
 // Função para calcular data futura
@@ -153,8 +321,51 @@ async function gerarMensagemSucesso(parsed, cartao = null) {
 }
 
 async function lancamentoCommand(sock, userId, texto) {
-  // 1. Fluxo aguardando forma de pagamento
+  console.log(`[LANCAMENTO] Comando iniciado: userId=${userId}, texto="${texto}"`);
+  
+  // 1. Fluxo aguardando confirmação da IA
   const estado = await obterEstado(userId);
+  if (estado?.etapa === 'aguardando_confirmacao_ia') {
+    const parsed = estado.dadosParciais;
+    
+    const resposta = texto.toLowerCase().trim();
+    
+    // Verificar se quer alterar categoria
+    if (resposta.startsWith('categoria ')) {
+      const novaCategoria = resposta.replace('categoria ', '').trim();
+      const categoriasValidas = [
+        'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia', 
+        'Lazer', 'Vestuário', 'Serviços', 'Casa', 'Trabalho', 'Renda', 'Outros'
+      ];
+      
+      if (categoriasValidas.includes(novaCategoria)) {
+        parsed.categoria = novaCategoria;
+        await sock.sendMessage(userId, {
+          text: `✅ Categoria alterada para: ${novaCategoria}\n\n🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsed.pagamento}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento? (sim/não)\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+        });
+        return;
+      } else {
+        await sock.sendMessage(userId, {
+          text: `❌ Categoria inválida. Categorias disponíveis:\n\n${categoriasValidas.map(cat => `• ${cat}`).join('\n')}\n\n💡 Digite: "categoria [nome_da_categoria]"`
+        });
+        return;
+      }
+    }
+    
+    if (resposta === 'sim' || resposta === 's' || resposta === 'yes' || resposta === 'y') {
+      // Usuário confirmou, processar lançamento
+      await limparEstado(userId);
+      return await processarLancamento(sock, userId, parsed);
+    } else {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { 
+        text: '❌ Lançamento cancelado. Tente novamente com um formato mais claro.' 
+      });
+      return;
+    }
+  }
+
+  // 2. Fluxo aguardando forma de pagamento
   if (estado?.etapa === 'aguardando_forma_pagamento') {
     const parsed = estado.dadosParciais;
     await limparEstado(userId);
@@ -237,9 +448,32 @@ async function lancamentoCommand(sock, userId, texto) {
   }
 
   // 4. Parsear mensagem
-  const parsed = parseMessage(texto);
+  let parsed = parseMessage(texto);
+  console.log(`[LANCAMENTO] Parse normal resultado:`, parsed);
+  
+  // Se o parse normal falhou, tentar com IA
   if (!parsed || !parsed.valor) {
-    await sock.sendMessage(userId, { text: '❌ Não entendi. Digite *ajuda* para ver os comandos.' });
+    console.log(`[LANCAMENTO] Parse normal falhou, tentando com IA...`);
+    await sock.sendMessage(userId, { 
+      text: '🤖 Analisando sua mensagem com IA...' 
+    });
+    
+    parsed = await analisarLancamentoComIA(userId, texto);
+    
+    if (!parsed || !parsed.valor) {
+      await sock.sendMessage(userId, { 
+        text: '❌ Não consegui entender. Tente usar um formato mais claro:\n\n💡 *Exemplos:*\n• "mercado 50 pix"\n• "gasto 100 com uber no credito"\n• "receita 5000 salario"\n\nDigite *ajuda* para ver todos os comandos.' 
+      });
+      return;
+    }
+    
+    // Confirmar com o usuário se a IA entendeu corretamente
+    await sock.sendMessage(userId, {
+      text: `🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsed.pagamento}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento? (sim/não)\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+    });
+    
+    // Aguardar confirmação
+    await definirEstado(userId, 'aguardando_confirmacao_ia', parsed);
     return;
   }
 

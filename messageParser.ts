@@ -77,6 +77,10 @@ function detectarCategoria(texto) {
   texto = texto.toLowerCase();
   
   // Verificações específicas de contexto primeiro (mais específicas)
+  if (texto.includes('material de construção') || texto.includes('materiais de construção') || texto.includes('construção') || texto.includes('construcao')) {
+    return { categoria: 'Moradia', confianca: 'alta' };
+  }
+  
   if (texto.includes('manutencao') && (texto.includes('carro') || texto.includes('moto') || texto.includes('veiculo') || texto.includes('veículo'))) {
     return { categoria: 'Transporte', confianca: 'alta' };
   }
