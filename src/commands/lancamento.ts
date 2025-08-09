@@ -425,9 +425,33 @@ async function lancamentoCommand(sock, userId, texto) {
     const cartaoEscolhido = cartoes[escolha];
     console.log('🔔 Cartão escolhido:', cartaoEscolhido);
     
-    // Processar lançamento com o cartão escolhido
+    // Processar com base em parcelamento/recorrente ou simples
+    if (parsed.parcelamento && parsed.numParcelas > 1) {
+      const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed, cartaoEscolhido);
+      await limparEstado(userId);
+      let msg = `✅ Parcelamento registrado no cartão ${cartaoEscolhido.nome_cartao}!\n\n`;
+      msg += `💰 Valor total: R$ ${formatarValor(parsed.valor)}\n`;
+      msg += `📦 ${parsed.numParcelas}x de R$ ${formatarValor(parsed.valor / parsed.numParcelas)}\n`;
+      msg += `📂 Categoria: ${parsed.categoria}\n`;
+      msg += `📝 Descrição: ${parsed.descricao}`;
+      await sock.sendMessage(userId, { text: msg });
+      return;
+    }
+
+    if (parsed.recorrente && parsed.recorrenteMeses > 1) {
+      const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed, cartaoEscolhido);
+      await limparEstado(userId);
+      let msg = `✅ Lançamento recorrente registrado no cartão ${cartaoEscolhido.nome_cartao}!\n\n`;
+      msg += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+      msg += `📅 ${parsed.recorrenteMeses} meses\n`;
+      msg += `📂 Categoria: ${parsed.categoria}\n`;
+      msg += `📝 Descrição: ${parsed.descricao}`;
+      await sock.sendMessage(userId, { text: msg });
+      return;
+    }
+
+    // Gasto simples no cartão
     const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartaoEscolhido.dia_vencimento, cartaoEscolhido.dia_fechamento);
-    
     const dados = {
       data: parsed.data.split('/').reverse().join('-'),
       tipo: parsed.tipo.toLowerCase(),
