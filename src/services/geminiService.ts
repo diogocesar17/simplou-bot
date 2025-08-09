@@ -186,10 +186,12 @@ Formato a resposta de forma clara e objetiva.
 // Função para responder perguntas financeiras
 async function responderPerguntaFinanceira(pergunta, contexto = null) {
   if (!isGeminiAvailable || !gemini) {
+    console.log('[GEMINI][responderPerguntaFinanceira] Gemini indisponível, retornando null');
     return null;
   }
   
   try {
+    console.log('[GEMINI][responderPerguntaFinanceira] Chamando modelo gemini-1.5-flash');
     const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     let prompt = `Responda à seguinte pergunta sobre finanças pessoais de forma clara e objetiva:
@@ -204,7 +206,9 @@ Pergunta: "${pergunta}"`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return response.text();
+    const texto = response.text();
+    console.log('[GEMINI][responderPerguntaFinanceira] Resposta recebida (primeiros 120 chars):', (texto || '').slice(0, 120));
+    return texto;
     
   } catch (error) {
     console.error('[GEMINI] Erro ao responder pergunta:', error.message);

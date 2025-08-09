@@ -2,6 +2,9 @@ import 'dotenv/config';
 import { default as makeWASocket, useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
 import qrcode from 'qrcode-terminal';
 import { handleMessage } from './src/index';
+// Usar require para compatibilidade com CommonJS no serviço Gemini
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const geminiService = require('./src/services/geminiService');
 import { 
   verificarEEnviarAlertasAutomaticos, 
   estaNoHorarioAlertas,
@@ -11,6 +14,16 @@ import {
 import { initializeDatabase } from './databaseService';
 
 async function startBot(): Promise<void> {
+    // Inicializar Gemini (se GEMINI_API_KEY estiver setada)
+    try {
+      const ok = geminiService.initializeGemini();
+      if (!ok) {
+        console.log('[INIT] Gemini não inicializado (verifique GEMINI_API_KEY)');
+      }
+    } catch (e) {
+      console.error('[INIT] Erro ao inicializar Gemini:', (e as any)?.message || e);
+    }
+
     // Inicializar banco de dados
     try {
       console.log('🔌 Inicializando banco de dados...');

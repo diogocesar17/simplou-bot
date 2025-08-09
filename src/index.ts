@@ -52,6 +52,7 @@ import relatorioCommand from './commands/relatorio';
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
 import { logger, fileLogger } from '../logger';
 import * as geminiService from './services/geminiService';
+import { initializeDatabase } from '../databaseService';
 import * as lancamentosService from './services/lancamentosService';
 
 // Exemplo de função de roteamento (simples)
@@ -213,7 +214,8 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     
     // Buscar dados do usuário para contexto
     const dados = await lancamentosService.buscarDadosParaAnalise(userId, 3);
-    const resposta = await geminiService.responderPerguntaInteligente(userId, texto, dados);
+    // Ajuste: usa a função correta responderPerguntaFinanceira
+    const resposta = await geminiService.responderPerguntaFinanceira(texto, dados);
     await sock.sendMessage(userId, { text: resposta });
     return;
   }
@@ -296,4 +298,20 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   await lancamentoCommand(sock, userId, texto);
 }
 
-export { handleMessage }; 
+// Inicialização do app (exposta para quem importa)
+async function startBotInit(): Promise<void> {
+  try {
+    // Banco (garante tabelas)
+    await initializeDatabase();
+  } catch (e) {
+    console.error('[INIT] Erro ao inicializar banco:', e?.message || e);
+  }
+  try {
+    // Gemini
+    geminiService.initializeGemini();
+  } catch (e) {
+    console.error('[INIT] Erro ao inicializar Gemini:', e?.message || e);
+  }
+}
+
+export { handleMessage, startBotInit };
