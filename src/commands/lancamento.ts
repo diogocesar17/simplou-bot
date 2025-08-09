@@ -1,4 +1,10 @@
 // @ts-nocheck
+// Utilitário simples para remover acentos/diacríticos
+function removerAcentos(texto: string): string {
+  return (texto || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
 // Comando de lançamento centralizado
 import { parseMessage } from '../utils/parseUtils';
 import * as lancamentosService from '../services/lancamentosService';
@@ -292,8 +298,9 @@ async function gerarMensagemSucesso(parsed, cartao = null) {
   const tipoTexto = isReceita ? 'Receita' : 'Gasto';
   const emoji = isReceita ? '💰' : '💸';
   
-  // Mensagem específica para cartão de crédito
-  if (cartao && !isReceita && (parsed.pagamento?.toLowerCase().includes('credito') || parsed.pagamento?.toLowerCase().includes('cartao'))) {
+  // Mensagem específica para cartão de crédito (tolerante a acentos)
+  const pagamentoSemAcentosMsg = removerAcentos((parsed.pagamento || '').toLowerCase());
+  if (cartao && !isReceita && (pagamentoSemAcentosMsg.includes('credito') || pagamentoSemAcentosMsg.includes('cartao'))) {
     // Calcular data de contabilização
     const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartao.dia_vencimento, cartao.dia_fechamento);
     const dataContabilizacao = resultadoContabilizacao.dataContabilizacao;
@@ -534,7 +541,7 @@ async function lancamentoCommand(sock, userId, texto) {
 
 async function processarLancamento(sock, userId, parsed) {
   // Detectar gasto no cartão de crédito
-  const pagamentoNormalizado = (parsed.pagamento || '').toLowerCase();
+  const pagamentoNormalizado = removerAcentos((parsed.pagamento || '').toLowerCase());
   
   if (parsed.tipo && parsed.tipo.toLowerCase() === 'gasto' && 
       (pagamentoNormalizado.includes('credito') || pagamentoNormalizado.includes('cartao'))) {
