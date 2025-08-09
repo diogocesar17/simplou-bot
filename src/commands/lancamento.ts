@@ -140,6 +140,10 @@ Data atual: ${new Date().toLocaleDateString('pt-BR')}
 
     const resposta = await geminiService.responderPerguntaFinanceira(prompt, []);
     console.log(`[IA_ANALISE] Resposta da IA: ${resposta}`);
+    if (!resposta) {
+      console.log('[IA_ANALISE] ❌ IA indisponível ou sem resposta. Abortando fallback.');
+      return null;
+    }
     
     // Tentar extrair JSON da resposta
     const jsonMatch = resposta.match(/\{[\s\S]*\}/);
@@ -467,6 +471,8 @@ async function lancamentoCommand(sock, userId, texto) {
       return;
     }
     
+    console.log('[LANCAMENTO] ✅ IA fallback retornou um parsed válido.');
+    
     // Confirmar com o usuário se a IA entendeu corretamente
     await sock.sendMessage(userId, {
       text: `🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsed.pagamento}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento? (sim/não)\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
@@ -476,6 +482,9 @@ async function lancamentoCommand(sock, userId, texto) {
     await definirEstado(userId, 'aguardando_confirmacao_ia', parsed);
     return;
   }
+  
+  // Se chegou aqui, o parser normal funcionou e a IA não será usada
+  console.log('[LANCAMENTO] Parser normal entendeu a mensagem. IA não será usada.');
 
   // 5. Falta forma de pagamento
   if (parsed.faltaFormaPagamento || parsed.pagamento === 'NÃO INFORMADO') {
