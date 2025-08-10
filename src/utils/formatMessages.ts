@@ -192,6 +192,90 @@ export function formatarConfirmacao(titulo: string, detalhes: string[], opcoes: 
 } 
 
 /**
+ * Formata uma mensagem de cancelamento padronizada e amigável
+ */
+export function formatarCancelamento(operacao: string, dicas?: Dica[]): string {
+  let msg = `🛑 *Operação Cancelada*\n\n`;
+  
+  msg += `❌ *${operacao}* foi cancelada com sucesso\n\n`;
+  
+  msg += `💡 *O que você pode fazer agora:*\n`;
+  
+  if (dicas && dicas.length > 0) {
+    dicas.forEach(dica => {
+      if (dica.comando) {
+        msg += `• ${dica.texto} → \`${dica.comando}\`\n`;
+      } else {
+        msg += `• ${dica.texto}\n`;
+      }
+    });
+  } else {
+    // Dicas padrão se nenhuma for fornecida
+    msg += `• Ver ajuda → \`ajuda\`\n`;
+    msg += `• Ver histórico → \`historico\`\n`;
+    msg += `• Ver resumo → \`resumo\`\n`;
+  }
+  
+  msg += `\n✨ *Dica:* Você pode sempre digitar \`cancelar\` ou \`0\` para sair de qualquer operação`;
+  
+  return msg;
+}
+
+/**
+ * Formata um menu com opções de cancelamento padronizadas
+ */
+export function formatarMenuComCancelamento(titulo: string, opcoes: string[], dica?: string, incluirCancelamento: boolean = true): string {
+  let msg = `🎯 *${titulo}*\n\n`;
+  
+  opcoes.forEach((opcao, index) => {
+    msg += `${index + 1}️⃣ ${opcao}\n`;
+  });
+  
+  if (incluirCancelamento) {
+    msg += `\n🛑 *Opções de Cancelamento:*\n`;
+    msg += `• \`0\` - Cancelar operação\n`;
+    msg += `• \`cancelar\` - Cancelar operação\n`;
+  }
+  
+  if (dica) {
+    msg += `\n💡 *Dica:* ${dica}`;
+  }
+  
+  return msg;
+}
+
+/**
+ * Formata uma confirmação com opções de cancelamento padronizadas
+ */
+export function formatarConfirmacaoComCancelamento(titulo: string, detalhes: string[], opcoes: string[], tituloDetalhes?: string): string {
+  let msg = `⚠️ *${titulo}*\n\n`;
+  
+  // Título dos detalhes (se fornecido)
+  if (tituloDetalhes) {
+    msg += `📝 *${tituloDetalhes}:*\n`;
+  }
+  
+  // Detalhes do item
+  detalhes.forEach(detalhe => {
+    msg += `• ${detalhe}\n`;
+  });
+  
+  msg += `\n⚠️ *Atenção:* Esta ação não pode ser desfeita!\n\n`;
+  
+  // Opções de confirmação
+  msg += `💡 *Confirma a operação:*\n`;
+  opcoes.forEach((opcao, index) => {
+    const emoji = index === 0 ? '✅' : '❌';
+    const texto = index === 0 ? 'Confirmar' : 'Cancelar';
+    msg += `${emoji} ${index + 1} - ${texto}\n`;
+  });
+  
+  msg += `\n🛑 *Cancelar:* Digite \`0\` ou \`cancelar\`\n`;
+  
+  return msg;
+}
+
+/**
  * Gera dicas contextuais baseadas no comando e estado
  */
 export function gerarDicasContextuais(comando: string, contexto?: any): Array<{texto: string, comando: string}> {

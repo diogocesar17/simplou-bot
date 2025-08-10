@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import * as cartoesService from '../services/cartoesService';
+import { formatarCancelamento } from '../utils/formatMessages';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/errorMessages';
 
 async function configurarCartaoCommand(sock, userId, texto) {
@@ -9,9 +10,14 @@ async function configurarCartaoCommand(sock, userId, texto) {
 
   // 1. Se está aguardando nome do cartão
   if (estado?.etapa === 'aguardando_nome_cartao') {
-    if (textoLimpo === 'cancelar') {
+    if (textoLimpo === 'cancelar' || texto === '0') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: ERROR_MESSAGES.OPERACAO_CANCELADA('Configuração de cartão') });
+      await sock.sendMessage(userId, { 
+        text: formatarCancelamento('Configuração de cartão', [
+          'Ver cartões → `cartoes`',
+          'Ver ajuda → `ajuda`'
+        ])
+      });
       return;
     }
 
@@ -22,15 +28,22 @@ async function configurarCartaoCommand(sock, userId, texto) {
 
     const dados = { nomeCartao: texto.trim() };
     await definirEstado(userId, 'aguardando_vencimento_cartao', dados);
-    await sock.sendMessage(userId, { text: `💳 Qual dia vence a fatura do ${dados.nomeCartao}? (1-31)\nExemplo: 15` });
+    await sock.sendMessage(userId, { 
+      text: `💳 Qual dia vence a fatura do ${dados.nomeCartao}? (1-31)\nExemplo: 15\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar` 
+    });
     return;
   }
 
   // 2. Se está aguardando o vencimento
   if (estado?.etapa === 'aguardando_vencimento_cartao') {
-    if (textoLimpo === 'cancelar') {
+    if (textoLimpo === 'cancelar' || texto === '0') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: ERROR_MESSAGES.OPERACAO_CANCELADA('Configuração de cartão') });
+      await sock.sendMessage(userId, { 
+        text: formatarCancelamento('Configuração de cartão', [
+          'Ver cartões → `cartoes`',
+          'Ver ajuda → `ajuda`'
+        ])
+      });
       return;
     }
 
@@ -46,16 +59,21 @@ async function configurarCartaoCommand(sock, userId, texto) {
     };
     await definirEstado(userId, 'aguardando_fechamento_cartao', dados);
     await sock.sendMessage(userId, {
-      text: `📅 Qual dia de fechamento da fatura do ${dados.nomeCartao}? (1-31)\nExemplo: 7\nOu digite "padrão" para usar 7 dias antes do vencimento.`
+      text: `📅 Qual dia de fechamento da fatura do ${dados.nomeCartao}? (1-31)\nExemplo: 7\nOu digite "padrão" para usar 7 dias antes do vencimento.\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar`
     });
     return;
   }
 
   // 3. Se está aguardando o fechamento
   if (estado?.etapa === 'aguardando_fechamento_cartao') {
-    if (textoLimpo === 'cancelar') {
+    if (textoLimpo === 'cancelar' || texto === '0') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: ERROR_MESSAGES.OPERACAO_CANCELADA('Configuração de cartão') });
+      await sock.sendMessage(userId, { 
+        text: formatarCancelamento('Configuração de cartão', [
+          'Ver cartões → `cartoes`',
+          'Ver ajuda → `ajuda`'
+        ])
+      });
       return;
     }
 
@@ -86,7 +104,7 @@ async function configurarCartaoCommand(sock, userId, texto) {
   // 4. Início do fluxo
   await definirEstado(userId, 'aguardando_nome_cartao');
   await sock.sendMessage(userId, {
-    text: '💳 Qual o nome do cartão? (Exemplo: Nubank, Itaú, Inter)\n\nDigite "cancelar" para abortar.'
+    text: '💳 *Configurar Novo Cartão*\n\n📝 Qual o nome do cartão?\nExemplo: Nubank, Itaú, Inter\n\n🛑 *Cancelar:* Digite \`0\` ou \`cancelar\`'
   });
 }
 

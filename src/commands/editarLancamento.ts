@@ -2,7 +2,7 @@
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarValor } from '../utils/formatUtils';
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
-import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
+import { formatarMensagem, gerarDicasContextuais, formatarCancelamento, formatarMenuComCancelamento } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 
@@ -49,7 +49,11 @@ async function editarLancamentoCommand(sock, userId, texto) {
               itens: ['Digite um número entre 1 e 5'],
               emoji: '💡'
             }],
-            dicas: gerarDicasContextuais('editar')
+            dicas: [
+              { texto: 'Ver histórico', comando: 'historico' },
+              { texto: 'Cancelar edição', comando: '0 ou cancelar' },
+              { texto: 'Ver ajuda', comando: 'ajuda' }
+            ]
           })
         });
         return;
@@ -61,129 +65,109 @@ async function editarLancamentoCommand(sock, userId, texto) {
       campo: campo
     });
     
-    await sock.sendMessage(userId, { text: instrucao });
+    await sock.sendMessage(userId, { 
+      text: `${instrucao}\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar a edição` 
+    });
     return;
   }
 
-  // Se está aguardando valor de um campo específico
+  // Se está aguardando o novo valor para um campo
   if (estado?.etapa === 'aguardando_valor_edicao_lancamento') {
-    console.log('aguardando_valor_edicao_lancamento');
-    const contexto = estado.dadosParciais;
-    await limparEstado(userId);
+    const { lancamentoId, lancamento, campo } = estado.dadosParciais;
     
-    // Processar a edição
-    const novosDados = { ...contexto.lancamento };
+    if (texto.toLowerCase() === 'cancelar' || texto === '0') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { 
+        text: formatarCancelamento('Edição de lançamento', [
+          'Ver histórico → `historico`',
+          'Ver resumo do mês → `resumo`',
+          'Ver ajuda → `ajuda`'
+        ])
+      });
+      return;
+    }
     
-    switch (contexto.campo) {
-      case 'valor':
-        const novoValor = parseFloat(texto.replace(/[^\d,.-]/g, '').replace(',', '.'));
-        if (isNaN(novoValor) || novoValor <= 0) {
+    try {
+      let novoValor = texto.trim();
+      
+      // Validações específicas por campo
+      if (campo === 'valor') {
+        const valorNumerico = parseFloat(novoValor.replace(',', '.'));
+        if (isNaN(valorNumerico) || valorNumerico <= 0) {
           await sock.sendMessage(userId, { 
             text: formatarMensagem({
               titulo: 'Valor inválido',
               emojiTitulo: '❌',
               secoes: [{
                 titulo: 'Solução',
-                itens: ['Digite um número positivo'],
+                itens: ['Digite um valor numérico válido (ex: 50.90)'],
                 emoji: '💡'
               }],
-              dicas: gerarDicasContextuais('editar')
+              dicas: [
+                { texto: 'Cancelar edição', comando: '0 ou cancelar' },
+                { texto: 'Ver ajuda', comando: 'ajuda' }
+              ]
             })
           });
           return;
         }
-        novosDados.valor = novoValor;
-        break;
-        
-      case 'categoria':
-        novosDados.categoria = texto.trim();
-        break;
-        
-      case 'descricao':
-        novosDados.descricao = texto.trim();
-        break;
-        
-      case 'pagamento':
-        novosDados.pagamento = texto.trim();
-        break;
-        
-      case 'data':
+        novoValor = valorNumerico.toString();
+      } else if (campo === 'data') {
         const dataRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-        if (!dataRegex.test(texto)) {
+        if (!dataRegex.test(novoValor)) {
           await sock.sendMessage(userId, { 
             text: formatarMensagem({
               titulo: 'Data inválida',
               emojiTitulo: '❌',
               secoes: [{
                 titulo: 'Solução',
-                itens: ['Use o formato dd/mm/aaaa'],
+                itens: ['Use o formato dd/mm/aaaa (ex: 25/10/2024)'],
                 emoji: '💡'
               }],
-              dicas: gerarDicasContextuais('editar')
+              dicas: [
+                { texto: 'Cancelar edição', comando: '0 ou cancelar' },
+                { texto: 'Ver ajuda', comando: 'ajuda' }
+              ]
             })
           });
           return;
         }
-        novosDados.data = texto.split('/').reverse().join('-');
-        break;
-        
-      default:
-        await sock.sendMessage(userId, { 
-          text: formatarMensagem({
-            titulo: 'Campo inválido',
-            emojiTitulo: '❌',
-            secoes: [{
-              titulo: 'Solução',
-              itens: ['Campo não permitido para edição'],
-              emoji: '💡'
-            }],
-            dicas: gerarDicasContextuais('editar')
-          })
-        });
-        return;
-    }
-    
-    try {
-      // Atualizar no banco
-      await lancamentosService.atualizarLancamentoPorId(userId, contexto.lancamentoId, novosDados);
+      }
+      
+      // Atualizar o lançamento
+      await lancamentosService.atualizarCampoLancamento(userId, lancamentoId, campo, novoValor);
+      
+      await limparEstado(userId);
       
       await sock.sendMessage(userId, { 
         text: formatarMensagem({
-          titulo: 'Lançamento editado com sucesso',
+          titulo: 'Lançamento atualizado com sucesso',
           emojiTitulo: '✅',
           secoes: [{
-            titulo: 'Detalhes do Lançamento',
+            titulo: 'Alteração realizada',
             itens: [
-              `Data: ${novosDados.data}`,
-              `Valor: R$ ${formatarValor(novosDados.valor)}`,
-              `Categoria: ${novosDados.categoria}`,
-              `Pagamento: ${novosDados.pagamento}`,
-              `Descrição: ${novosDados.descricao}`
+              `Campo: ${campo}`,
+              `Novo valor: ${novoValor}`,
+              `Lançamento: ${lancamento.descricao}`
             ],
             emoji: '📝'
           }],
           dicas: gerarDicasContextuais('editar')
         })
       });
+      
     } catch (error) {
+      console.error('Erro ao atualizar lançamento:', error);
+      await limparEstado(userId);
       await sock.sendMessage(userId, { 
-        text: formatarMensagem({
-          titulo: 'Erro ao editar lançamento',
-          emojiTitulo: '❌',
-          secoes: [{
-            titulo: 'Solução',
-            itens: ['Tente novamente em alguns instantes'],
-            emoji: '💡'
-          }],
-          dicas: gerarDicasContextuais('editar')
-        })
+        text: ERROR_MESSAGES.ERRO_INTERNO('Atualizar lançamento', 'Tente novamente em alguns instantes')
       });
     }
     return;
   }
 
-  // Comando inicial: editar [número]
-  const match = texto.toLowerCase().match(/^editar\s+(\d+)$/i);
+  // Se não há estado, processar comando de edição
+  const match = texto.match(/^editar\s+(\d+)$/);
   if (!match) {
     await sock.sendMessage(userId, { 
       text: formatarMensagem({
@@ -191,7 +175,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
         emojiTitulo: '❌',
         secoes: [{
           titulo: 'Solução',
-          itens: ['Use: editar [número]'],
+          itens: ['Use o formato: editar <número>'],
           emoji: '💡'
         }],
         dicas: [
@@ -202,47 +186,9 @@ async function editarLancamentoCommand(sock, userId, texto) {
     });
     return;
   }
-  
-  // Verificar se há um histórico exibido no estado
-  const estadoHistorico = await obterEstado(userId);
-  if (!estadoHistorico || estadoHistorico.etapa !== 'historico_exibido') {
-    await sock.sendMessage(userId, { 
-      text: formatarMensagem({
-        titulo: 'Estado inválido',
-        emojiTitulo: '❌',
-        secoes: [{
-          titulo: 'Solução',
-          itens: ['Execute "histórico" primeiro para ver os lançamentos'],
-          emoji: '💡'
-        }],
-        dicas: gerarDicasContextuais('editar')
-      })
-    });
-    return;
-  }
-  
-  // Verificar se o estado não expirou (mais de 10 minutos)
-  const agora = Date.now();
-  const tempoExpiracao = 10 * 60 * 1000; // 10 minutos
-  if (agora - estadoHistorico.dadosParciais.timestamp > tempoExpiracao) {
-    await limparEstado(userId);
-    await sock.sendMessage(userId, { 
-      text: formatarMensagem({
-        titulo: 'Lista expirada',
-        emojiTitulo: '❌',
-        secoes: [{
-          titulo: 'Solução',
-          itens: ['Execute "histórico" novamente para ver os lançamentos'],
-          emoji: '💡'
-        }],
-        dicas: gerarDicasContextuais('editar')
-      })
-    });
-    return;
-  }
-  
-  const idx = parseInt(match[1], 10) - 1;
-  const lista = estadoHistorico.dadosParciais.lista;
+
+  const idx = parseInt(match[1]) - 1;
+  const lista = await lancamentosService.buscarLancamentosRecentes(userId, 10);
   
   if (!lista || !lista[idx]) {
     await sock.sendMessage(userId, { 
@@ -254,7 +200,10 @@ async function editarLancamentoCommand(sock, userId, texto) {
           itens: ['Envie "histórico" para listar novamente'],
           emoji: '💡'
         }],
-        dicas: gerarDicasContextuais('editar')
+        dicas: [
+          { texto: 'Ver histórico', comando: 'historico' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
+        ]
       })
     });
     return;
@@ -293,7 +242,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
       ],
       dicas: [
         { texto: 'Digite o número da opção', comando: '1, 2, 3, 4 ou 5' },
-        { texto: 'Cancelar edição', comando: 'cancelar' }
+        { texto: 'Cancelar edição', comando: '0 ou cancelar' }
       ]
     })
   });
@@ -305,67 +254,6 @@ async function editarLancamentoCommand(sock, userId, texto) {
     lancamento: lancamento,
     campo: null
   });
-  
-  // // Aguardar escolha do campo
-  // const aguardandoEscolha = {};
-  // aguardandoEscolha[userId] = {
-  //   lancamentoId: lancamento.id,
-  //   lancamento: lancamento
-  // };
-  
-  // // Interceptar próxima mensagem para processar escolha
-  // const processarEscolha = async (sock, userId, texto) => {
-  //   const estado = await obterEstado(userId);
-  //   if (estado?.etapa === 'aguardando_campo_edicao_lancamento') {
-  //     const contexto = estado.dados;
-  //     await limparEstado(userId);
-      
-  //     const escolha = parseInt(texto);
-  //     let campo = null;
-  //     let instrucao = '';
-      
-  //     switch (escolha) {
-  //       case 1:
-  //         campo = 'valor';
-  //         instrucao = '💰 Digite o novo valor:';
-  //         break;
-  //       case 2:
-  //         campo = 'categoria';
-  //         instrucao = '📂 Digite a nova categoria:';
-  //         break;
-  //       case 3:
-  //         campo = 'descricao';
-  //         instrucao = '📝 Digite a nova descrição:';
-  //         break;
-  //       case 4:
-  //         campo = 'pagamento';
-  //         instrucao = '💳 Digite a nova forma de pagamento:';
-  //         break;
-  //       case 5:
-  //         campo = 'data';
-  //         instrucao = '📅 Digite a nova data (dd/mm/aaaa):';
-  //         break;
-  //       default:
-  //         await sock.sendMessage(userId, { text: '❌ Opção inválida. Digite um número entre 1 e 5.' });
-  //         return;
-  //     }
-      
-  //     await definirEstado(userId, 'aguardando_valor_edicao_lancamento', {
-  //       lancamentoId: contexto.lancamentoId,
-  //       lancamento: contexto.lancamento,
-  //       campo: campo
-  //     });
-      
-  //     await sock.sendMessage(userId, { text: instrucao });
-  //   }
-  // };
-  
-  // // Processar escolha na próxima mensagem
-  // setTimeout(() => {
-  //   if (aguardandoEscolha[userId]) {
-  //     processarEscolha(sock, userId, texto);
-  //   }
-  // }, 100);
 }
 
 export default editarLancamentoCommand; 

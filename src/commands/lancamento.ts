@@ -5,6 +5,14 @@ function removerAcentos(texto: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
 }
+
+// Formata Date em YYYY-MM-DD sem efeitos de timezone (usando campos locais)
+function formatarDateParaISO(data: Date): string {
+  const y = data.getFullYear();
+  const m = String(data.getMonth() + 1).padStart(2, '0');
+  const d = String(data.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 // Comando de lançamento centralizado
 import { parseMessage } from '../utils/parseUtils';
 import * as lancamentosService from '../services/lancamentosService';
@@ -13,6 +21,7 @@ import * as geminiService from '../services/geminiService';
 import { formatarValor } from '../utils/formatUtils';
 import { converterDataParaISO } from '../utils/dataUtils';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
+import { formatarMensagem } from '../utils/formatMessages';
 
 // Função para gerar ID único
 function gerarIdUnico() {
@@ -191,17 +200,24 @@ Data atual: ${new Date().toLocaleDateString('pt-BR')}
 }
 
 // Função para calcular data futura
-function calcularDataFutura(dataInicial, mesesAdicionar) {
-  const data = new Date(dataInicial);
+function calcularDataFutura(dataInicial: Date, mesesAdicionar: number) {
+  // Evitar efeito de timezone ao usar Date com string ISO
+  const data = new Date(dataInicial.getFullYear(), dataInicial.getMonth(), dataInicial.getDate());
   data.setMonth(data.getMonth() + mesesAdicionar);
-  return data.toLocaleDateString('pt-BR');
+  // Retorna em dd/mm/aaaa
+  const dd = String(data.getDate()).padStart(2, '0');
+  const mm = String(data.getMonth() + 1).padStart(2, '0');
+  const yyyy = data.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 // Função para criar parcelamento
 async function criarParcelamento(userId, parsed, cartaoInfo = null) {
   const parcelamentoId = gerarIdUnico();
   const valorParcela = parsed.valor / parsed.numParcelas;
-  const dataInicial = new Date(parsed.data.split('/').reverse().join('-'));
+  // Evitar timezone: construir Date com componentes locais dd/mm/aaaa
+  const [diaStr, mesStr, anoStr] = parsed.data.split('/');
+  const dataInicial = new Date(parseInt(anoStr, 10), parseInt(mesStr, 10) - 1, parseInt(diaStr, 10));
   
   let lancamentosCriados = [];
   
@@ -212,7 +228,11 @@ async function criarParcelamento(userId, parsed, cartaoInfo = null) {
     // Calcular data de contabilização se for cartão
     let resultadoContabilizacao = null;
     if (cartaoInfo) {
-      resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(dataParcela.split('/').reverse().join('-'), cartaoInfo.dia_vencimento, cartaoInfo.dia_fechamento);
+      resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(
+        dataParcela.split('/').reverse().join('-'),
+        cartaoInfo.dia_vencimento,
+        cartaoInfo.dia_fechamento
+      );
     }
     
     const dados = {
@@ -229,8 +249,8 @@ async function criarParcelamento(userId, parsed, cartaoInfo = null) {
       recorrente_fim: null,
       recorrente_id: null,
       cartao_nome: cartaoInfo ? cartaoInfo.nome_cartao : null,
-      data_lancamento: cartaoInfo ? new Date().toISOString().split('T')[0] : null,
-      data_contabilizacao: cartaoInfo ? resultadoContabilizacao.dataContabilizacao.toISOString().split('T')[0] : null,
+      data_lancamento: cartaoInfo ? formatarDateParaISO(new Date()) : null,
+      data_contabilizacao: cartaoInfo ? formatarDateParaISO(resultadoContabilizacao.dataContabilizacao) : null,
       mes_fatura: cartaoInfo ? resultadoContabilizacao.mesFatura : null,
       ano_fatura: cartaoInfo ? resultadoContabilizacao.anoFatura : null,
       dia_vencimento: cartaoInfo ? cartaoInfo.dia_vencimento : null,
@@ -276,8 +296,8 @@ async function criarRecorrente(userId, parsed, cartaoInfo = null) {
       recorrente_fim: dataFim.split('/').reverse().join('-'),
       recorrente_id: recorrenteId,
       cartao_nome: cartaoInfo ? cartaoInfo.nome_cartao : null,
-      data_lancamento: cartaoInfo ? new Date().toISOString().split('T')[0] : null,
-      data_contabilizacao: cartaoInfo ? resultadoContabilizacao.dataContabilizacao.toISOString().split('T')[0] : null,
+      data_lancamento: cartaoInfo ? formatarDateParaISO(new Date()) : null,
+      data_contabilizacao: cartaoInfo ? formatarDateParaISO(resultadoContabilizacao.dataContabilizacao) : null,
       mes_fatura: cartaoInfo ? resultadoContabilizacao.mesFatura : null,
       ano_fatura: cartaoInfo ? resultadoContabilizacao.anoFatura : null,
       dia_vencimento: cartaoInfo ? cartaoInfo.dia_vencimento : null,
@@ -304,7 +324,7 @@ async function gerarMensagemSucesso(parsed, cartao = null) {
     // Calcular data de contabilização
     const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartao.dia_vencimento, cartao.dia_fechamento);
     const dataContabilizacao = resultadoContabilizacao.dataContabilizacao;
-    const dataContabilizacaoFormatada = dataContabilizacao.toISOString().split('T')[0].split('-').reverse().join('/');
+    const dataContabilizacaoFormatada = formatarDateParaISO(dataContabilizacao).split('-').reverse().join('/');
     
     let mensagem = `💳 ${tipoTexto} registrado no cartão ${cartao.nome_cartao}!\n\n`;
     mensagem += `📅 Data: ${parsed.data}\n`;
@@ -419,12 +439,46 @@ async function lancamentoCommand(sock, userId, texto) {
     const parsed = estado.dadosParciais;
     await limparEstado(userId);
     
+    // Verificar se o usuário quer cancelar
+    if (texto.toLowerCase() === 'cancelar' || texto === '0') {
+      await sock.sendMessage(userId, { 
+        text: formatarMensagem({
+          titulo: 'Operação cancelada',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Status',
+            itens: ['Seleção de cartão cancelada pelo usuário'],
+            emoji: '🛑'
+          }],
+          dicas: [
+            { texto: 'Registrar novo lançamento', comando: 'gastei 50 no mercado no pix' },
+            { texto: 'Ver ajuda', comando: 'ajuda' },
+            { texto: 'Ver cartões', comando: 'cartoes' }
+          ]
+        })
+      });
+      return;
+    }
+    
     const cartoes = await cartoesService.listarCartoesConfigurados(userId);
     const escolha = parseInt(texto) - 1;
     
     if (isNaN(escolha) || escolha < 0 || escolha >= cartoes.length) {
       await sock.sendMessage(userId, { 
-        text: `❌ Opção inválida. Escolha um número entre 1 e ${cartoes.length}` 
+        text: formatarMensagem({
+          titulo: 'Opção inválida',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Solução',
+            itens: [`Digite um número entre 1 e ${cartoes.length} ou "0" para cancelar`],
+            emoji: '💡'
+          }],
+          dicas: [
+            { texto: 'Ver cartões disponíveis', comando: 'cartoes' },
+            { texto: 'Cancelar operação', comando: '0 ou cancelar' },
+            { texto: 'Ver ajuda', comando: 'ajuda' }
+          ]
+        })
       });
       return;
     }
@@ -458,7 +512,11 @@ async function lancamentoCommand(sock, userId, texto) {
     }
 
     // Gasto simples no cartão
-    const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartaoEscolhido.dia_vencimento, cartaoEscolhido.dia_fechamento);
+    const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(
+      parsed.data.split('/').reverse().join('-'),
+      cartaoEscolhido.dia_vencimento,
+      cartaoEscolhido.dia_fechamento
+    );
     const dados = {
       data: parsed.data.split('/').reverse().join('-'),
       tipo: parsed.tipo.toLowerCase(),
@@ -467,8 +525,8 @@ async function lancamentoCommand(sock, userId, texto) {
       categoria: parsed.categoria,
       pagamento: parsed.pagamento,
       cartao_nome: cartaoEscolhido.nome_cartao,
-      data_lancamento: new Date().toISOString().split('T')[0],
-      data_contabilizacao: resultadoContabilizacao.dataContabilizacao.toISOString().split('T')[0],
+      data_lancamento: formatarDateParaISO(new Date()),
+      data_contabilizacao: formatarDateParaISO(resultadoContabilizacao.dataContabilizacao),
       mes_fatura: resultadoContabilizacao.mesFatura,
       ano_fatura: resultadoContabilizacao.anoFatura,
       dia_vencimento: cartaoEscolhido.dia_vencimento,
@@ -606,8 +664,8 @@ async function processarLancamento(sock, userId, parsed) {
         categoria: parsed.categoria,
         pagamento: parsed.pagamento,
         cartao_nome: cartao.nome_cartao,
-        data_lancamento: new Date().toISOString().split('T')[0],
-        data_contabilizacao: resultadoContabilizacao.dataContabilizacao.toISOString().split('T')[0],
+        data_lancamento: formatarDateParaISO(new Date()),
+        data_contabilizacao: formatarDateParaISO(resultadoContabilizacao.dataContabilizacao),
         mes_fatura: resultadoContabilizacao.mesFatura,
         ano_fatura: resultadoContabilizacao.anoFatura,
         dia_vencimento: cartao.dia_vencimento,
@@ -624,11 +682,20 @@ async function processarLancamento(sock, userId, parsed) {
       // Múltiplos cartões, pedir para escolher
       console.log('🔔 Múltiplos cartões, pedir para escolher');
       await definirEstado(userId, 'aguardando_escolha_cartao', parsed);
-      let msg = `💳 *Escolha o cartão:*\n\n`;
-      cartoes.forEach((cartao, index) => {
-        msg += `${index + 1}. ${cartao.nome_cartao}\n`;
+      let msg = formatarMensagem({
+        titulo: 'Escolha o Cartão',
+        emojiTitulo: '💳',
+        secoes: [{
+          titulo: 'Cartões Disponíveis',
+          itens: cartoes.map((cartao, index) => `${index + 1}. ${cartao.nome_cartao}`),
+          emoji: '💳'
+        }],
+        dicas: [
+          { texto: 'Digite o número do cartão', comando: '1, 2, 3...' },
+          { texto: 'Cancelar operação', comando: '0 ou cancelar' }
+        ],
+        ajuda: 'Digite o número do cartão que deseja usar ou "0" para cancelar'
       });
-      msg += `\nDigite o número do cartão:`;
       await sock.sendMessage(userId, { text: msg });
       return;
     }
