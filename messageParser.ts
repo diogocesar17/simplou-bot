@@ -354,7 +354,10 @@ function parseMessage(msg) {
     if (ano < 100) ano += 2000; // Suporte para ano 2 dígitos
     const dataVencimentoObj = new Date(ano, mes, dia);
     if (!isNaN(dataVencimentoObj.getTime())) {
-      dataVencimento = dataVencimentoObj.toISOString().split('T')[0]; // Formato YYYY-MM-DD para o banco
+      const y = dataVencimentoObj.getFullYear();
+      const m = String(dataVencimentoObj.getMonth() + 1).padStart(2, '0');
+      const d = String(dataVencimentoObj.getDate()).padStart(2, '0');
+      dataVencimento = `${y}-${m}-${d}`; // Formato YYYY-MM-DD sem depender de timezone
     }
   }
 

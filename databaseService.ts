@@ -1526,7 +1526,8 @@ async function gerarEstatisticasSistema() {
     const cartoesResult = await pool.query(cartoesQuery);
     
     // Lançamentos de hoje
-    const hoje = new Date().toISOString().split('T')[0];
+    const hojeDate = new Date();
+    const hoje = `${hojeDate.getFullYear()}-${String(hojeDate.getMonth() + 1).padStart(2, '0')}-${String(hojeDate.getDate()).padStart(2, '0')}`;
     const lancamentosHojeQuery = `
       SELECT COUNT(*) as total 
       FROM lancamentos 
@@ -1727,7 +1728,8 @@ async function limparDadosAntigos() {
       FROM lancamentos 
       WHERE data < $1
     `;
-    const countResult = await pool.query(countQuery, [dataLimite.toISOString().split('T')[0]]);
+    const dataLimiteStr = `${dataLimite.getFullYear()}-${String(dataLimite.getMonth() + 1).padStart(2, '0')}-${String(dataLimite.getDate()).padStart(2, '0')}`;
+    const countResult = await pool.query(countQuery, [dataLimiteStr]);
     const lancamentosParaRemover = countResult.rows[0]?.total || 0;
     
     // Remover lançamentos antigos
@@ -1735,7 +1737,7 @@ async function limparDadosAntigos() {
       DELETE FROM lancamentos 
       WHERE data < $1
     `;
-    await pool.query(deleteQuery, [dataLimite.toISOString().split('T')[0]]);
+    await pool.query(deleteQuery, [dataLimiteStr]);
     
     // Calcular tempo de processamento
     const tempoProcessamento = Math.round((Date.now() - inicio) / 1000);

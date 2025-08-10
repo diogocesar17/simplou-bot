@@ -76,11 +76,20 @@ async function historicoCommand(sock, userId, texto) {
 
   // Formatar lançamentos
   const itensLancamentos = ultimos.map((l, idx) => {
-    const dataBR = (l.data instanceof Date)
-      ? l.data.toLocaleDateString('pt-BR')
-      : (typeof l.data === 'string' && l.data.match(/\d{4}-\d{2}-\d{2}/)
-          ? new Date(l.data).toLocaleDateString('pt-BR')
-          : l.data);
+    // Quando sem filtro de mês/ano, o histórico é dos "últimos lançamentos" (por criado_em)
+    // então exibimos a data baseada em criado_em. Com filtro de período, exibimos a data do lançamento (l.data)
+    let dataParaExibir: Date | string;
+    if (mesAno) {
+      dataParaExibir = l.data;
+    } else {
+      dataParaExibir = l.criado_em || l.data;
+    }
+
+    const dataBR = (dataParaExibir instanceof Date)
+      ? dataParaExibir.toLocaleDateString('pt-BR')
+      : (typeof dataParaExibir === 'string' && dataParaExibir.match(/\d{4}-\d{2}-\d{2}/)
+          ? new Date(dataParaExibir).toLocaleDateString('pt-BR')
+          : (typeof dataParaExibir === 'string' ? dataParaExibir : new Date(dataParaExibir as any).toLocaleDateString('pt-BR')));
     
     const emojiTipo = l.tipo === 'receita' ? '💰' : '💸';
     
