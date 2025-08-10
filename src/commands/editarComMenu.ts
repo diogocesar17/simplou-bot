@@ -2,6 +2,7 @@
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import editarLancamentoCommand from './editarLancamento';
 import editarCartaoCommand from './editarCartao';
+import { formatarCancelamento, formatarMenuComCancelamento } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function editarComMenuCommand(sock, userId, texto) {
@@ -10,9 +11,15 @@ async function editarComMenuCommand(sock, userId, texto) {
 
   // Se está aguardando escolha do tipo de edição
   if (estado?.etapa === 'aguardando_tipo_edicao') {
-    if (textoLower === 'cancelar') {
+    if (textoLower === 'cancelar' || texto === '0') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: ERROR_MESSAGES.OPERACAO_CANCELADA('Edição') });
+      await sock.sendMessage(userId, { 
+        text: formatarCancelamento('Edição', [
+          'Ver histórico → `historico`',
+          'Ver resumo do mês → `resumo`',
+          'Ver ajuda → `ajuda`'
+        ])
+      });
       return;
     }
 
@@ -33,7 +40,7 @@ async function editarComMenuCommand(sock, userId, texto) {
         
       default:
         await sock.sendMessage(userId, { 
-          text: ERROR_MESSAGES.VALOR_INVALIDO('Opção', '1 - para editar lançamento\n2 - para editar cartão\ncancelar - para cancelar') 
+          text: ERROR_MESSAGES.VALOR_INVALIDO('Opção', '1 - para editar lançamento\n2 - para editar cartão\n0 ou cancelar - para cancelar') 
         });
         return;
     }
@@ -43,7 +50,15 @@ async function editarComMenuCommand(sock, userId, texto) {
   if (textoLower === 'editar') {
     await definirEstado(userId, 'aguardando_tipo_edicao');
     await sock.sendMessage(userId, {
-      text: '✏️ *O que você quer editar?*\n\n1️⃣ *Lançamento* - editar valor, categoria, data, etc.\n2️⃣ *Cartão* - editar vencimento, fechamento\n\n💡 Digite o número da opção ou "cancelar"'
+      text: formatarMenuComCancelamento(
+        'O que você quer editar?',
+        [
+          'Lançamento - editar valor, categoria, data, etc.',
+          'Cartão - editar vencimento, fechamento'
+        ],
+        '💡 Escolha o tipo de edição que deseja realizar',
+        true
+      )
     });
     return;
   }

@@ -21,6 +21,7 @@ import * as geminiService from '../services/geminiService';
 import { formatarValor } from '../utils/formatUtils';
 import { converterDataParaISO } from '../utils/dataUtils';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
+import { formatarMensagem } from '../utils/formatMessages';
 
 // Função para gerar ID único
 function gerarIdUnico() {
@@ -438,12 +439,46 @@ async function lancamentoCommand(sock, userId, texto) {
     const parsed = estado.dadosParciais;
     await limparEstado(userId);
     
+    // Verificar se o usuário quer cancelar
+    if (texto.toLowerCase() === 'cancelar' || texto === '0') {
+      await sock.sendMessage(userId, { 
+        text: formatarMensagem({
+          titulo: 'Operação cancelada',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Status',
+            itens: ['Seleção de cartão cancelada pelo usuário'],
+            emoji: '🛑'
+          }],
+          dicas: [
+            { texto: 'Registrar novo lançamento', comando: 'gastei 50 no mercado no pix' },
+            { texto: 'Ver ajuda', comando: 'ajuda' },
+            { texto: 'Ver cartões', comando: 'cartoes' }
+          ]
+        })
+      });
+      return;
+    }
+    
     const cartoes = await cartoesService.listarCartoesConfigurados(userId);
     const escolha = parseInt(texto) - 1;
     
     if (isNaN(escolha) || escolha < 0 || escolha >= cartoes.length) {
       await sock.sendMessage(userId, { 
-        text: `❌ Opção inválida. Escolha um número entre 1 e ${cartoes.length}` 
+        text: formatarMensagem({
+          titulo: 'Opção inválida',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Solução',
+            itens: [`Digite um número entre 1 e ${cartoes.length} ou "0" para cancelar`],
+            emoji: '💡'
+          }],
+          dicas: [
+            { texto: 'Ver cartões disponíveis', comando: 'cartoes' },
+            { texto: 'Cancelar operação', comando: '0 ou cancelar' },
+            { texto: 'Ver ajuda', comando: 'ajuda' }
+          ]
+        })
       });
       return;
     }
@@ -647,11 +682,20 @@ async function processarLancamento(sock, userId, parsed) {
       // Múltiplos cartões, pedir para escolher
       console.log('🔔 Múltiplos cartões, pedir para escolher');
       await definirEstado(userId, 'aguardando_escolha_cartao', parsed);
-      let msg = `💳 *Escolha o cartão:*\n\n`;
-      cartoes.forEach((cartao, index) => {
-        msg += `${index + 1}. ${cartao.nome_cartao}\n`;
+      let msg = formatarMensagem({
+        titulo: 'Escolha o Cartão',
+        emojiTitulo: '💳',
+        secoes: [{
+          titulo: 'Cartões Disponíveis',
+          itens: cartoes.map((cartao, index) => `${index + 1}. ${cartao.nome_cartao}`),
+          emoji: '💳'
+        }],
+        dicas: [
+          { texto: 'Digite o número do cartão', comando: '1, 2, 3...' },
+          { texto: 'Cancelar operação', comando: '0 ou cancelar' }
+        ],
+        ajuda: 'Digite o número do cartão que deseja usar ou "0" para cancelar'
       });
-      msg += `\nDigite o número do cartão:`;
       await sock.sendMessage(userId, { text: msg });
       return;
     }

@@ -140,7 +140,29 @@ export const ERROR_MESSAGES = {
     causa: 'Você cancelou a operação',
     solucao: 'Digite o comando novamente se desejar continuar',
     dica: 'Use "ajuda" para ver todos os comandos disponíveis'
-  })
+  }),
+
+  // Nova mensagem de cancelamento mais amigável
+  CANCELAMENTO_AMIGAVEL: (operacao: string, dicas?: string[]) => {
+    let msg = `🛑 *${operacao} Cancelada*\n\n`;
+    msg += `✅ Operação cancelada com sucesso!\n\n`;
+    
+    if (dicas && dicas.length > 0) {
+      msg += `💡 *O que você pode fazer agora:*\n`;
+      dicas.forEach(dica => {
+        msg += `• ${dica}\n`;
+      });
+    } else {
+      msg += `💡 *O que você pode fazer agora:*\n`;
+      msg += `• Ver ajuda → \`ajuda\`\n`;
+      msg += `• Ver histórico → \`historico\`\n`;
+      msg += `• Ver resumo → \`resumo\`\n`;
+    }
+    
+    msg += `\n✨ *Dica:* Você pode sempre digitar \`cancelar\` ou \`0\` para sair de qualquer operação`;
+    
+    return msg;
+  }
 };
 
 /**

@@ -2,6 +2,7 @@
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import excluirLancamentoCommand from './excluirLancamento';
 import excluirCartaoCommand from './excluirCartao';
+import { formatarCancelamento, formatarMenuComCancelamento } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function excluirComMenuCommand(sock, userId, texto) {
@@ -10,9 +11,15 @@ async function excluirComMenuCommand(sock, userId, texto) {
 
   // Se está aguardando escolha do tipo de exclusão
   if (estado?.etapa === 'aguardando_tipo_exclusao') {
-    if (textoLower === 'cancelar') {
+    if (textoLower === 'cancelar' || texto === '0') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: ERROR_MESSAGES.OPERACAO_CANCELADA('Exclusão') });
+      await sock.sendMessage(userId, { 
+        text: formatarCancelamento('Exclusão', [
+          'Ver histórico → `historico`',
+          'Ver resumo do mês → `resumo`',
+          'Ver ajuda → `ajuda`'
+        ])
+      });
       return;
     }
 
@@ -33,7 +40,7 @@ async function excluirComMenuCommand(sock, userId, texto) {
         
       default:
         await sock.sendMessage(userId, { 
-          text: ERROR_MESSAGES.VALOR_INVALIDO('Opção', '1 - para excluir lançamento\n2 - para excluir cartão\ncancelar - para cancelar') 
+          text: ERROR_MESSAGES.VALOR_INVALIDO('Opção', '1 - para excluir lançamento\n2 - para excluir cartão\n0 ou cancelar - para cancelar') 
         });
         return;
     }
@@ -43,7 +50,15 @@ async function excluirComMenuCommand(sock, userId, texto) {
   if (textoLower === 'excluir') {
     await definirEstado(userId, 'aguardando_tipo_exclusao');
     await sock.sendMessage(userId, {
-      text: '🗑️ *O que você quer excluir?*\n\n1️⃣ *Lançamento* - excluir gasto, receita, etc.\n2️⃣ *Cartão* - excluir configuração de cartão\n\n⚠️ *Atenção:* Esta ação não pode ser desfeita!\n\n💡 Digite o número da opção ou "cancelar"'
+      text: formatarMenuComCancelamento(
+        'O que você quer excluir?',
+        [
+          'Lançamento - excluir gasto, receita, etc.',
+          'Cartão - excluir configuração de cartão'
+        ],
+        '⚠️ Atenção: Esta ação não pode ser desfeita!',
+        true
+      )
     });
     return;
   }
