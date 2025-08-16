@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { formatarMensagem } from '../utils/formatMessages';
 
 async function ajudaCommand(sock, userId) {
@@ -60,4 +59,4 @@ async function ajudaCommand(sock, userId) {
   });
 }
 
-export default ajudaCommand; 
+export default ajudaCommand;

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as usuariosService from '../services/usuariosService';
 
 async function quemsouCommand(sock, userId) {
@@ -12,4 +11,4 @@ async function quemsouCommand(sock, userId) {
   await sock.sendMessage(userId, { text: msg });
 }
 
-export default quemsouCommand; 
+export default quemsouCommand;

@@ -1,7 +1,6 @@
-// @ts-nocheck
-const Redis = require('ioredis');
-const { BufferJSON, initAuthCreds } = require('@whiskeysockets/baileys');
-const redis = new Redis(process.env.REDIS_URL);
+import Redis from 'ioredis';
+import { BufferJSON, initAuthCreds } from '@whiskeysockets/baileys';
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 const AUTH_KEY_CRED = 'wa:auth:credentials';
 const AUTH_KEY_KEYS = 'wa:auth:keys';
@@ -20,7 +19,7 @@ async function saveAuthState(creds, keys) {
     await redis.set(AUTH_KEY_KEYS, keysStr);
 
     console.log('✅ Sessão salva no Redis');
-  } catch (err) {
+  } catch (err: any) {
     console.error('❌ Erro ao salvar no Redis:', err.message);
   }
 }
@@ -39,7 +38,7 @@ async function loadAuthState() {
       creds: JSON.parse(credStr, BufferJSON.reviver),
       keys: JSON.parse(keyStr, BufferJSON.reviver),
     };
-  } catch (err) {
+  } catch (err: any) {
     console.error('❌ Erro ao carregar do Redis:', err.message);
     return null;
   }
@@ -50,7 +49,7 @@ async function getHybridAuthState() {
 
   if (!redisState) {
     console.log('📌 Sessão não encontrada. Usando MultiFile.');
-    const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
+    const { useMultiFileAuthState } = await import('@whiskeysockets/baileys');
     const { state, saveCreds } = await useMultiFileAuthState('auth');
 
     return {
@@ -71,6 +70,6 @@ async function getHybridAuthState() {
   };
 }
 
-module.exports = {
+export {
   getHybridAuthState,
 };

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { formatarMensagem } from '../utils/formatMessages';
 
 async function meuidCommand(sock, userId) {
@@ -19,4 +18,4 @@ async function meuidCommand(sock, userId) {
   });
 }
 
-export default meuidCommand; 
+export default meuidCommand;

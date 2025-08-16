@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 /**
  * Utilitário para padronizar mensagens de erro
  */

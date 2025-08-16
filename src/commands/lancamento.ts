@@ -547,9 +547,9 @@ async function lancamentoCommand(sock, userId, texto) {
   // Se o parse normal falhou, tentar com IA
   if (!parsed || !parsed.valor) {
     console.log(`[LANCAMENTO] Parse normal falhou, tentando com IA...`);
-    await sock.sendMessage(userId, { 
-      text: '🤖 Analisando sua mensagem com IA...' 
-    });
+    // await sock.sendMessage(userId, { 
+    //   text: '🤖 Analisando sua mensagem com IA...' 
+    // });
     
     parsed = await analisarLancamentoComIA(userId, texto);
     

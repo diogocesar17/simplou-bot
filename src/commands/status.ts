@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as usuariosService from '../services/usuariosService';
 import * as sistemaService from '../services/sistemaService';
 import { SYSTEM_CONFIG } from '../../config';
@@ -34,4 +33,4 @@ async function statusCommand(sock, userId) {
   });
 }
 
-export default statusCommand; 
+export default statusCommand;

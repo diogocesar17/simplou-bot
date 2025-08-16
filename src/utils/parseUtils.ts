@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { parseMessage } from '../../messageParser';
  
-export { parseMessage }; 
+export { parseMessage };

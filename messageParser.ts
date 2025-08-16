@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Categorias principais fixas com palavras-chave expandidas
 const categoriasPrincipais = {
   'Alimentação': [
@@ -166,7 +165,7 @@ function detectarCategoria(texto) {
 }
 
 function validarValor(valor, categoria, tipo, texto) {
-  const validacoes = [];
+  const validacoes: string[] = [];
   
   // Validação básica
   if (valor < 0.01) {
@@ -260,7 +259,7 @@ function parseMessage(msg) {
 
   // Valor
   // Novo: aceita formatos 10.631,80 ou 10631,80 ou 10631.80
-  let valor = null;
+  let valor: number | null = null;
   const valorMatch = texto.match(/(\d{1,3}(?:[.\s]\d{3})*(?:[.,]\d{2})|\d+[.,]?\d*)\s*(reais?|r\$|rs?)?/i);
   if (valorMatch) {
     let valorStr = valorMatch[1].replace(/\s/g, '');
@@ -296,7 +295,7 @@ function parseMessage(msg) {
   const faltaFormaPagamento = tipo === 'gasto' && pagamento === 'NÃO INFORMADO';
 
   // Data (procura por formatos dd/mm/aaaa, d/m/aaaa, dd/mm, d/m, etc)
-  let data = null;
+  let data: string | null = null;
   
   // Primeiro, tenta detectar formato textual: "dia 19 de outubro", "19 de outubro", etc.
   const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -343,7 +342,7 @@ function parseMessage(msg) {
   }
 
   // Data de vencimento para boletos (procura por "vencimento", "vence", "venc", "para o dia", "para", etc)
-  let dataVencimento = null;
+  let dataVencimento: string | null = null;
   const regexVencimento = /(?:vencimento|vence|venc|para\s+(?:o\s+)?dia?)\s*(?:em\s*)?(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/i;
   const matchVencimento = texto.match(regexVencimento);
   if (matchVencimento) {
@@ -430,7 +429,7 @@ function parseMessage(msg) {
 
   // Para receitas, não aplicar alertas de valor alto
   if (tipo === 'receita') {
-    validacao.validacoes = validacao.validacoes.filter(v => !v.includes('🚨'));
+    validacao.validacoes = (validacao.validacoes || []).filter((v: string) => !v.includes('🚨'));
   }
 
   // Verifica se é nova categoria
@@ -473,11 +472,11 @@ function isDataMuitoDistante(dataStr) {
   const data = new Date(ano, mes, dia);
   if (isNaN(data.getTime())) return false;
   const hoje = new Date();
-  const diffDias = Math.abs((data - hoje) / (1000 * 60 * 60 * 24));
+  const diffDias = Math.abs((data.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
   return diffDias > 90;
 }
 
-module.exports = { 
+export { 
   parseMessage, 
   categoriasCadastradas, 
   isDataMuitoDistante,
