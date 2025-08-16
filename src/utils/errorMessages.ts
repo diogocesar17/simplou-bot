@@ -55,7 +55,7 @@ export const ERROR_MESSAGES = {
   // Erros de dados não encontrados
   DADOS_NAO_ENCONTRADOS: (tipo: string, periodo?: string) => gerarMensagemErro({
     titulo: `${tipo} não encontrado`,
-    causa: period ? `Nenhum ${tipo.toLowerCase()} encontrado para ${period}` : `Nenhum ${tipo.toLowerCase()} encontrado`,
+    causa: periodo ? `Nenhum ${tipo.toLowerCase()} encontrado para ${periodo}` : `Nenhum ${tipo.toLowerCase()} encontrado`,
     solucao: 'Registre alguns dados primeiro',
     exemplo: tipo === 'Lançamento' ? 'gastei 50 no mercado no pix' : 'configurar cartão',
     dica: tipo === 'Lançamento' ? 
@@ -85,6 +85,14 @@ export const ERROR_MESSAGES = {
     titulo: 'Erro no banco de dados',
     causa: `Falha ao ${operacao}`,
     solucao: 'Tente novamente em alguns instantes',
+    dica: 'Se o problema persistir, entre em contato com o suporte'
+  }),
+
+  // Erros internos do sistema
+  ERRO_INTERNO: (operacao: string, solucao: string) => gerarMensagemErro({
+    titulo: 'Erro interno do sistema',
+    causa: `Falha ao ${operacao}`,
+    solucao: solucao,
     dica: 'Se o problema persistir, entre em contato com o suporte'
   }),
 
@@ -183,4 +191,4 @@ export const SUCCESS_MESSAGES = {
 
   LANCAMENTO_EDITADO: (campo: string, valor: string) => 
     `✅ *Lançamento editado com sucesso!*\n\n📝 ${campo}: ${valor}\n\n💡 Use "histórico" para ver seus lançamentos`
-}; 
+};

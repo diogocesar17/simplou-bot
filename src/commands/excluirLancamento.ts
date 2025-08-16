@@ -18,30 +18,54 @@ async function excluirLancamentoCommand(sock, userId, texto) {
     if (confirmacao === '1' || confirmacao === 'sim' || confirmacao === 'confirmar') {
       try {
         const lancamento = estado.dadosParciais.lancamento;
-        // Chamar serviço para excluir
-        await lancamentosService.excluirLancamentoPorId(userId, lancamento.id);
+        
+        // Chamar serviço para excluir (agora trata automaticamente parcelamentos)
+        const lancamentosExcluidos = await lancamentosService.excluirLancamentoPorId(userId, lancamento.id);
         
         // Limpar estado após exclusão bem-sucedida
         await limparEstado(userId);
         
-        await sock.sendMessage(userId, { 
-          text: formatarMensagem({
-            titulo: 'Lançamento excluído com sucesso',
-            emojiTitulo: '✅',
-            secoes: [
-              {
-                titulo: 'Detalhes do Lançamento',
-                itens: [
-                  `Descrição: ${lancamento.descricao}`,
-                  `Valor: R$ ${lancamento.valor}`,
-                  `Categoria: ${lancamento.categoria}`
-                ],
-                emoji: '📝'
-              }
-            ],
-            dicas: gerarDicasContextuais('excluir')
-          })
-        });
+        // Personalizar mensagem baseada no tipo de lançamento
+        if (lancamento.parcelamento_id) {
+          await sock.sendMessage(userId, { 
+            text: formatarMensagem({
+              titulo: 'Parcelamento excluído com sucesso',
+              emojiTitulo: '✅',
+              secoes: [
+                {
+                  titulo: 'Detalhes do Parcelamento',
+                  itens: [
+                    `Descrição: ${lancamento.descricao}`,
+                    `Valor Total: R$ ${lancamento.valor}`,
+                    `Categoria: ${lancamento.categoria}`,
+                    `Parcelas Excluídas: ${lancamentosExcluidos}`
+                  ],
+                  emoji: '📝'
+                }
+              ],
+              dicas: gerarDicasContextuais('excluir')
+            })
+          });
+        } else {
+          await sock.sendMessage(userId, { 
+            text: formatarMensagem({
+              titulo: 'Lançamento excluído com sucesso',
+              emojiTitulo: '✅',
+              secoes: [
+                {
+                  titulo: 'Detalhes do Lançamento',
+                  itens: [
+                    `Descrição: ${lancamento.descricao}`,
+                    `Valor: R$ ${lancamento.valor}`,
+                    `Categoria: ${lancamento.categoria}`
+                  ],
+                  emoji: '📝'
+                }
+              ],
+              dicas: gerarDicasContextuais('excluir')
+            })
+          });
+        }
       } catch (error) {
         console.error('Erro ao excluir lançamento:', error);
         await limparEstado(userId);
@@ -127,8 +151,26 @@ async function excluirLancamentoCommand(sock, userId, texto) {
     timestamp: agora
   });
   
-  await sock.sendMessage(userId, { 
-    text: formatarConfirmacao(
+  // Personalizar mensagem baseada no tipo de lançamento
+  let mensagemConfirmacao;
+  
+  if (lancamento.parcelamento_id) {
+    // Se for parcelado, mostrar mensagem específica
+    mensagemConfirmacao = formatarConfirmacao(
+      'Confirmar Exclusão de Parcelamento',
+      [
+        `📝 Descrição: ${lancamento.descricao}`,
+        `💰 Valor Total: R$ ${lancamento.valor}`,
+        `📂 Categoria: ${lancamento.categoria}`,
+        `📅 Data: ${lancamento.data instanceof Date ? lancamento.data.toLocaleDateString('pt-BR') : lancamento.data}`,
+        `⚠️ ATENÇÃO: Esta ação excluirá TODAS as parcelas deste parcelamento!`
+      ],
+      ['Confirmar', 'Cancelar'],
+      'Dados do Parcelamento'
+    );
+  } else {
+    // Se não for parcelado, mensagem normal
+    mensagemConfirmacao = formatarConfirmacao(
       'Confirmar Exclusão',
       [
         `📝 Descrição: ${lancamento.descricao}`,
@@ -138,7 +180,11 @@ async function excluirLancamentoCommand(sock, userId, texto) {
       ],
       ['Confirmar', 'Cancelar'],
       'Dados do Lançamento'
-    )
+    );
+  }
+  
+  await sock.sendMessage(userId, { 
+    text: mensagemConfirmacao
   });
 }
 

@@ -935,7 +935,7 @@ async function getUltimosLancamentos(userId, n = 5) {
 
 async function getLancamentoPorId(userId, id) {
   const query = `
-    SELECT id, data, tipo, descricao, valor, categoria, pagamento
+    SELECT id, data, tipo, descricao, valor, categoria, pagamento, parcelamento_id, parcela_atual, total_parcelas
     FROM lancamentos 
     WHERE user_id = $1 AND id = $2
   `;
@@ -1046,14 +1046,25 @@ async function excluirLancamentoPorId(userId, id) {
     // Buscar informações do lançamento antes de excluir
     const lancamento = await getLancamentoPorId(userId, id);
     
+    if (!lancamento) {
+      throw new Error('Lançamento não encontrado');
+    }
+    
+    // Se for um lançamento parcelado, excluir todas as parcelas
+    if (lancamento.parcelamento_id) {
+      const parcelasExcluidas = await excluirParcelamentoPorId(userId, lancamento.parcelamento_id);
+      return parcelasExcluidas; // Retorna o número de parcelas excluídas
+    }
+    
+    // Se não for parcelado, excluir apenas o lançamento
     const query = `DELETE FROM lancamentos WHERE user_id = $1 AND id = $2`;
-    await pool.query(query, [userId, id]);
+    const deleteResult = await pool.query(query, [userId, id]);
     
     // Registrar log de auditoria
-    if (lancamento) {
-      const detalhes = `ID: ${id}, Tipo: ${lancamento.tipo}, Valor: R$ ${lancamento.valor}, Categoria: ${lancamento.categoria}, Descrição: ${lancamento.descricao}`;
-      await registrarLog(userId, 'EXCLUIR_LANCAMENTO', detalhes);
-    }
+    const detalhes = `ID: ${id}, Tipo: ${lancamento.tipo}, Valor: R$ ${lancamento.valor}, Categoria: ${lancamento.categoria}, Descrição: ${lancamento.descricao}`;
+    await registrarLog(userId, 'EXCLUIR_LANCAMENTO', detalhes);
+    
+    return deleteResult.rowCount; // Retorna o número de lançamentos excluídos
   } catch (error) {
     fileLogger.error('❌ Erro ao excluir lançamento:', error);
     throw error;
@@ -1087,12 +1098,17 @@ async function excluirParcelamentoPorId(userId, parcelamentoId) {
   try {
     // Buscar informações do parcelamento antes de excluir
     const query = `
-      SELECT COUNT(*) as total_parcelas, SUM(valor) as valor_total, descricao, categoria
+      SELECT COUNT(*) as total_parcelas, SUM(valor) as valor_total, 
+             MAX(descricao) as descricao, MAX(categoria) as categoria
       FROM lancamentos 
       WHERE user_id = $1 AND parcelamento_id = $2
     `;
     const result = await pool.query(query, [userId, parcelamentoId]);
     const info = result.rows[0];
+    
+    if (!info || info.total_parcelas == 0) {
+      throw new Error('Parcelamento não encontrado ou sem parcelas');
+    }
     
     const deleteQuery = `
       DELETE FROM lancamentos
@@ -1102,10 +1118,8 @@ async function excluirParcelamentoPorId(userId, parcelamentoId) {
     const deleteResult = await pool.query(deleteQuery, [userId, parcelamentoId]);
     
     // Registrar log de auditoria
-    if (info && info.total_parcelas > 0) {
-      const detalhes = `Parcelamento ID: ${parcelamentoId}, Parcelas: ${info.total_parcelas}, Valor Total: R$ ${info.valor_total}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
-      await registrarLog(userId, 'EXCLUIR_PARCELAMENTO', detalhes);
-    }
+    const detalhes = `Parcelamento ID: ${parcelamentoId}, Parcelas: ${info.total_parcelas}, Valor Total: R$ ${info.valor_total}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
+    await registrarLog(userId, 'EXCLUIR_PARCELAMENTO', detalhes);
     
     return deleteResult.rowCount;
   } catch (error) {
@@ -1119,12 +1133,16 @@ async function excluirRecorrentePorId(userId, recorrenteId) {
   try {
     // Buscar informações do recorrente antes de excluir
     const query = `
-      SELECT COUNT(*) as total_recorrencias, valor, descricao, categoria
+      SELECT COUNT(*) as total_recorrencias, valor, MAX(descricao) as descricao, MAX(categoria) as categoria
       FROM lancamentos 
       WHERE user_id = $1 AND recorrente_id = $2
     `;
     const result = await pool.query(query, [userId, recorrenteId]);
     const info = result.rows[0];
+    
+    if (!info || info.total_recorrencias == 0) {
+      throw new Error('Recorrente não encontrado ou sem recorrências');
+    }
     
     const deleteQuery = `
       DELETE FROM lancamentos
@@ -1134,10 +1152,8 @@ async function excluirRecorrentePorId(userId, recorrenteId) {
     const deleteResult = await pool.query(deleteQuery, [userId, recorrenteId]);
     
     // Registrar log de auditoria
-    if (info && info.total_recorrencias > 0) {
-      const detalhes = `Recorrente ID: ${recorrenteId}, Recorrências: ${info.total_recorrencias}, Valor: R$ ${info.valor}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
-      await registrarLog(userId, 'EXCLUIR_RECORRENTE', detalhes);
-    }
+    const detalhes = `Recorrente ID: ${recorrenteId}, Recorrências: ${info.total_recorrencias}, Valor: R$ ${info.valor}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
+    await registrarLog(userId, 'EXCLUIR_RECORRENTE', detalhes);
     
     return deleteResult.rowCount;
   } catch (error) {
