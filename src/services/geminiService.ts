@@ -1,12 +1,26 @@
-// @ts-nocheck
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+
+// Interfaces para tipagem
+interface AnaliseTransacao {
+  tipo: 'gasto' | 'receita';
+  valor: number;
+  categoria: string;
+  formaPagamento: string;
+  descricao: string;
+  confianca: 'alta' | 'media' | 'baixa';
+}
+
+interface TesteConexao {
+  success: boolean;
+  message: string;
+}
 
 // Configuração do Gemini
-let gemini = null;
-let isGeminiAvailable = false;
+let gemini: GoogleGenerativeAI | null = null;
+let isGeminiAvailable: boolean = false;
 
 // Inicializar Gemini
-function initializeGemini() {
+export function initializeGemini(): boolean {
   const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
@@ -19,21 +33,21 @@ function initializeGemini() {
     isGeminiAvailable = true;
     console.log('[GEMINI] Inicializado com sucesso!');
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('[GEMINI] Erro ao inicializar:', error.message);
     return false;
   }
 }
 
 // Função para analisar transação com Gemini
-async function analisarTransacaoComGemini(texto, userId) {
+export async function analisarTransacaoComGemini(texto: string, userId: string): Promise<AnaliseTransacao | null> {
   if (!isGeminiAvailable || !gemini) {
     console.log('[GEMINI] Não disponível, usando parser padrão');
     return null;
   }
   
   try {
-    const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model: GenerativeModel = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     const prompt = `
 Analise a seguinte mensagem de transação financeira e extraia as informações em formato JSON:
@@ -65,7 +79,7 @@ Regras importantes:
     // Tentar extrair JSON da resposta
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed: AnaliseTransacao = JSON.parse(jsonMatch[0]);
       console.log('[GEMINI] Análise realizada:', parsed);
       return parsed;
     } else {
@@ -73,20 +87,20 @@ Regras importantes:
       return null;
     }
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('[GEMINI] Erro na análise:', error.message);
     return null;
   }
 }
 
 // Função para analisar padrões de gastos
-async function analisarPadroesGastos(userId, dados) {
+export async function analisarPadroesGastos(userId: string, dados: any): Promise<string | null> {
   if (!isGeminiAvailable || !gemini) {
     return null;
   }
   
   try {
-    const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model: GenerativeModel = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     const prompt = `
 Analise os dados de gastos do usuário e forneça insights inteligentes:
@@ -108,20 +122,20 @@ Formato a resposta de forma clara e objetiva, usando emojis para melhor visualiz
     const response = await result.response;
     return response.text();
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('[GEMINI] Erro na análise de padrões:', error.message);
     return null;
   }
 }
 
 // Função para gerar sugestões de economia
-async function gerarSugestoesEconomia(userId, dados) {
+export async function gerarSugestoesEconomia(userId: string, dados: any): Promise<string | null> {
   if (!isGeminiAvailable || !gemini) {
     return null;
   }
   
   try {
-    const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model: GenerativeModel = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     const prompt = `
 Com base nos dados de gastos do usuário, gere sugestões práticas de economia:
@@ -142,20 +156,20 @@ Formato a resposta de forma motivacional e prática, usando emojis.
     const response = await result.response;
     return response.text();
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('[GEMINI] Erro ao gerar sugestões:', error.message);
     return null;
   }
 }
 
 // Função para prever gastos futuros
-async function preverGastosFuturos(userId, dados) {
+export async function preverGastosFuturos(userId: string, dados: any): Promise<string | null> {
   if (!isGeminiAvailable || !gemini) {
     return null;
   }
   
   try {
-    const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model: GenerativeModel = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     const prompt = `
 Analise o histórico de gastos e faça previsões para os próximos meses:
@@ -177,14 +191,14 @@ Formato a resposta de forma clara e objetiva.
     const response = await result.response;
     return response.text();
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('[GEMINI] Erro na previsão:', error.message);
     return null;
   }
 }
 
 // Função para responder perguntas financeiras
-async function responderPerguntaFinanceira(pergunta, contexto = null) {
+export async function responderPerguntaFinanceira(userId: string, pergunta: string, contexto: any = null): Promise<string | null> {
   if (!isGeminiAvailable || !gemini) {
     console.log('[GEMINI][responderPerguntaFinanceira] Gemini indisponível, retornando null');
     return null;
@@ -192,7 +206,7 @@ async function responderPerguntaFinanceira(pergunta, contexto = null) {
   
   try {
     console.log('[GEMINI][responderPerguntaFinanceira] Chamando modelo gemini-1.5-flash');
-    const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model: GenerativeModel = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
     
     let prompt = `Responda à seguinte pergunta sobre finanças pessoais de forma clara e objetiva:
 
@@ -210,14 +224,14 @@ Pergunta: "${pergunta}"`;
     console.log('[GEMINI][responderPerguntaFinanceira] Resposta recebida (primeiros 120 chars):', (texto || '').slice(0, 120));
     return texto;
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('[GEMINI] Erro ao responder pergunta:', error.message);
     return null;
   }
 }
 
 // Teste de conectividade
-async function testarConexaoGemini() {
+export async function testarConexaoGemini(): Promise<TesteConexao> {
   if (!isGeminiAvailable) {
     return { success: false, message: 'Gemini não está configurado' };
   }
@@ -229,18 +243,9 @@ async function testarConexaoGemini() {
     } else {
       return { success: false, message: 'Erro na análise de teste' };
     }
-  } catch (error) {
+  } catch (error: any) {
     return { success: false, message: `Erro: ${error.message}` };
   }
 }
 
-module.exports = {
-  initializeGemini,
-  analisarTransacaoComGemini,
-  analisarPadroesGastos,
-  gerarSugestoesEconomia,
-  preverGastosFuturos,
-  responderPerguntaFinanceira,
-  testarConexaoGemini,
-  isGeminiAvailable: () => isGeminiAvailable
-}; 
+export { isGeminiAvailable };

@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Contextos globais para controle de fluxo
 declare global {
   var aguardandoEdicaoCartao: { [key: string]: any };
@@ -303,13 +302,13 @@ async function startBotInit(): Promise<void> {
   try {
     // Banco (garante tabelas)
     await initializeDatabase();
-  } catch (e) {
+  } catch (e: any) {
     console.error('[INIT] Erro ao inicializar banco:', e?.message || e);
   }
   try {
     // Gemini
     geminiService.initializeGemini();
-  } catch (e) {
+  } catch (e: any) {
     console.error('[INIT] Erro ao inicializar Gemini:', e?.message || e);
   }
 }

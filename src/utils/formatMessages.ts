@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 /**
  * Utilitário para formatação padronizada de mensagens
  */
@@ -503,4 +501,4 @@ export function gerarDicasProdutividade(contexto?: any): Array<{texto: string, c
   }
   
   return dicas;
-} 
+}

@@ -1,7 +1,8 @@
-// @ts-nocheck
-// @ts-nocheck
 import { Pool } from 'pg';
 import { logger, fileLogger } from './logger';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { ADMIN_USERS, AUTHORIZED_USERS } from './config';
 
 // Configuração otimizada da conexão com PostgreSQL
 const pool = new Pool({
@@ -146,7 +147,7 @@ async function initializeDatabase() {
 
     client.release();
     logger.info('✅ Banco de dados inicializado com sucesso');
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro ao inicializar banco de dados:', error.message);
     logger.error('🔍 Verifique se:');
     logger.error('   - DATABASE_URL está configurada');
@@ -219,7 +220,7 @@ async function migrateCartaoColumns(client) {
     } else {
       logger.info('✅ Colunas de cartão já existem');
     }
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro na migração:', error.message);
     throw error;
   }
@@ -283,7 +284,7 @@ async function migrateParcelamentoRecorrenteColumns(client) {
     } else {
       logger.info('✅ Colunas de parcelamento e recorrente já existem');
     }
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro na migração de parcelamento e recorrente:', error.message);
     throw error;
   }
@@ -306,7 +307,7 @@ async function migrateCartoesConfigTable(client) {
     } else {
       logger.info('✅ Coluna dia_fechamento já existe na tabela cartoes_config');
     }
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro na migração da tabela cartoes_config:', error.message);
     throw error;
   }
@@ -329,7 +330,7 @@ async function migrateDataVencimentoColumn(client) {
     } else {
       logger.info('✅ Coluna data_vencimento já existe na tabela lancamentos');
     }
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro na migração da coluna data_vencimento:', error.message);
     throw error;
   }
@@ -377,7 +378,7 @@ async function migrateTimezoneColumns(client) {
     } else {
       logger.info('✅ Colunas de timestamp já estão corretas');
     }
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro na migração de colunas de timestamp:', error.message);
     throw error;
   }
@@ -423,8 +424,8 @@ async function salvarConfiguracaoCartao(userId, nomeCartao, diaVencimento, diaFe
     await registrarLog(userId, 'CONFIGURAR_CARTAO', detalhes);
     
     return result.rows[0].id;
-  } catch (error) {
-    fileLogger.error('❌ Erro ao salvar configuração de cartão:', error);
+  } catch (error: any) {
+    fileLogger.error('❌ Erro ao buscar configuração de cartão:', error);
     throw error;
   }
 }
@@ -445,7 +446,7 @@ async function atualizarCartaoConfigurado(userId, nomeCartao, diaVencimento, dia
     await registrarLog(userId, 'ATUALIZAR_CARTAO', detalhes);
     
     return result.rows[0]?.id;
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro ao atualizar configuração de cartão:', error);
     throw error;
   }
@@ -481,8 +482,8 @@ async function contarLancamentosAssociadosCartao(userId, nomeCartao) {
     `;
     const result = await pool.query(query, [userId, nomeCartao]);
     return parseInt(result.rows[0].total);
-  } catch (error) {
-    fileLogger.error('❌ Erro ao contar lançamentos associados:', error);
+ } catch (error: any) {
+    fileLogger.error('❌ Erro ao contar lançamentos associados ao cartão:', error);
     throw error;
   }
 }
@@ -511,8 +512,8 @@ async function excluirCartaoConfigurado(userId, nomeCartao) {
       cartaoExcluido: nomeCartao,
       lancamentosAssociados: totalLancamentos
     };
-  } catch (error) {
-    fileLogger.error('❌ Erro ao excluir cartão:', error);
+  } catch (error: any) {
+    fileLogger.error('❌ Erro ao excluir cartão configurado:', error);
     throw error;
   }
 }
@@ -610,7 +611,7 @@ async function appendRowToDatabase(userId, values) {
     await registrarLog(userId, acao, detalhes);
     
     return lancamentoId;
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro ao adicionar lançamento:', error);
     throw error;
   }
@@ -842,7 +843,7 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
   // Agrupa parcelamentos e recorrentes
   const vistosParcelamentos = new Set();
   const vistosRecorrentes = new Set();
-  const lancamentosAgrupados = [];
+  const lancamentosAgrupados: any[] = [];
   
   for (let l of lancamentos) {
     // Pula se já foi processado como parte de um grupo
@@ -854,7 +855,7 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
       // Agrupa parcelamentos
       const grupo = lancamentos.filter(x => x.parcelamento_id === l.parcelamento_id);
       // Ordena o grupo por criado_em para pegar o mais recente como representante
-      grupo.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+      grupo.sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
       const representante = grupo[0]; // Pega o mais recente
       
       // Se é histórico por período, mostra apenas o valor da parcela específica
@@ -885,7 +886,7 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
       // Agrupa recorrentes
       const grupo = lancamentos.filter(x => x.recorrente_id === l.recorrente_id);
       // Ordena o grupo por criado_em para pegar o mais recente como representante
-      grupo.sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em));
+      grupo.sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
       const representante = grupo[0]; // Pega o mais recente
       // Valor de uma recorrência (não somar todas)
       const valorRecorrente = parseFloat(representante.valor);
@@ -949,8 +950,8 @@ async function atualizarLancamentoPorId(userId, id, novosDados) {
     // Buscar informações do lançamento antes de atualizar
     const lancamentoAntes = await getLancamentoPorId(userId, id);
     
-    const campos = [];
-    const valores = [];
+    const campos: string[] = [];
+    const valores: any[] = [];
     let paramIndex = 1;
 
     // Adiciona os campos a serem atualizados
@@ -1008,7 +1009,7 @@ async function atualizarLancamentoPorId(userId, id, novosDados) {
     
     // Registrar log de auditoria
     if (lancamentoAntes) {
-      const mudancas = [];
+      const mudancas: string[] = [];
       if (novosDados.data !== undefined && novosDados.data !== lancamentoAntes.data) {
         mudancas.push(`Data: ${lancamentoAntes.data} → ${novosDados.data}`);
       }
@@ -1035,7 +1036,7 @@ async function atualizarLancamentoPorId(userId, id, novosDados) {
     }
     
     return result.rows[0];
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro ao atualizar lançamento:', error);
     throw error;
   }
@@ -1065,7 +1066,7 @@ async function excluirLancamentoPorId(userId, id) {
     await registrarLog(userId, 'EXCLUIR_LANCAMENTO', detalhes);
     
     return deleteResult.rowCount; // Retorna o número de lançamentos excluídos
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro ao excluir lançamento:', error);
     throw error;
   }
@@ -1122,7 +1123,7 @@ async function excluirParcelamentoPorId(userId, parcelamentoId) {
     await registrarLog(userId, 'EXCLUIR_PARCELAMENTO', detalhes);
     
     return deleteResult.rowCount;
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro ao excluir parcelamento:', error);
     throw error;
   }
@@ -1156,7 +1157,7 @@ async function excluirRecorrentePorId(userId, recorrenteId) {
     await registrarLog(userId, 'EXCLUIR_RECORRENTE', detalhes);
     
     return deleteResult.rowCount;
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('❌ Erro ao excluir recorrente:', error);
     throw error;
   }
@@ -1180,7 +1181,7 @@ async function buscarLancamentosParaExclusao(userId, limite = 20) {
   // Agrupa parcelamentos e recorrentes
   const vistosParcelamentos = new Set();
   const vistosRecorrentes = new Set();
-  const lancamentosAgrupados = [];
+  const lancamentosAgrupados: any[] = [];
   
   for (let l of lancamentos) {
     // Pula se já foi processado como parte de um grupo
@@ -1328,7 +1329,7 @@ async function getResumoReal(userId, mes = null, ano = null) {
   const saldo = totalReceitas - totalDespesas;
   
   // Buscar gastos pendentes no cartão
-  const queryPendentes = `
+  let queryPendentes = `
     SELECT SUM(valor) as total_pendente, COUNT(*) as qtd_pendente
     FROM lancamentos 
     WHERE user_id = $1 
@@ -1430,7 +1431,7 @@ function formatarAlertaCartao(cartao) {
 function formatarAlertaBoleto(boleto) {
   const hoje = new Date();
   const vencimento = new Date(boleto.data_vencimento);
-  const diffTime = vencimento - hoje;
+  const diffTime = vencimento.getTime() - hoje.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
   const valorFormatado = parseFloat(boleto.valor).toFixed(2);
@@ -1486,14 +1487,14 @@ async function queryDatabase(query, params = []) {
 /**
  * Registra log de auditoria
  */
-async function registrarLog(userId, acao, detalhes = null) {
+async function registrarLog(userId, acao, detalhes: any = null) {
   try {
     const query = `
       INSERT INTO logs_auditoria (user_id, acao, detalhes) 
       VALUES ($1, $2, $3)
     `;
     await pool.query(query, [userId, acao, detalhes]);
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('[LOGS] Erro ao registrar log:', error);
   }
 }
@@ -1583,8 +1584,7 @@ async function gerarEstatisticasSistema() {
 /**
  * Gera backup em formato CSV
  */
-const fs = require('fs').promises;
-const path = require('path');
+// fs e path já importados no topo do arquivo
 
 async function gerarBackupCSV(userId) {
   try {
@@ -1718,7 +1718,7 @@ async function gerarBackupCSV(userId) {
       tamanho,
       periodo: `Todos os lançamentos até ${new Date().toLocaleDateString('pt-BR')}`
     };
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('[BACKUP] Erro ao gerar backup:', error);
     return {
       sucesso: false,
@@ -1824,8 +1824,7 @@ async function gerarRelatorioCSV(userId, mes, ano) {
     }
     
     // Criar diretório de relatórios se não existir
-    const fs = require('fs').promises;
-    const path = require('path');
+    // fs e path já importados no topo do arquivo
     
     const relatoriosDir = path.join(process.cwd(), 'relatorios');
     try {
@@ -2085,9 +2084,9 @@ async function buscarProximosVencimentos(userId, dias = 30) {
     
     // Agrupar por tipo e data
     const vencimentos = {
-      cartoes: [],
-      boletos: [],
-      outros: []
+      cartoes: [] as any[],
+      boletos: [] as any[],
+      outros: [] as any[]
     };
     
     result.rows.forEach(row => {
@@ -2097,7 +2096,7 @@ async function buscarProximosVencimentos(userId, dias = 30) {
         valor: parseFloat(row.valor),
         categoria: row.categoria,
         data_vencimento: row.data_vencimento_real,
-        dias_restantes: Math.ceil((new Date(row.data_vencimento_real) - new Date()) / (1000 * 60 * 60 * 24)),
+        dias_restantes: Math.ceil((new Date(row.data_vencimento_real).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
         cartao_nome: row.cartao_nome,
         status: row.status_fatura || 'pendente'
       };
@@ -2112,7 +2111,7 @@ async function buscarProximosVencimentos(userId, dias = 30) {
     });
     
     return vencimentos;
-  } catch (error) {
+  } catch (error: any) {
     fileLogger.error('Erro ao buscar próximos vencimentos:', error);
     throw error;
   }
@@ -2193,7 +2192,7 @@ async function buscarGastosValorAlto(userId, valorMinimo = 100, limite = 20, mes
 // Função para migrar usuários do config.js para a tabela
 async function migrarUsuariosConfig(client) {
   try {
-    const { ADMIN_USERS, AUTHORIZED_USERS } = require('./config.js');
+    // ADMIN_USERS e AUTHORIZED_USERS já importados no topo do arquivo
     
     // Verificar se já existem usuários na tabela
     const checkQuery = 'SELECT COUNT(*) as total FROM usuarios';
@@ -2258,7 +2257,7 @@ async function cadastrarUsuario(userId, dados) {
     
     logger.info(`✅ Usuário cadastrado: ${userId} (${nome})`);
     return result.rows[0];
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === '23505') { // Unique violation
       throw new Error('Usuário já está cadastrado');
     }
@@ -2270,7 +2269,7 @@ async function cadastrarUsuario(userId, dados) {
 // Função para promover usuário para premium
 async function promoverParaPremium(userId, diasExpiracao = null, promovidoPor) {
   try {
-    let dataExpiracao = null;
+    let dataExpiracao: Date | null = null;
     if (diasExpiracao) {
       // Usar timezone do Brasil
       const agora = new Date();
@@ -2339,10 +2338,10 @@ async function removerUsuario(userId, removidoPor) {
 }
 
 // Função para listar usuários
-async function listarUsuarios(filtros = {}) {
+async function listarUsuarios(filtros: { plano?: string; status?: string; is_admin?: boolean; ativos?: boolean } = {}) {
   try {
     let query = 'SELECT * FROM usuarios WHERE 1=1';
-    const params = [];
+    const params: any[] = [];
     let paramIndex = 1;
     
     if (filtros.plano) {
@@ -2524,4 +2523,4 @@ export {
   registrarAcesso,
   buscarUsuariosPremiumExpiracao,
   gerarRelatorioCSV
-}; 
+};

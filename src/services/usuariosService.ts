@@ -1,5 +1,5 @@
-// @ts-nocheck
 import * as databaseService from '../../databaseService';
+import { ADMIN_USERS } from '../../config';
 
 // TODO: Tipar corretamente. Usar any onde necessário.
 
@@ -16,12 +16,12 @@ export async function buscarUsuario(userId: string): Promise<any> {
   return await databaseService.buscarUsuario(userId);
 }
 
-export async function promoverParaPremium(userId: string, dataExpiracao: string): Promise<any> {
-  return await databaseService.promoverParaPremium(userId, dataExpiracao);
+export async function promoverParaPremium(userId: string, diasExpiracao: null | undefined = null, promovidoPor: string): Promise<any> {
+  return await databaseService.promoverParaPremium(userId, diasExpiracao, promovidoPor);
 }
 
-export async function removerUsuario(userId: string): Promise<any> {
-  return await databaseService.removerUsuario(userId);
+export async function removerUsuario(userId: string, removidoPor: string): Promise<any> {
+  return await databaseService.removerUsuario(userId, removidoPor);
 }
 
 export async function verificarAcessoUsuario(userId: string): Promise<any> {
@@ -38,7 +38,6 @@ export async function buscarUsuariosPremiumExpiracao(dias: number = 7): Promise<
 
 // Função para verificar se usuário é admin
 export async function verificarAdmin(userId: string): Promise<boolean> {
-  const { ADMIN_USERS } = require('../../config');
   return ADMIN_USERS.includes(userId);
 }
 
@@ -77,7 +76,7 @@ export async function processarComandoUsuarios(): Promise<any> {
       success: true,
       message
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao processar comando usuários:', error);
     return {
       success: false,
@@ -139,11 +138,11 @@ export async function processarComandoRemover(texto: string, adminId: string): P
         message: '❌ Erro ao remover usuário. Tente novamente.'
       };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao processar comando remover:', error);
     return {
       success: false,
       message: '❌ Erro interno ao processar remoção.'
     };
   }
-} 
+}

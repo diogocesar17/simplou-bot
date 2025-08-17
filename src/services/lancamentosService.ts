@@ -1,40 +1,80 @@
-// @ts-nocheck
 import * as databaseService from '../../databaseService';
+import { Lancamento, Cartao } from '../types/global';
 
-// TODO: Tipar corretamente. Usar any onde necessário.
+// Interfaces específicas para este serviço
+interface DadosLancamento {
+  data: string;
+  tipo: 'receita' | 'despesa';
+  descricao: string;
+  valor: number;
+  categoria: string;
+  pagamento: string;
+  parcelamento_id?: number | null;
+  parcela_atual?: number | null;
+  total_parcelas?: number | null;
+  recorrente?: string | null;
+  recorrente_fim?: string | null;
+  recorrente_id?: number | null;
+  cartao_nome?: string | null;
+  data_lancamento?: string | null;
+  data_contabilizacao?: string | null;
+  mes_fatura?: number | null;
+  ano_fatura?: number | null;
+  dia_vencimento?: number | null;
+  status_fatura?: string | null;
+  data_vencimento?: string | null;
+}
+
+interface ResumoFinanceiro {
+  totalReceitas: number;
+  totalDespesas: number;
+  saldo: number;
+  totalLancamentos: number;
+  totalPendente?: number;
+  qtdPendente?: number;
+  [key: string]: any;
+}
+
+interface FiltrosExclusao {
+  categoria?: string;
+  periodo?: string;
+  valor_min?: number;
+  valor_max?: number;
+  [key: string]: any;
+}
 
 // Funções para resumos
-export async function getResumoDoDia(userId: string): Promise<any> {
+export async function getResumoDoDia(userId: string): Promise<ResumoFinanceiro> {
   return await databaseService.getResumoDoDia(userId);
 }
 
-export async function getResumoDoMesAtual(userId: string): Promise<any> {
+export async function getResumoDoMesAtual(userId: string): Promise<ResumoFinanceiro> {
   return await databaseService.getResumoDoMesAtual(userId);
 }
 
-export async function getResumoPorMes(userId: string, mes: number, ano: number): Promise<any> {
+export async function getResumoPorMes(userId: string, mes: number, ano: number): Promise<ResumoFinanceiro> {
   return await databaseService.getResumoPorMes(userId, mes, ano);
 }
 
-export async function getResumoReal(userId: string, mes?: number, ano?: number): Promise<any> {
+export async function getResumoReal(userId: string, mes: any = null, ano: any = null): Promise<ResumoFinanceiro> {
   return await databaseService.getResumoReal(userId, mes, ano);
 }
 
 // Funções para listagem
-export async function listarLancamentos(userId: string, limite: number = 10, mes?: number, ano?: number): Promise<any[]> {
+export async function listarLancamentos(userId: string, limite: number = 10, mes: any = null, ano: any = null): Promise<Lancamento[]> {
   return await databaseService.listarLancamentos(userId, limite, mes, ano);
 }
 
-export async function getUltimosLancamentos(userId: string, limite: number = 10): Promise<any[]> {
+export async function getUltimosLancamentos(userId: string, limite: number = 10): Promise<Lancamento[]> {
   return await databaseService.getUltimosLancamentos(userId, limite);
 }
 
-export async function getLancamentoPorId(userId: string, id: number): Promise<any> {
+export async function getLancamentoPorId(userId: string, id: number): Promise<Lancamento | null> {
   return await databaseService.getLancamentoPorId(userId, id);
 }
 
 // Funções para salvar/atualizar
-export async function salvarLancamento(userId: string, dados: any): Promise<any> {
+export async function salvarLancamento(userId: string, dados: DadosLancamento): Promise<any> {
   // Converter objeto para array na ordem correta dos campos
   const values = [
     dados.data,                    // $2
@@ -88,7 +128,7 @@ export async function buscarFaturaCartao(userId: string, nomeCartao: string, mes
   return await databaseService.buscarFaturaCartao(userId, nomeCartao, mes, ano);
 }
 
-export async function buscarGastosPorCategoria(userId: string, categoria: string, limite: number = 20, mes?: number, ano?: number): Promise<any[]> {
+export async function buscarGastosPorCategoria(userId: string, categoria: string, limite: number = 20, mes: any = null, ano: any = null): Promise<Lancamento[]> {
   return await databaseService.buscarGastosPorCategoria(userId, categoria, limite, mes, ano);
 }
 
@@ -114,16 +154,16 @@ export async function excluirRecorrentePorId(userId: string, id: number): Promis
 }
 
 // Funções para vencimentos
-export async function buscarProximosVencimentos(userId: string, dias: number = 7): Promise<any[]> {
+export async function buscarProximosVencimentos(userId: string, dias: number = 7): Promise<any> {
   return await databaseService.buscarProximosVencimentos(userId, dias);
 }
 
 // Funções para exclusão em lote
-export async function buscarLancamentosParaExclusao(userId: string, filtros: any): Promise<any[]> {
-  return await databaseService.buscarLancamentosParaExclusao(userId, filtros);
+export async function buscarLancamentosParaExclusao(userId: string, limite: number = 20): Promise<any> {
+  return await databaseService.buscarLancamentosParaExclusao(userId, limite);
 }
 
 // Função para gerar relatório CSV
 export async function gerarRelatorioCSV(userId: string, mes: number, ano: number): Promise<any> {
   return await databaseService.gerarRelatorioCSV(userId, mes, ano);
-} 
+}

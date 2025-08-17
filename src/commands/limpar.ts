@@ -1,12 +1,11 @@
-// @ts-nocheck
 import * as sistemaService from '../services/sistemaService';
 import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
 
-async function limparCommand(sock, userId) {
+async function limparCommand(sock: any, userId: string) {
   // Limpar dados antigos reais
   const resultado = await sistemaService.limparDadosAntigos();
   if (resultado.sucesso) {
-    const itens = [];
+    const itens: string[] = [];
     if (resultado.lancamentosRemovidos > 0) {
       itens.push(`Lançamentos removidos: ${resultado.lancamentosRemovidos}`);
     }
@@ -48,4 +47,4 @@ async function limparCommand(sock, userId) {
   }
 }
 
-export default limparCommand; 
+export default limparCommand;
