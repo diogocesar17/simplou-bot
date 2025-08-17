@@ -12,11 +12,34 @@ async function ajudaCommand(sock, userId) {
             'resumo - Resumo do mês atual',
             'resumo hoje - Resumo do dia atual',
             'resumo [mês/ano] - Resumo específico (ex: resumo 03/2024)',
+            'resumo detalhado - Análise completa com gráficos e categorias',
+            'resumo detalhado [mês/ano] - Análise detalhada de período específico',
             'historico - Últimos lançamentos',
             'historico [mês/ano] - Lançamentos do mês (ex: historico julho 2025)',
             'fatura [cartão] [mês/ano] - Fatura de cartão (ex: fatura nubank 08/2025)'
           ],
           emoji: '📊'
+        },
+        {
+          titulo: 'Consultas Avançadas',
+          itens: [
+            'parcelados - Lista todos os parcelamentos ativos',
+            'recorrentes - Lista gastos fixos e recorrentes',
+            'vencimentos - Próximos vencimentos de cartões',
+            'vencimentos [dias] - Vencimentos nos próximos X dias',
+            'valor alto - Gastos acima da média do mês',
+            'categoria [nome] - Gastos por categoria específica',
+            'alertas - Verificar alertas e lembretes'
+          ],
+          emoji: '🔍'
+        },
+        {
+          titulo: 'Relatórios e Exportação',
+          itens: [
+            'relatorio - Exporta CSV com lançamentos do mês atual',
+            'relatorio [mês/ano] - Exporta CSV de período específico (ex: relatorio 08/2024)'
+          ],
+          emoji: '📄'
         },
         {
           titulo: 'Gestão de Cartões',
@@ -36,6 +59,26 @@ async function ajudaCommand(sock, userId) {
             'cancelar - Cancela operação em andamento'
           ],
           emoji: '📝'
+        },
+        {
+          titulo: 'Análises Inteligentes (IA)',
+          itens: [
+            'analisar - Análise de padrões de gastos com IA',
+            'sugestoes - Dicas personalizadas de economia',
+            'previsao - Previsão de gastos futuros',
+            'ajuda inteligente - Assistente financeiro com IA'
+          ],
+          emoji: '🤖'
+        },
+        {
+          titulo: 'Comandos Administrativos',
+          itens: [
+            'status - Status do sistema e estatísticas',
+            'usuarios - Gerenciar usuários (admin)',
+            'logs - Visualizar logs do sistema (admin)',
+            'limpar - Limpeza de dados antigos (admin)'
+          ],
+          emoji: '⚙️'
         },
         {
           titulo: 'Exemplos de Lançamentos',

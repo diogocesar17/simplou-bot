@@ -248,7 +248,7 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     await limparCommand(sock, userId);
     return;
   }
-  if (textoLower.startsWith('relatorio')) {
+  if (textoLower.startsWith('relatorio') || textoLower.startsWith('relatório')) {
     await relatorioCommand(sock, userId, texto);
     return;
   }
