@@ -2,7 +2,7 @@
 const categoriasPrincipais = {
   'Alimentação': [
     'mercado', 'supermercado', 'padaria', 'restaurante', 'ifood', 'rappi', 'lanche', 'almoço', 'jantar', 'pizza', 'hamburguer', 'comida', 'bebida', 'bar', 'café', 'cafe', 'lanchonete', 'delivery',
-    'pizzaria', 'fast food', 'fastfood', 'sorvete', 'doces', 'chocolate', 'refrigerante', 'suco', 'água', 'agua', 'cerveja', 'vinho', 'whisky', 'vodka', 'gin', 'tequila',
+    'pizzaria', 'fast food', 'fastfood', 'sorvete', 'picolé', 'picole', 'doces', 'chocolate', 'refrigerante', 'suco', 'água', 'agua', 'cerveja', 'vinho', 'whisky', 'vodka', 'gin', 'tequila',
     'feira', 'hortifruti', 'açougue', 'acougue', 'peixaria', 'queijaria', 'doceria', 'confeitaria', 'panificadora', 'salgados', 'bolos', 'tortas', 'sanduíches', 'sanduiches', 'cafeteria', 'cafeteria'
   ],
   'Saúde': [
@@ -113,10 +113,12 @@ function detectarCategoria(texto) {
     }
   }
   
-  // Se não encontrou, tenta correspondência parcial
+  // Se não encontrou, tenta correspondência parcial com word boundary mais flexível
   for (const [categoria, palavras] of Object.entries(categoriasPrincipais)) {
     for (const palavra of palavras) {
-      if (textoLimpo.includes(palavra.toLowerCase())) {
+      // Usa regex com word boundary para evitar matches parciais incorretos
+      const regexParcial = new RegExp(`\\b${palavra}\\b`, 'i');
+      if (regexParcial.test(textoLimpo)) {
         return { categoria, confianca: 'media' };
       }
     }

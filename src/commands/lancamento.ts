@@ -153,44 +153,34 @@ Mensagem para analisar: "${texto}"
 Data atual: ${new Date().toLocaleDateString('pt-BR')}
 `;
 
-    const resposta = await geminiService.responderPerguntaFinanceira(prompt, []);
-    console.log(`[IA_ANALISE] Resposta da IA: ${resposta}`);
-    if (!resposta) {
+    const analiseGemini = await geminiService.analisarTransacaoComGemini(texto, userId);
+    console.log(`[IA_ANALISE] Resposta da IA:`, analiseGemini);
+    if (!analiseGemini) {
       console.log('[IA_ANALISE] ❌ IA indisponível ou sem resposta. Abortando fallback.');
       return null;
     }
     
-    // Tentar extrair JSON da resposta
-    const jsonMatch = resposta.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.log(`[IA_ANALISE] ❌ Não conseguiu extrair JSON da resposta`);
-      return null;
-    }
-    
-    const parsed = JSON.parse(jsonMatch[0]);
-    console.log(`[IA_ANALISE] JSON parseado:`, parsed);
-    
     // Validar se tem os campos essenciais
-    if (!parsed.tipo || !parsed.valor || !parsed.descricao || parsed.confianca < 0.7) {
-      console.log(`[IA_ANALISE] ❌ Campos essenciais faltando ou confiança baixa`);
+    if (!analiseGemini.tipo || !analiseGemini.valor || !analiseGemini.descricao) {
+      console.log(`[IA_ANALISE] ❌ Campos essenciais faltando`);
       return null;
     }
     
     const resultado = {
-      tipo: parsed.tipo,
-      valor: parsed.valor,
-      descricao: parsed.descricao,
-      categoria: categoriaPorPalavrasChave || parsed.categoria || 'Outros',
-      pagamento: parsed.pagamento || 'NÃO INFORMADO',
-      data: parsed.data || new Date().toLocaleDateString('pt-BR'),
-      faltaFormaPagamento: parsed.pagamento === 'NÃO INFORMADO',
+      tipo: analiseGemini.tipo,
+      valor: analiseGemini.valor,
+      descricao: analiseGemini.descricao,
+      categoria: categoriaPorPalavrasChave || analiseGemini.categoria || 'Outros',
+      pagamento: analiseGemini.formaPagamento || 'NÃO INFORMADO',
+      data: new Date().toLocaleDateString('pt-BR'),
+      faltaFormaPagamento: !analiseGemini.formaPagamento || analiseGemini.formaPagamento === 'NÃO INFORMADO',
       faltaDataVencimento: false,
       parcelamento: false,
       recorrente: false
     };
     
     console.log(`[IA_ANALISE] Resultado final:`, resultado);
-    console.log(`[IA_ANALISE] Categoria final: ${resultado.categoria} (palavras-chave: ${categoriaPorPalavrasChave}, IA: ${parsed.categoria})`);
+    console.log(`[IA_ANALISE] Categoria final: ${resultado.categoria} (palavras-chave: ${categoriaPorPalavrasChave}, IA: ${analiseGemini.categoria})`);
     
     return resultado;
   } catch (error) {
@@ -544,8 +534,8 @@ async function lancamentoCommand(sock, userId, texto) {
   let parsed = parseMessage(texto);
   console.log(`[LANCAMENTO] Parse normal resultado:`, parsed);
   
-  // Se o parse normal falhou, tentar com IA
-  if (!parsed || !parsed.valor) {
+  // Se o parse normal falhou ou categoria é incerta, tentar com IA
+  if (!parsed || !parsed.valor || parsed.categoria === 'Outros' || parsed.confiancaCategoria === 'nenhuma') {
     console.log(`[LANCAMENTO] Parse normal falhou, tentando com IA...`);
     // await sock.sendMessage(userId, { 
     //   text: '🤖 Analisando sua mensagem com IA...' 
