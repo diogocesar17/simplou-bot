@@ -154,9 +154,37 @@ function detectarCategoria(texto) {
       
       // Se não for forma de pagamento, verifica se está nas categorias principais
       if (!formasPagamento.includes(palavraExtraida)) {
-        for (const [categoria, palavras] of Object.entries(categoriasPrincipais)) {
-          if (palavras.some(p => p.toLowerCase().includes(palavraExtraida) || palavraExtraida.includes(p.toLowerCase()))) {
-            return { categoria, confianca: 'baixa' };
+        // Evitar matches com palavras muito pequenas (menos de 3 caracteres)
+        if (palavraExtraida.length >= 3) {
+          for (const [categoria, palavras] of Object.entries(categoriasPrincipais)) {
+            // Usar correspondência mais restritiva para evitar falsos positivos
+            const matchEncontrado = palavras.some(p => {
+              const pLower = p.toLowerCase();
+              // Só aceitar match se:
+              // 1. A palavra extraída é igual à palavra-chave completa, OU
+              // 2. A palavra-chave contém a palavra extraída como palavra completa (com word boundary), OU
+              // 3. A palavra extraída contém a palavra-chave completa (para casos como "mercadinho" contendo "mercado")
+              if (pLower === palavraExtraida) {
+                return true;
+              }
+              
+              // Verificar se a palavra-chave contém a palavra extraída como palavra completa
+              const regexPalavraCompleta = new RegExp(`\\b${palavraExtraida}\\b`, 'i');
+              if (regexPalavraCompleta.test(pLower)) {
+                return true;
+              }
+              
+              // Verificar se a palavra extraída contém a palavra-chave completa (mínimo 4 caracteres)
+              if (pLower.length >= 4 && palavraExtraida.includes(pLower)) {
+                return true;
+              }
+              
+              return false;
+            });
+            
+            if (matchEncontrado) {
+              return { categoria, confianca: 'baixa' };
+            }
           }
         }
       }
@@ -392,12 +420,32 @@ function parseMessage(msg) {
         
         // Se não for forma de pagamento, verifica se está nas categorias principais
         if (!formasPagamento.includes(palavraExtraida)) {
-          for (const [cat, palavras] of Object.entries(categoriasPrincipais)) {
-            if (palavras.some(p => p.toLowerCase().includes(palavraExtraida) || palavraExtraida.includes(p.toLowerCase()))) {
-              categoria = cat;
-              categoriaDetectada = cat;
-              confiancaCategoria = 'media';
-              break;
+          // Aplicar a mesma lógica restritiva usada em detectarCategoria
+          if (palavraExtraida.length >= 3) {
+            for (const [cat, palavras] of Object.entries(categoriasPrincipais)) {
+              const encontrou = palavras.some(keyword => {
+                const keywordLower = keyword.toLowerCase();
+                const palavraLower = palavraExtraida.toLowerCase();
+                
+                // Correspondência exata
+                if (keywordLower === palavraLower) return true;
+                
+                // Correspondência de limite de palavra usando regex
+                const regex = new RegExp(`\\b${palavraLower}\\b`, 'i');
+                if (regex.test(keywordLower)) return true;
+                
+                // Se a palavra extraída contém a keyword completa (apenas para keywords >= 4 chars)
+                if (keywordLower.length >= 4 && palavraLower.includes(keywordLower)) return true;
+                
+                return false;
+              });
+              
+              if (encontrou) {
+                categoria = cat;
+                categoriaDetectada = cat;
+                confiancaCategoria = 'media';
+                break;
+              }
             }
           }
         }
