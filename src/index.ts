@@ -46,6 +46,8 @@ import removerUsuarioCommand from './commands/removerUsuario';
 import statusUsuarioCommand from './commands/statusUsuario';
 import alertasCommand from './commands/alertas';
 import relatorioCommand from './commands/relatorio';
+import lembreteCommand from './commands/lembrete';
+import meusLembretesCommand from './commands/meuslembretes';
 
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
@@ -100,6 +102,17 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
 
     if (estado.etapa.includes('cartao')) {
       await configurarCartaoCommand(sock, userId, texto);
+      return;
+    }
+
+    // Roteamento para estados de lembretes
+    if (estado.etapa.includes('lembrete')) {
+      await lembreteCommand(sock, userId, texto);
+      return;
+    }
+
+    if (estado.etapa.includes('selecao_lembrete') || estado.etapa.includes('acao_lembrete') || estado.etapa.includes('confirmando_exclusao_lembrete')) {
+      await meusLembretesCommand(sock, userId, texto);
       return;
     }
   
@@ -270,8 +283,18 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   }
 
   // Roteamento para o comando de alertas
-  if (["alertas", "alerta", "lembretes", "lembrete"].includes(textoLower)) {
+  if (["alertas", "alerta"].includes(textoLower)) {
     await alertasCommand(sock, userId);
+    return;
+  }
+
+  // Roteamento para comandos de lembretes
+  if (textoLower === "lembrete" || textoLower.startsWith("lembrete ") || textoLower === "criar lembrete") {
+    await lembreteCommand(sock, userId, texto);
+    return;
+  }
+  if (textoLower === "meuslembretes" || textoLower.startsWith("meuslembretes ") || textoLower === "meus lembretes") {
+    await meusLembretesCommand(sock, userId, texto);
     return;
   }
 

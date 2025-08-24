@@ -97,6 +97,49 @@ async function initializeDatabase() {
       )
     `);
 
+    // Criar tabela de lembretes
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS lembretes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR(50) NOT NULL,
+        titulo VARCHAR(100) NOT NULL,
+        descricao TEXT,
+        valor DECIMAL(10,2),
+        categoria VARCHAR(50),
+        data_vencimento DATE NOT NULL,
+        recorrente BOOLEAN DEFAULT FALSE,
+        tipo_recorrencia VARCHAR(20) CHECK (tipo_recorrencia IN ('mensal', 'anual', 'semanal')),
+        dias_antecedencia INTEGER DEFAULT 3 CHECK (dias_antecedencia >= 0 AND dias_antecedencia <= 30),
+        ativo BOOLEAN DEFAULT TRUE,
+        auto_criar_lancamento BOOLEAN DEFAULT FALSE,
+        proximo_envio DATE,
+        ultimo_envio DATE,
+        criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Criar tabela de configuração do sistema
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS config_sistema (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        chave VARCHAR(50) NOT NULL UNIQUE,
+        valor TEXT NOT NULL,
+        descricao TEXT,
+        criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Inserir configurações padrão do sistema
+    await client.query(`
+      INSERT INTO config_sistema (chave, valor, descricao) 
+      VALUES 
+        ('limite_lembretes_gratuito', '5', 'Limite de lembretes para usuários gratuitos'),
+        ('limite_lembretes_premium', '-1', 'Limite de lembretes para usuários premium (-1 = ilimitado)')
+      ON CONFLICT (chave) DO NOTHING
+    `);
+
     // Migração: Adicionar colunas de cartão se não existirem
     await migrateCartaoColumns(client);
     
@@ -140,6 +183,20 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_usuarios_plano ON usuarios(plano);
       CREATE INDEX IF NOT EXISTS idx_usuarios_status ON usuarios(status);
       CREATE INDEX IF NOT EXISTS idx_usuarios_admin ON usuarios(is_admin);
+    `);
+
+    // Criar índices para tabela de lembretes
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_lembretes_user_id ON lembretes(user_id);
+      CREATE INDEX IF NOT EXISTS idx_lembretes_data_vencimento ON lembretes(data_vencimento);
+      CREATE INDEX IF NOT EXISTS idx_lembretes_ativo ON lembretes(ativo);
+      CREATE INDEX IF NOT EXISTS idx_lembretes_proximo_envio ON lembretes(proximo_envio);
+      CREATE INDEX IF NOT EXISTS idx_lembretes_user_ativo ON lembretes(user_id, ativo);
+    `);
+
+    // Criar índices para tabela de configuração do sistema
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_config_sistema_chave ON config_sistema(chave);
     `);
 
     // Migração: Migrar usuários do config.js para a tabela

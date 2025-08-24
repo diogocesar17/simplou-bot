@@ -5,6 +5,7 @@ import {
   listarUsuarios
 } from '../../databaseService';
 import { logger } from '../../logger';
+import * as lembretesService from './lembretesService';
 
 // Interfaces para tipagem
 interface Cartao {
@@ -252,7 +253,108 @@ async function buscarAlertaPremium(userId: string, eLembreteFinal: boolean = fal
 }
 
 /**
- * Busca todos os alertas para um usuário (vencimentos + premium)
+ * Busca alertas de lembretes para um usuário
+ * @param userId - ID do usuário
+ * @param eLembreteFinal - Se é o lembrete final (11h)
+ * @returns Mensagem formatada ou null se não há lembretes
+ */
+async function buscarAlertasLembretes(userId: string, eLembreteFinal: boolean = false): Promise<string | null> {
+  try {
+    // Buscar todos os lembretes para envio e filtrar pelo usuário
+    const todosLembretes = await lembretesService.buscarLembretesParaEnvio();
+    const lembretesDoUsuario = todosLembretes.filter(lembrete => lembrete.user_id === userId);
+    
+    if (!lembretesDoUsuario || lembretesDoUsuario.length === 0) {
+      return null;
+    }
+    
+    let alertasFiltrados: typeof lembretesDoUsuario = [];
+    
+    // Filtrar lembretes não enviados
+    for (const lembrete of lembretesDoUsuario) {
+      const idLembrete = `lembrete_${lembrete.id}`;
+      
+      if (!alertaJaEnviado(userId, 'lembrete', idLembrete)) {
+        alertasFiltrados.push(lembrete);
+        marcarAlertaEnviado(userId, 'lembrete', idLembrete);
+        
+        // Marcar lembrete como enviado no banco
+        await lembretesService.marcarLembreteEnviado(lembrete.id);
+      } else if (eLembreteFinal) {
+        // Para lembrete final, incluir mesmo se já foi enviado
+        alertasFiltrados.push(lembrete);
+      }
+    }
+    
+    if (alertasFiltrados.length === 0) {
+      return null;
+    }
+    
+    let mensagem = eLembreteFinal ? "🔔 *LEMBRETE FINAL - LEMBRETES*\n\n" : "🔔 *ALERTAS DE LEMBRETES*\n\n";
+    
+    alertasFiltrados.forEach(lembrete => {
+      const hoje = new Date();
+      const vencimento = new Date(lembrete.data_vencimento);
+      const diffTime = vencimento.getTime() - hoje.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      let statusEmoji = '';
+      let statusTexto = '';
+      
+      if (diffDays === 0) {
+        statusEmoji = '🔴';
+        statusTexto = '*VENCIMENTO HOJE*';
+      } else if (diffDays === 1) {
+        statusEmoji = '🟡';
+        statusTexto = '*VENCIMENTO AMANHÃ*';
+      } else {
+        statusEmoji = '🟡';
+        statusTexto = `*VENCIMENTO EM ${diffDays} DIAS*`;
+      }
+      
+      mensagem += `• ${statusEmoji} ${statusTexto}: ${lembrete.titulo}`;
+      
+      if (lembrete.valor) {
+        const valorFormatado = parseFloat(lembrete.valor.toString()).toFixed(2);
+        mensagem += ` - R$ ${valorFormatado}`;
+      }
+      
+      if (lembrete.categoria) {
+        mensagem += ` (${lembrete.categoria})`;
+      }
+      
+      mensagem += '\n';
+      
+      if (lembrete.descricao) {
+        mensagem += `  📝 ${lembrete.descricao}\n`;
+      }
+      
+      if (lembrete.auto_criar_lancamento) {
+        mensagem += `  🤖 *Criará lançamento automaticamente*\n`;
+      }
+    });
+    
+    // Adicionar sugestões inteligentes se houver lembretes com auto_criar_lancamento
+    const lembretesComAutoCriacao = alertasFiltrados.filter(l => l.auto_criar_lancamento);
+    if (lembretesComAutoCriacao.length > 0) {
+      mensagem += '\n💡 *SUGESTÕES INTELIGENTES:*\n';
+      lembretesComAutoCriacao.forEach(lembrete => {
+        const valorTexto = lembrete.valor ? ` ${lembrete.valor}` : '';
+        const categoriaTexto = lembrete.categoria ? ` ${lembrete.categoria}` : '';
+        mensagem += `• 🚀 Criar lançamento: "${lembrete.titulo}${valorTexto}${categoriaTexto}"\n`;
+      });
+      mensagem += '\n📝 *Basta copiar e enviar a sugestão acima para criar o lançamento!*';
+    }
+    
+    return mensagem;
+  } catch (error) {
+    logger.error('Erro ao buscar alertas de lembretes:', error);
+    return null;
+  }
+}
+
+/**
+ * Busca todos os alertas para um usuário (vencimentos + premium + lembretes)
  * @param userId - ID do usuário
  * @param eLembreteFinal - Se é o lembrete final (11h)
  * @returns Mensagem completa ou null
@@ -264,11 +366,19 @@ async function buscarTodosAlertas(userId: string, eLembreteFinal: boolean = fals
     
     const alertaVencimento = await buscarAlertasVencimento(userId, eLembreteFinal);
     const alertaPremium = await buscarAlertaPremium(userId, eLembreteFinal);
+    const alertaLembretes = await buscarAlertasLembretes(userId, eLembreteFinal);
     
     let mensagemCompleta = '';
     
     if (alertaVencimento) {
       mensagemCompleta += alertaVencimento;
+    }
+    
+    if (alertaLembretes) {
+      if (mensagemCompleta) {
+        mensagemCompleta += '\n\n' + '─'.repeat(30) + '\n\n';
+      }
+      mensagemCompleta += alertaLembretes;
     }
     
     if (alertaPremium) {
@@ -296,7 +406,11 @@ async function temAlertas(userId: string): Promise<boolean> {
     const usuariosExpiracao = await buscarUsuariosPremiumExpiracao(7);
     const usuarioPremium = usuariosExpiracao.find(u => u.user_id === userId);
     
-    return alertas.temAlertas || !!usuarioPremium;
+    // Buscar lembretes do usuário
+    const todosLembretes = await lembretesService.buscarLembretesParaEnvio();
+    const lembretesDoUsuario = todosLembretes.filter(lembrete => lembrete.user_id === userId);
+    
+    return alertas.temAlertas || !!usuarioPremium || (lembretesDoUsuario && lembretesDoUsuario.length > 0);
   } catch (error) {
     logger.error('Erro ao verificar se há alertas:', error);
     return false;
@@ -390,6 +504,7 @@ function eVerificacaoFinalDoDia(): boolean {
 export {
   buscarAlertasVencimento,
   buscarAlertaPremium,
+  buscarAlertasLembretes,
   buscarTodosAlertas,
   temAlertas,
   verificarEEnviarAlertasAutomaticos,
@@ -401,4 +516,4 @@ export {
   type Usuario,
   type AlertasFiltrados,
   type EstatisticasAlertas
-}; 
+};
