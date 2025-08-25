@@ -61,6 +61,17 @@ async function ajudaCommand(sock, userId) {
           emoji: '📝'
         },
         {
+          titulo: 'Lembretes e Alertas',
+          itens: [
+            'lembrete - Criar novo lembrete',
+            'Criar lembrete - Criar novo lembrete (comando interativo)',
+            'meuslembretes - Gerenciar lembretes existentes',
+            'Meus Lembretes - Gerenciar lembretes (comando interativo)',
+            'alertas - Verificar alertas e lembretes ativos'
+          ],
+          emoji: '⏰'
+        },
+        {
           titulo: 'Análises Inteligentes (IA)',
           itens: [
             'analisar - Análise de padrões de gastos com IA',
