@@ -579,43 +579,50 @@ async function excluirCartaoConfigurado(userId, nomeCartao) {
 function calcularDataContabilizacao(dataLancamento, diaVencimento, diaFechamento = null) {
   const lancamento = new Date(dataLancamento);
   const dia = lancamento.getDate();
-  let mes = lancamento.getMonth(); // 0-11
-  let ano = lancamento.getFullYear();
+  const mesIndex = lancamento.getMonth(); // 0-11
+  const ano = lancamento.getFullYear();
 
+  // Quando não há fechamento, usar lógica baseada apenas no vencimento
   if (diaFechamento === null || diaFechamento === undefined) {
-    // Lógica antiga: só vencimento
-    const vencimentoAtual = new Date(ano, mes, diaVencimento);
+    const vencimentoAtual = new Date(ano, mesIndex, diaVencimento);
     if (lancamento > vencimentoAtual) {
+      const nextMonthIndex = mesIndex === 11 ? 0 : mesIndex + 1;
+      const nextYear = mesIndex === 11 ? ano + 1 : ano;
       return {
-        dataContabilizacao: new Date(ano, mes + 1, diaVencimento),
-        mesFatura: mes + 2, // +1 para mês 1-12, +1 para próximo mês
-        anoFatura: mes === 11 ? ano + 1 : ano
+        dataContabilizacao: new Date(nextYear, nextMonthIndex, diaVencimento),
+        mesFatura: nextMonthIndex + 1,
+        anoFatura: nextYear
       };
     } else {
       return {
         dataContabilizacao: vencimentoAtual,
-        mesFatura: mes + 1,
+        mesFatura: mesIndex + 1,
         anoFatura: ano
       };
     }
   }
 
-  // Lógica correta: fechamento
-  let mesFatura, anoFatura;
+  // Lógica com fechamento: decidir mês/ano da fatura usando índices 0-11
+  let monthIndex, anoFatura;
   if (dia <= diaFechamento) {
     // Antes ou no fechamento: fatura do mês corrente
-    mesFatura = mes + 1;
+    monthIndex = mesIndex;
     anoFatura = ano;
   } else {
     // Após fechamento: fatura do mês seguinte
-    mesFatura = mes + 2;
-    anoFatura = mes === 11 ? ano + 1 : ano;
+    if (mesIndex === 11) {
+      monthIndex = 0; // Janeiro
+      anoFatura = ano + 1;
+    } else {
+      monthIndex = mesIndex + 1;
+      anoFatura = ano;
+    }
   }
-  // Data de vencimento da fatura
-  let dataVencimento = new Date(anoFatura, mesFatura - 1, diaVencimento);
+  // Data de vencimento da fatura (Date aceita índice 0-11 corretamente)
+  const dataVencimento = new Date(anoFatura, monthIndex, diaVencimento);
   return {
     dataContabilizacao: dataVencimento,
-    mesFatura,
+    mesFatura: monthIndex + 1,
     anoFatura
   };
 }
