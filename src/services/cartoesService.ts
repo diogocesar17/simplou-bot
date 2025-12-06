@@ -24,8 +24,17 @@ export async function contarLancamentosAssociadosCartao(userId: string, nomeCart
 }
 
 // Funções para calcular datas de contabilização
-export async function calcularDataContabilizacao(dataLancamento: string, diaVencimento: number): Promise<any> {
-  return databaseService.calcularDataContabilizacao(dataLancamento, diaVencimento);
+export async function calcularDataContabilizacao(
+  dataLancamento: string,
+  diaVencimento: number,
+  diaFechamento?: number | null
+): Promise<any> {
+  // Quando não há fechamento, usar assinatura com 2 argumentos
+  if (diaFechamento === null || diaFechamento === undefined) {
+    return databaseService.calcularDataContabilizacao(dataLancamento, diaVencimento);
+  }
+  // Tipagem do databaseService pode estar mais restritiva; garantir compatibilidade
+  return (databaseService as any).calcularDataContabilizacao(dataLancamento, diaVencimento, diaFechamento);
 }
 
 // Funções para buscar vencimentos
