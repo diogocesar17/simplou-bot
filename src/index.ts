@@ -63,7 +63,8 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   const estado = await obterEstado(userId);
 
   logger.info(`Estado: ${estado?.etapa}`);
-  if (estado?.etapa?.startsWith('aguardando_')) {
+  // Tratar qualquer etapa de fluxo (aguardando_*, confirmando_*, etc.)
+  if (estado?.etapa) {
     // Rotear dinamicamente com base na etapa
     if (estado.etapa.includes('edicao_cartao')) {
       await editarCartaoCommand(sock, userId, texto);
@@ -105,14 +106,19 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
       return;
     }
 
-    // Roteamento para estados de lembretes
-    if (estado.etapa.includes('lembrete')) {
-      await lembreteCommand(sock, userId, texto);
+    // Roteamento para estados de meus lembretes (mais específicos) primeiro
+    if (
+      estado.etapa.includes('selecao_lembrete') ||
+      estado.etapa.includes('acao_lembrete') ||
+      estado.etapa.includes('confirmando_exclusao_lembrete')
+    ) {
+      await meusLembretesCommand(sock, userId, texto);
       return;
     }
 
-    if (estado.etapa.includes('selecao_lembrete') || estado.etapa.includes('acao_lembrete') || estado.etapa.includes('confirmando_exclusao_lembrete')) {
-      await meusLembretesCommand(sock, userId, texto);
+    // Roteamento para estados de criação/edição de lembrete (genérico)
+    if (estado.etapa.includes('lembrete')) {
+      await lembreteCommand(sock, userId, texto);
       return;
     }
   
@@ -293,7 +299,12 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     await lembreteCommand(sock, userId, texto);
     return;
   }
-  if (textoLower === "meuslembretes" || textoLower.startsWith("meuslembretes ") || textoLower === "meus lembretes") {
+  if (
+    textoLower === "meuslembretes" ||
+    textoLower.startsWith("meuslembretes ") ||
+    textoLower === "meus lembretes" ||
+    textoLower.startsWith("meus lembretes ")
+  ) {
     await meusLembretesCommand(sock, userId, texto);
     return;
   }

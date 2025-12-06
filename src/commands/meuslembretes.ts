@@ -28,7 +28,7 @@ async function meusLembretesCommand(sock, userId, texto) {
         case '2':
         case 'pausar':
         case 'ativar':
-          const lembrete = await lembretesService.buscarLembretePorId(lembreteId, userId);
+          const lembrete = await lembretesService.buscarLembretePorId(userId, lembreteId);
           if (!lembrete) {
             await sock.sendMessage(userId, {
               text: '❌ Lembrete não encontrado.'
@@ -38,7 +38,7 @@ async function meusLembretesCommand(sock, userId, texto) {
           }
           
           const novoStatus = !lembrete.ativo;
-          await lembretesService.alternarStatusLembrete(lembreteId, userId);
+          await lembretesService.alternarStatusLembrete(userId, lembreteId);
           
           const statusTexto = novoStatus ? 'ativado' : 'pausado';
           const emoji = novoStatus ? '✅' : '⏸️';
@@ -91,7 +91,7 @@ async function meusLembretesCommand(sock, userId, texto) {
     
     if (confirmacao === '1' || confirmacao === 'sim') {
       try {
-        const lembrete = await lembretesService.buscarLembretePorId(lembreteId, userId);
+        const lembrete = await lembretesService.buscarLembretePorId(userId, lembreteId);
         if (!lembrete) {
           await sock.sendMessage(userId, {
             text: '❌ Lembrete não encontrado.'
@@ -100,7 +100,7 @@ async function meusLembretesCommand(sock, userId, texto) {
           return;
         }
         
-        await lembretesService.excluirLembrete(lembreteId, userId);
+        await lembretesService.excluirLembrete(userId, lembreteId);
         
         await sock.sendMessage(userId, {
           text: `🗑️ Lembrete "${lembrete.titulo}" foi excluído com sucesso!`
