@@ -14,8 +14,8 @@ async function configurarCartaoCommand(sock, userId, texto) {
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
         text: formatarCancelamento('Configuração de cartão', [
-          'Ver cartões → `cartoes`',
-          'Ver ajuda → `ajuda`'
+          { texto: 'Ver cartões', comando: 'cartoes' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
         ])
       });
       return;
@@ -40,8 +40,8 @@ async function configurarCartaoCommand(sock, userId, texto) {
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
         text: formatarCancelamento('Configuração de cartão', [
-          'Ver cartões → `cartoes`',
-          'Ver ajuda → `ajuda`'
+          { texto: 'Ver cartões', comando: 'cartoes' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
         ])
       });
       return;
@@ -70,8 +70,8 @@ async function configurarCartaoCommand(sock, userId, texto) {
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
         text: formatarCancelamento('Configuração de cartão', [
-          'Ver cartões → `cartoes`',
-          'Ver ajuda → `ajuda`'
+          { texto: 'Ver cartões', comando: 'cartoes' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
         ])
       });
       return;

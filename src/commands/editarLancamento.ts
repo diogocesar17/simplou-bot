@@ -12,8 +12,21 @@ async function editarLancamentoCommand(sock, userId, texto) {
   // Se está aguardando edição de um campo específico
   if (estado?.etapa === 'aguardando_campo_edicao_lancamento') {
     const contexto = estado.dadosParciais;
-    await limparEstado(userId);
-    
+    const textoLower = texto.toLowerCase().trim();
+
+    // Permitir cancelar nesta etapa
+    if (textoLower === 'cancelar' || texto === '0') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { 
+        text: formatarCancelamento('Edição de lançamento', [
+          { texto: 'Ver histórico', comando: 'historico' },
+          { texto: 'Ver resumo do mês', comando: 'resumo' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
+        ])
+      });
+      return;
+    }
+
     const escolha = parseInt(texto);
     let campo = null;
     let instrucao = '';
@@ -40,6 +53,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
         instrucao = '📅 Digite a nova data (dd/mm/aaaa):';
         break;
       default:
+        // Não limpar estado, deixar o usuário responder novamente
         await sock.sendMessage(userId, { 
           text: formatarMensagem({
             titulo: 'Opção inválida',
@@ -58,7 +72,8 @@ async function editarLancamentoCommand(sock, userId, texto) {
         });
         return;
     }
-    
+    // Avança para a próxima etapa
+    await limparEstado(userId);
     await definirEstado(userId, 'aguardando_valor_edicao_lancamento', {
       lancamentoId: contexto.lancamentoId,
       lancamento: contexto.lancamento,
@@ -79,9 +94,9 @@ async function editarLancamentoCommand(sock, userId, texto) {
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
         text: formatarCancelamento('Edição de lançamento', [
-          'Ver histórico → `historico`',
-          'Ver resumo do mês → `resumo`',
-          'Ver ajuda → `ajuda`'
+          { texto: 'Ver histórico', comando: 'historico' },
+          { texto: 'Ver resumo do mês', comando: 'resumo' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
         ])
       });
       return;
@@ -167,7 +182,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
   }
 
   // Se não há estado, processar comando de edição
-  const match = texto.match(/^editar\s+(\d+)$/);
+  const match = texto.toLowerCase().match(/^editar\s+(\d+)$/i);
   if (!match) {
     await sock.sendMessage(userId, { 
       text: formatarMensagem({
@@ -210,7 +225,17 @@ async function editarLancamentoCommand(sock, userId, texto) {
   }
   
   const lancamento = lista[idx];
-  
+
+  // Formatar data de exibição (ISO, Date ou string já formatada)
+  let dataExibir: string;
+  if (lancamento.data instanceof Date) {
+    dataExibir = lancamento.data.toLocaleDateString('pt-BR');
+  } else if (typeof lancamento.data === 'string' && lancamento.data.match(/^\d{4}-\d{2}-\d{2}/)) {
+    dataExibir = new Date(lancamento.data).toLocaleDateString('pt-BR');
+  } else {
+    dataExibir = String(lancamento.data);
+  }
+
   // Mostrar lançamento e opções de edição
   await sock.sendMessage(userId, { 
     text: formatarMensagem({
@@ -220,7 +245,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
         {
           titulo: 'Detalhes do Lançamento',
           itens: [
-            `Data: ${lancamento.data}`,
+            `Data: ${dataExibir}`,
             `Valor: R$ ${formatarValor(lancamento.valor)}`,
             `Categoria: ${lancamento.categoria}`,
             `Pagamento: ${lancamento.pagamento}`,

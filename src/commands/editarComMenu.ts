@@ -15,9 +15,9 @@ async function editarComMenuCommand(sock, userId, texto) {
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
         text: formatarCancelamento('Edição', [
-          'Ver histórico → `historico`',
-          'Ver resumo do mês → `resumo`',
-          'Ver ajuda → `ajuda`'
+          { texto: 'Ver histórico', comando: 'historico' },
+          { texto: 'Ver resumo do mês', comando: 'resumo' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
         ])
       });
       return;

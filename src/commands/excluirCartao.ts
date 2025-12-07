@@ -21,9 +21,9 @@ async function excluirCartaoCommand(sock, userId, texto) {
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
         text: formatarCancelamento('Exclusão de cartão', [
-          'Ver cartões → `cartoes`',
-          'Configurar cartão → `configurar cartao`',
-          'Ver ajuda → `ajuda`'
+          { texto: 'Ver cartões', comando: 'cartoes' },
+          { texto: 'Configurar cartão', comando: 'configurar cartao' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
         ])
       });
       return;
@@ -72,9 +72,9 @@ async function excluirCartaoCommand(sock, userId, texto) {
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
         text: formatarCancelamento('Exclusão de cartão', [
-          'Ver cartões → `cartoes`',
-          'Configurar cartão → `configurar cartao`',
-          'Ver ajuda → `ajuda`'
+          { texto: 'Ver cartões', comando: 'cartoes' },
+          { texto: 'Configurar cartão', comando: 'configurar cartao' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
         ])
       });
       return;

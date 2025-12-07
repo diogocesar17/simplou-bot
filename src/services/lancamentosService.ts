@@ -69,6 +69,11 @@ export async function getUltimosLancamentos(userId: string, limite: number = 10)
   return await databaseService.getUltimosLancamentos(userId, limite);
 }
 
+// Wrapper para edição que espera "recentes" no fluxo de comandos
+export async function buscarLancamentosRecentes(userId: string, limite: number = 10): Promise<Lancamento[]> {
+  return await databaseService.getUltimosLancamentos(userId, limite);
+}
+
 export async function getLancamentoPorId(userId: string, id: number): Promise<Lancamento | null> {
   return await databaseService.getLancamentoPorId(userId, id);
 }
@@ -108,6 +113,58 @@ export async function atualizarLancamentoPorId(userId: string, id: number, dados
 
 export async function excluirLancamentoPorId(userId: string, id: number): Promise<any> {
   return await databaseService.excluirLancamentoPorId(userId, id);
+}
+
+// Atualiza um único campo do lançamento por ID
+export async function atualizarCampoLancamento(
+  userId: string,
+  id: number,
+  campo: string,
+  valor: any
+): Promise<any> {
+  const novosDados: any = {};
+
+  const toNumber = (v: any) => {
+    if (typeof v === 'number') return v;
+    const parsed = parseFloat(String(v).replace(',', '.'));
+    return isNaN(parsed) ? undefined : parsed;
+  };
+
+  const toISODate = (br: string) => {
+    // Espera formato dd/mm/aaaa
+    const partes = String(br).trim().split('/');
+    if (partes.length === 3) {
+      const [dd, mm, aaaa] = partes;
+      const ddNum = dd.padStart(2, '0');
+      const mmNum = mm.padStart(2, '0');
+      return `${aaaa}-${mmNum}-${ddNum}`;
+    }
+    // Se já estiver em ISO, retorna como está
+    return br;
+  };
+
+  switch (campo) {
+    case 'valor':
+      novosDados.valor = toNumber(valor);
+      break;
+    case 'categoria':
+      novosDados.categoria = valor;
+      break;
+    case 'descricao':
+      novosDados.descricao = valor;
+      break;
+    case 'pagamento':
+      novosDados.pagamento = valor;
+      break;
+    case 'data':
+      novosDados.data = toISODate(valor);
+      break;
+    default:
+      // Campo não suportado
+      throw new Error(`Campo de edição não suportado: ${campo}`);
+  }
+
+  return await databaseService.atualizarLancamentoPorId(userId, id, novosDados);
 }
 
 // Funções para análise
