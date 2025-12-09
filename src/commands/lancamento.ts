@@ -101,9 +101,12 @@ function categorizarPorPalavrasChave(texto) {
 }
 
 // Função para análise inteligente com IA
+// TODO: Migrar análise de IA para fila de background (BullMQ em Redis),
+// evitando bloqueio do fluxo principal e melhorando escalabilidade.
 async function analisarLancamentoComIA(userId, texto) {
   try {
-    console.log(`[IA_ANALISE] Iniciando análise para: "${texto}"`);
+    const TIMEOUT_MS = Math.max(3000, Number(process.env.GEMINI_TIMEOUT_MS || 7000));
+    console.log(`[IA_ANALISE] Iniciando análise. textoLen=${(texto || '').length}, timeoutMs=${TIMEOUT_MS}`);
     
     // Primeiro, tentar categorizar por palavras-chave
     const categoriaPorPalavrasChave = categorizarPorPalavrasChave(texto);
@@ -153,10 +156,25 @@ Mensagem para analisar: "${texto}"
 Data atual: ${new Date().toLocaleDateString('pt-BR')}
 `;
 
-    const analiseGemini = await geminiService.analisarTransacaoComGemini(texto, userId);
-    console.log(`[IA_ANALISE] Resposta da IA:`, analiseGemini);
+    // Abstração de timeout para a chamada de IA
+    const withTimeout = (promise, ms) => {
+      return new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('IA_TIMEOUT')), ms);
+        promise.then((v) => { clearTimeout(t); resolve(v); }).catch((e) => { clearTimeout(t); reject(e); });
+      });
+    };
+
+    const analiseGemini = await withTimeout(
+      geminiService.analisarTransacaoComGemini(texto, userId),
+      TIMEOUT_MS
+    );
+    if (analiseGemini) {
+      console.log(`[IA_ANALISE] OK. tipo=${analiseGemini.tipo}; valor=${analiseGemini.valor}; cat=${analiseGemini.categoria}; fp=${analiseGemini.formaPagamento}`);
+    } else {
+      console.log('[IA_ANALISE] ❌ IA retornou nulo (sem resposta útil)');
+    }
     if (!analiseGemini) {
-      console.log('[IA_ANALISE] ❌ IA indisponível ou sem resposta. Abortando fallback.');
+      console.log('[IA_ANALISE] ❌ IA indisponível/sem resposta. Abortando fallback.');
       return null;
     }
     
@@ -196,12 +214,16 @@ Data atual: ${new Date().toLocaleDateString('pt-BR')}
       recorrente: false
     };
     
-    console.log(`[IA_ANALISE] Resultado final:`, resultado);
-    console.log(`[IA_ANALISE] Categoria final: ${resultado.categoria} (palavras-chave: ${categoriaPorPalavrasChave}, IA: ${analiseGemini.categoria})`);
+    console.log(`[IA_ANALISE] Resultado final resumido → tipo=${resultado.tipo}; valor=${resultado.valor}; cat=${resultado.categoria}; pagamento=${resultado.pagamento}`);
+    console.log(`[IA_ANALISE] Categoria final: ${resultado.categoria} (chave=${categoriaPorPalavrasChave || 'nenhuma'} | ia=${analiseGemini.categoria || 'n/a'})`);
     
     return resultado;
   } catch (error) {
-    console.error('Erro na análise com IA:', error);
+    if (String(error && error.message) === 'IA_TIMEOUT') {
+      console.log('[IA_ANALISE] ⏱️ Timeout atingido na análise de IA');
+    } else {
+      console.log('[IA_ANALISE] Erro tratado na análise de IA:', (error && error.message) || String(error));
+    }
     return null;
   }
 }
@@ -359,7 +381,7 @@ async function gerarMensagemSucesso(parsed, cartao = null) {
 }
 
 async function lancamentoCommand(sock, userId, texto) {
-  console.log(`[LANCAMENTO] Comando iniciado: userId=${userId}, texto="${texto}"`);
+  console.log(`[LANCAMENTO] Comando iniciado: userId=${userId}, textoLen=${(texto || '').length})`);
   
   // 1. Fluxo aguardando confirmação da IA
   const estado = await obterEstado(userId);
@@ -578,7 +600,7 @@ async function lancamentoCommand(sock, userId, texto) {
       status_fatura: 'pendente',
       data_vencimento: converterDataParaISO(parsed.dataVencimento)
     };
-    console.log('🔔 Dados do lançamento:', dados);
+    console.log(`🔔 Dados do lançamento (resumo) → tipo=${dados.tipo}; valor=${dados.valor}; cat=${dados.categoria}; pagamento=${dados.pagamento}; cartao=${dados.cartao_nome}`);
     await lancamentosService.salvarLancamento(userId, dados);
     await limparEstado(userId);
     await sock.sendMessage(userId, { text: await gerarMensagemSucesso(parsed, cartaoEscolhido) });
@@ -588,14 +610,15 @@ async function lancamentoCommand(sock, userId, texto) {
   // 4. Parsear mensagem
   let parsed = parseMessage(texto);
   const parsedNormal = parsed;
-  console.log(`[LANCAMENTO] Parse normal resultado:`, parsed);
+  console.log(`[LANCAMENTO] Parse normal resumo → valor=${parsed?.valor ?? 'n/a'}; cat=${parsed?.categoria ?? 'n/a'}; pagamento=${parsed?.pagamento ?? 'n/a'}`);
   
   // Se o parse normal falhou ou categoria é incerta, tentar com IA
   if (!parsed || !parsed.valor || parsed.categoria === 'Outros' || parsed.confiancaCategoria === 'nenhuma') {
     console.log(`[LANCAMENTO] Parse normal falhou, tentando com IA...`);
-    // await sock.sendMessage(userId, { 
-    //   text: '🤖 Analisando sua mensagem com IA...' 
-    // });
+    // Aviso imediato ao usuário para reduzir latência percebida
+    await sock.sendMessage(userId, { 
+      text: '⌛ Estou analisando sua mensagem, só um instante.' 
+    });
     
     const parsedIA = await analisarLancamentoComIA(userId, texto);
     
@@ -611,9 +634,17 @@ async function lancamentoCommand(sock, userId, texto) {
       await definirEstado(userId, 'aguardando_confirmacao_ia', parsedIA);
       return;
     } else {
-      console.log('[LANCAMENTO] ❌ IA indisponível ou sem resposta. Prosseguindo com o entendimento padrão.');
+      console.log('[LANCAMENTO] ❌ IA falhou ou atingiu timeout. Comunicando usuário e seguindo padrão.');
+      // Resposta amigável ao usuário (evitar duplicidade posteriormente)
+      await sock.sendMessage(userId, { 
+        text: '⏱️ A análise inteligente demorou demais ou não foi possível entender.\n\nTente um formato mais simples, por exemplo:\n• "mercado 50 pix"\n• "gasto 100 uber credito"\n• "receita 5000 salario"' 
+      });
       parsed = parsedNormal;
-      // Não retornar aqui: deixa fluir para o processamento normal abaixo
+      // Se o parse normal também não tiver valor, encerrar aqui para não duplicar mensagens
+      if (!parsed || !parsed.valor) {
+        return;
+      }
+      // Caso contrário, prossegue para o fluxo normal abaixo
     }
   }
   

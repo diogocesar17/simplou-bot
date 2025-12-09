@@ -93,14 +93,14 @@ Regras importantes:
     const jsonMatch = textResp.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed: AnaliseTransacao = JSON.parse(jsonMatch[0]);
-      console.log('[GEMINI] Análise realizada:', parsed);
+      console.log('[GEMINI] Análise realizada (resumo) → tipo=%s; valor=%s; cat=%s; fp=%s; conf=%s', parsed.tipo, parsed.valor, parsed.categoria, parsed.formaPagamento, parsed.confianca);
       return parsed;
     } else {
-      console.log('[GEMINI] Não conseguiu extrair JSON da resposta:', textResp);
+      console.log('[GEMINI] Não conseguiu extrair JSON. respLen=%d; prefix=%s', (textResp || '').length, (textResp || '').slice(0, 80));
       return null;
     }
   } catch (error: any) {
-    console.error('[GEMINI] Erro na análise:', error?.message || error);
+    console.error('[GEMINI] Erro na análise (resumido):', error?.message || String(error));
     return null;
   }
 }
