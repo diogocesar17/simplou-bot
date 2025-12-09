@@ -166,14 +166,31 @@ Data atual: ${new Date().toLocaleDateString('pt-BR')}
       return null;
     }
     
+    // Normalizar forma de pagamento retornada pela IA
+    const normalizar = (v) => {
+      if (!v) return null;
+      const s = removerAcentos(String(v).trim().toLowerCase());
+      if (['nao informado', 'não informado', 'nao especificado', 'não especificado', 'indefinido', 'desconhecido'].includes(s)) {
+        return null;
+      }
+      if (s.includes('pix')) return 'pix';
+      if (s.includes('dinheiro') || s.includes('cash')) return 'dinheiro';
+      if (s.includes('credito') || s.includes('cartao de credito') || s.includes('cartao') || s.includes('cartão')) return 'credito';
+      if (s.includes('debito') || s.includes('cartao de debito')) return 'debito';
+      if (s.includes('boleto')) return 'boleto';
+      if (s.includes('transferencia') || s.includes('transferencia bancaria') || s.includes('transferencia bancária') || s.includes('ted') || s.includes('doc') || s.includes('transfer')) return 'transferencia';
+      return null;
+    };
+    const pagamentoNormalizado = normalizar(analiseGemini.formaPagamento);
+
     const resultado = {
       tipo: analiseGemini.tipo,
       valor: analiseGemini.valor,
       descricao: analiseGemini.descricao,
       categoria: categoriaPorPalavrasChave || analiseGemini.categoria || 'Outros',
-      pagamento: analiseGemini.formaPagamento || 'NÃO INFORMADO',
+      pagamento: pagamentoNormalizado || 'NÃO INFORMADO',
       data: new Date().toLocaleDateString('pt-BR'),
-      faltaFormaPagamento: !analiseGemini.formaPagamento || analiseGemini.formaPagamento === 'NÃO INFORMADO',
+      faltaFormaPagamento: !pagamentoNormalizado,
       faltaDataVencimento: false,
       parcelamento: false,
       recorrente: false
@@ -362,7 +379,7 @@ async function lancamentoCommand(sock, userId, texto) {
       if (categoriasValidas.includes(novaCategoria)) {
         parsed.categoria = novaCategoria;
         await sock.sendMessage(userId, {
-          text: `✅ Categoria alterada para: ${novaCategoria}\n\n🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsed.pagamento}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento? (sim/não)\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+          text: `✅ Categoria alterada para: ${novaCategoria}\n\n🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsed.pagamento}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
         });
         return;
       } else {
@@ -373,15 +390,53 @@ async function lancamentoCommand(sock, userId, texto) {
       }
     }
     
+    const opcaoConfirmacao = parseInt(resposta, 10);
+    if (!isNaN(opcaoConfirmacao)) {
+      if (opcaoConfirmacao === 1) {
+        // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
+        if (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento) {
+          await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
+          await sock.sendMessage(userId, { 
+            text: '💳 Qual foi a forma de pagamento?\n\n1. PIX\n2. Dinheiro\n3. Crédito\n4. Débito\n5. Boleto\n6. Transferência\n\nDigite o número da opção:' 
+          });
+          return;
+        }
+        // Forma de pagamento presente, processar lançamento
+        await limparEstado(userId);
+        return await processarLancamento(sock, userId, parsed);
+      }
+      if (opcaoConfirmacao === 2) {
+        await limparEstado(userId);
+        await sock.sendMessage(userId, { 
+          text: '❌ Lançamento cancelado. Tente novamente com um formato mais claro.' 
+        });
+        return;
+      }
+      // Opção inválida
+      await sock.sendMessage(userId, { text: '❌ Opção inválida. Digite 1 para Sim ou 2 para Não.' });
+      return;
+    }
+    // Backward compatibility: aceitar textos
     if (resposta === 'sim' || resposta === 's' || resposta === 'yes' || resposta === 'y') {
-      // Usuário confirmou, processar lançamento
+      // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
+      if (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento) {
+        await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
+        await sock.sendMessage(userId, { 
+          text: '💳 Qual foi a forma de pagamento?\n\n1. PIX\n2. Dinheiro\n3. Crédito\n4. Débito\n5. Boleto\n6. Transferência\n\nDigite o número da opção:' 
+        });
+        return;
+      }
+      // Forma de pagamento presente, processar lançamento
       await limparEstado(userId);
       return await processarLancamento(sock, userId, parsed);
-    } else {
+    } else if (resposta === 'não' || resposta === 'nao' || resposta === 'n' || resposta === 'no') {
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
         text: '❌ Lançamento cancelado. Tente novamente com um formato mais claro.' 
       });
+      return;
+    } else {
+      await sock.sendMessage(userId, { text: '❌ Opção inválida. Digite 1 para Sim ou 2 para Não.' });
       return;
     }
   }
@@ -532,6 +587,7 @@ async function lancamentoCommand(sock, userId, texto) {
 
   // 4. Parsear mensagem
   let parsed = parseMessage(texto);
+  const parsedNormal = parsed;
   console.log(`[LANCAMENTO] Parse normal resultado:`, parsed);
   
   // Se o parse normal falhou ou categoria é incerta, tentar com IA
@@ -541,27 +597,34 @@ async function lancamentoCommand(sock, userId, texto) {
     //   text: '🤖 Analisando sua mensagem com IA...' 
     // });
     
-    parsed = await analisarLancamentoComIA(userId, texto);
+    const parsedIA = await analisarLancamentoComIA(userId, texto);
     
-    if (!parsed || !parsed.valor) {
-      await sock.sendMessage(userId, { 
-        text: '❌ Não consegui entender. Tente usar um formato mais claro:\n\n💡 *Exemplos:*\n• "mercado 50 pix"\n• "gasto 100 com uber no credito"\n• "receita 5000 salario"\n\nDigite *ajuda* para ver todos os comandos.' 
+    if (parsedIA && parsedIA.valor) {
+      console.log('[LANCAMENTO] ✅ IA fallback retornou um parsed válido.');
+      
+      // Confirmar com o usuário se a IA entendeu corretamente
+      await sock.sendMessage(userId, {
+        text: `🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsedIA.valor)}\n📝 Descrição: ${parsedIA.descricao}\n📂 Categoria: ${parsedIA.categoria}\n💳 Pagamento: ${parsedIA.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsedIA.pagamento}\n📅 Data: ${parsedIA.data}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
       });
+      
+      // Aguardar confirmação
+      await definirEstado(userId, 'aguardando_confirmacao_ia', parsedIA);
       return;
+    } else {
+      console.log('[LANCAMENTO] ❌ IA indisponível ou sem resposta. Prosseguindo com o entendimento padrão.');
+      parsed = parsedNormal;
+      // Não retornar aqui: deixa fluir para o processamento normal abaixo
     }
-    
-    console.log('[LANCAMENTO] ✅ IA fallback retornou um parsed válido.');
-    
-    // Confirmar com o usuário se a IA entendeu corretamente
-    await sock.sendMessage(userId, {
-      text: `🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsed.pagamento}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento? (sim/não)\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
-    });
-    
-    // Aguardar confirmação
-    await definirEstado(userId, 'aguardando_confirmacao_ia', parsed);
-    return;
   }
   
+  // Se após fallback o parsed ainda não tiver valor, orientar o usuário e interromper
+  if (!parsed || !parsed.valor) {
+    await sock.sendMessage(userId, { 
+      text: '❌ Não consegui entender. Tente usar um formato mais claro:\n\n💡 *Exemplos:*\n• "mercado 50 pix"\n• "gasto 100 com uber no credito"\n• "receita 5000 salario"\n\nDigite *ajuda* para ver todos os comandos.' 
+    });
+    return;
+  }
+
   // Se chegou aqui, o parser normal funcionou e a IA não será usada
   console.log('[LANCAMENTO] Parser normal entendeu a mensagem. IA não será usada.');
 
