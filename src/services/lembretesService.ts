@@ -1,6 +1,6 @@
-import { pool, registrarLog } from '../../databaseService';
-import { logger } from '../../logger';
-import { buscarUsuario } from '../../databaseService';
+import { pool, registrarLog } from '../infrastructure/databaseService';
+import { logger } from '../infrastructure/logger';
+import { buscarUsuario } from '../infrastructure/databaseService';
 
 export interface Lembrete {
   id: string;

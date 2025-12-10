@@ -42,9 +42,9 @@ import meusLembretesCommand from './commands/meuslembretes';
 
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
-import { logger, fileLogger } from '../logger';
+import { logger, fileLogger } from './infrastructure/logger';
 import * as geminiService from './services/geminiService';
-import { initializeDatabase } from '../databaseService';
+import { initializeDatabase } from './infrastructure/databaseService';
 import * as lancamentosService from './services/lancamentosService';
 
 // Exemplo de função de roteamento (simples)

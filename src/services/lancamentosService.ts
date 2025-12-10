@@ -1,4 +1,4 @@
-import * as databaseService from '../../databaseService';
+import * as databaseService from '../infrastructure/databaseService';
 import { Lancamento, Cartao } from '../types/global';
 
 // Interfaces específicas para este serviço

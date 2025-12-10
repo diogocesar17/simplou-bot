@@ -1,6 +1,6 @@
 // @ts-nocheck
 import * as alertasService from '../services/alertasService';
-import { logger } from '../../logger';
+import { logger } from '../infrastructure/logger';
 import { formatarMensagem } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 

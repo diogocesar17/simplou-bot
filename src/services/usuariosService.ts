@@ -1,4 +1,4 @@
-import * as databaseService from '../../databaseService';
+import * as databaseService from '../infrastructure/databaseService';
 import * as authorizationService from './authorizationService';
 
 // TODO: Tipar corretamente. Usar any onde necessário.

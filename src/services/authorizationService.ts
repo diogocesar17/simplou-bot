@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import * as databaseService from '../../databaseService'
+import * as databaseService from '../infrastructure/databaseService'
 
 // Normaliza entradas (número puro ou JID) para JID do WhatsApp
 function formatPhoneNumber(phoneNumber: string): string {

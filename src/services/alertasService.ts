@@ -3,8 +3,8 @@ import {
   gerarMensagemAlertas,
   buscarUsuariosPremiumExpiracao,
   listarUsuarios
-} from '../../databaseService';
-import { logger } from '../../logger';
+} from '../infrastructure/databaseService';
+import { logger } from '../infrastructure/logger';
 import * as lembretesService from './lembretesService';
 
 // Interfaces para tipagem

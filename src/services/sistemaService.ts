@@ -1,4 +1,4 @@
-import * as databaseService from '../../databaseService';
+import * as databaseService from '../infrastructure/databaseService';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
