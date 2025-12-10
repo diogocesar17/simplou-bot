@@ -1,22 +1,50 @@
 // ===== CONFIGURAÇÃO DE USUÁRIOS =====
+// Carrega variáveis de ambiente (no index.ts já é feito, mas aqui reforçamos para segurança)
+import 'dotenv/config'
+
+// Função para formatar número de telefone
+function formatPhoneNumber(phoneNumber: string): string {
+  // Remove caracteres especiais
+  let clean = phoneNumber.replace(/\D/g, '')
+  // Adiciona código do país se não tiver
+  if (!clean.startsWith('55')) {
+    clean = '55' + clean
+  }
+  // Adiciona sufixo do WhatsApp
+  return clean + '@s.whatsapp.net'
+}
+
+// Normaliza valor da env para JID do WhatsApp
+function normalizeJid(input: string): string {
+  const s = input.trim()
+  // Se já está em formato JID, retorna como está
+  if (s.endsWith('@s.whatsapp.net')) return s
+  // Caso contrário, tenta formatar como número
+  return formatPhoneNumber(s)
+}
+
+function parseUsersFromEnv(envName: string, fallback: string[] = []): string[] {
+  const raw = process.env[envName]
+  if (!raw) {
+    // Comportamento padrão seguro em desenvolvimento: usar fallback
+    // Comentário: Se ADMIN_USERS/AUTHORIZED_USERS não forem definidos, usa fallback
+    return [...fallback]
+  }
+  return raw
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .map(normalizeJid)
+}
 
 // Lista de usuários autorizados (ADMINISTRADORES)
-// Substitua pelos números reais dos administradores
-const ADMIN_USERS: string[] = [
-  '556181429135@s.whatsapp.net', // Seu número (administrador principal)
-  // Adicione outros números de administradores aqui
-];
+// Em produção, defina via env ADMIN_USERS="5511999999999,5511888888888"
+const ADMIN_USERS: string[] = parseUsersFromEnv('ADMIN_USERS', [])
 
 // Lista de usuários autorizados (USUÁRIOS NORMAIS)
-// Substitua pelos números reais dos usuários (máximo 5 usuários)
-const AUTHORIZED_USERS: string[] = [
-  '556181429135@s.whatsapp.net', // Seu número (administrador)
-  // Adicione outros usuários aqui (máximo 4 usuários adicionais)
-  '556193096344@s.whatsapp.net', // Usuário 1
-  // '5511777777777@s.whatsapp.net', // Usuário 2
-  // '5511666666666@s.whatsapp.net', // Usuário 3
-  // '5511555555555@s.whatsapp.net', // Usuário 4
-];
+// Em produção, defina via env AUTHORIZED_USERS="5511999999999,5511666666666"
+// Padrão: se AUTHORIZED_USERS não estiver definido, usa os ADMIN_USERS como autorizados
+const AUTHORIZED_USERS: string[] = parseUsersFromEnv('AUTHORIZED_USERS', ADMIN_USERS)
 
 // Configurações do sistema
 const SYSTEM_CONFIG = {
@@ -65,16 +93,7 @@ function removeUser(phoneNumber: string): string {
 }
 
 // Função para formatar número de telefone
-function formatPhoneNumber(phoneNumber: string): string {
-  // Remove caracteres especiais
-  let clean = phoneNumber.replace(/\D/g, '');
-  // Adiciona código do país se não tiver
-  if (!clean.startsWith('55')) {
-    clean = '55' + clean;
-  }
-  // Adiciona sufixo do WhatsApp
-  return clean + '@s.whatsapp.net';
-}
+// formatPhoneNumber já definido acima
 
 // Função para listar usuários
 function listUsers() {

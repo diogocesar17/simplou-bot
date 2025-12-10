@@ -73,6 +73,43 @@ Para rodar com Docker:
 docker-compose up -d
 ```
 
+### Produção (Segurança e Configuração)
+
+- Postgres interno (sem porta exposta):
+  - O `docker-compose.yml` não expõe a porta `5432` do Postgres em produção. O serviço do bot acessa o banco via rede interna do Docker.
+  - Para desenvolvimento local, se precisar acessar via host, descomente:
+    ```yaml
+    # ports:
+    #   - "5432:5432"
+    ```
+
+- `DATABASE_URL` em produção (rede interna):
+  - Use o host `postgres` para conectar via rede interna:
+    ```env
+    DATABASE_URL=postgresql://simplou:simplou123@postgres:5432/simplou
+    ```
+
+- Controle de acesso via variáveis de ambiente:
+  - Fallback/bootstrapping: configure `SUPER_ADMINS` como lista separada por vírgula.
+  - Esses super-admins sempre têm acesso (admin e autorizado), mesmo se o banco estiver vazio.
+  - A autorização normal é feita via banco (tabela `usuarios`, campos `status` e `is_admin`).
+
+- Fail-fast na inicialização do banco:
+  - Se `initializeDatabase()` falhar, o processo encerra com `process.exit(1)` e o Docker (com `restart: always`) tenta reiniciar até o Postgres estar pronto.
+  - Isso evita a instância “viva” mas inoperante.
+
+### Exemplo de `.env` para produção
+
+```env
+NODE_ENV=production
+PORT=3000
+DATABASE_URL=postgresql://simplou:simplou123@postgres:5432/simplou
+GEMINI_API_KEY=sua_chave_api_aqui
+SUPER_ADMINS=5511999999999
+TZ=America/Sao_Paulo
+REDIS_URL=redis://redis:6379
+```
+
 ## 📄 Licença
 
 MIT License

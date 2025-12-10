@@ -57,8 +57,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-postgres.sql:/docker-entrypoint-initdb.d/init-postgres.sql
-    ports:
-      - "5432:5432"
+    # Em produção, NÃO exponha a porta do Postgres
+    # Para desenvolvimento local, você pode descomentar a linha abaixo
+    # ports:
+    #   - "5432:5432"
     networks:
       - simplou-network
   redis:

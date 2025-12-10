@@ -1,5 +1,7 @@
 # 🚀 Melhorias Implementadas para Uso em Grupo
 
+> Nota: O controle de acesso via listas em `config.js` foi substituído por autorização baseada em banco de dados com fallback de `SUPER_ADMINS` via `.env`. As seções abaixo de `config.js` são históricas e podem ser usadas apenas como referência de migração.
+
 ## 📋 Resumo das Funcionalidades Adicionadas
 
 ### 1. **Sistema de Autenticação e Controle de Acesso**

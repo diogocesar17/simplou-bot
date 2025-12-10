@@ -1,5 +1,5 @@
 import * as databaseService from '../../databaseService';
-import { ADMIN_USERS } from '../../config';
+import * as authorizationService from './authorizationService';
 
 // TODO: Tipar corretamente. Usar any onde necessário.
 
@@ -38,7 +38,12 @@ export async function buscarUsuariosPremiumExpiracao(dias: number = 7): Promise<
 
 // Função para verificar se usuário é admin
 export async function verificarAdmin(userId: string): Promise<boolean> {
-  return ADMIN_USERS.includes(userId);
+  return await authorizationService.isAdmin(userId);
+}
+
+// Nova verificação unificada de autorização (via banco + fallback SUPER_ADMINS)
+export async function verificarAutorizado(userId: string): Promise<boolean> {
+  return await authorizationService.isAuthorized(userId);
 }
 
 // Função para processar comando de listagem de usuários

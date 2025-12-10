@@ -85,9 +85,10 @@ status 5511999999999
 
 ### **Processo de Migração:**
 1. **Verificação:** Checa se já existem usuários na tabela
-2. **Migração de Admins:** Converte ADMIN_USERS para premium
-3. **Migração de Usuários:** Converte AUTHORIZED_USERS para gratuito
+2. **Migração de Admins (legado):** Converte `ADMIN_USERS` (env) para premium
+3. **Migração de Usuários (legado):** Converte `AUTHORIZED_USERS` (env) para gratuito
 4. **Logs:** Registra todo o processo
+5. **Observação:** Após a migração, o fluxo de autorização passa a ser 100% via banco.
 
 ### **Execução:**
 - Automática na inicialização do banco
@@ -105,8 +106,9 @@ status 5511999999999
 - ✅ Logs de auditoria completos
 
 ### **Controle de Acesso:**
+- ✅ Serviço central `authorizationService` (Node/TS)
+- ✅ Fallback seguro via `SUPER_ADMINS` (env)
 - ✅ Verificação automática em todas as operações
-- ✅ Middleware de autenticação
 - ✅ Registro de último acesso
 - ✅ Conversão automática de premium expirado
 

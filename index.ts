@@ -203,7 +203,11 @@ async function initApp(): Promise<void> {
     await initializeDatabase()
     console.log('✅ Banco de dados inicializado com sucesso!')
   } catch (error) {
-    console.error('❌ Erro ao inicializar banco de dados:', error)
+    // Fail-fast: se o banco falhar na inicialização, encerramos o processo
+    // para que o Docker/Compose (com restart: always) reinicie o container
+    const err = error as any
+    const stack = (err?.stack || (typeof err === 'object' ? JSON.stringify(err) : String(err)))
+    console.error('❌ Erro ao inicializar banco de dados:', stack)
     process.exit(1)
   }
 
@@ -252,6 +256,8 @@ function iniciarSistemaAlertas(sock: WASocket): void {
 
 // 🚀 Start da aplicação
 initApp().catch((e) => {
-  console.error('❌ Erro fatal ao iniciar aplicação:', e)
+  const err = e as any
+  const stack = (err?.stack || (typeof err === 'object' ? JSON.stringify(err) : String(err)))
+  console.error('❌ Erro fatal ao iniciar aplicação:', stack)
   process.exit(1)
 })
