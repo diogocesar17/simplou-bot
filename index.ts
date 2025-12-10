@@ -18,9 +18,13 @@ import {
 } from './src/services/alertasService'
 import { initializeDatabase } from './databaseService'
 import { Boom } from '@hapi/boom'
+import { startHealthServer } from './src/healthServer'
 
 let sock: WASocket | null = null
 let reconnecting = false
+const INITIAL_RETRY_DELAY_MS = 5000
+const MAX_RETRY_DELAY_MS = 60000
+let retryDelayMs = INITIAL_RETRY_DELAY_MS
 
 /**
  * Cria o socket do WhatsApp e registra os listeners.
@@ -60,6 +64,10 @@ async function createSocket(): Promise<void> {
     if (connection === 'open') {
       console.log('✅ Conectado com sucesso ao WhatsApp!')
 
+      // Resetar controle de backoff ao conectar
+      retryDelayMs = INITIAL_RETRY_DELAY_MS
+      reconnecting = false
+
       // Iniciar sistema de alertas automáticos (uma vez por socket)
       iniciarSistemaAlertas(sock!)
     }
@@ -72,15 +80,44 @@ async function createSocket(): Promise<void> {
       console.log('   Mensagem:', (error as Error | undefined)?.message)
       console.log('   StatusCode:', statusCode)
 
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut
+      const reason = statusCode as number | undefined
 
-      if (shouldReconnect) {
-        console.log('🔁 Tentando reconectar ao WhatsApp...')
-        await reconnect()
-      } else {
-        console.log('❌ Sessão encerrada pelo WhatsApp (loggedOut).')
-        console.log('   Apague a pasta ./auth para parear novamente.')
+      // Tratamento específico por statusCode / DisconnectReason
+      if (reason === DisconnectReason.badSession || reason === 401) {
+        // 401 / badSession: sessão inválida/expirada. Não tentar reconectar em loop.
+        console.error('🛑 Sessão inválida ou expirada (401/badSession).')
+        console.error('   Apague a pasta ./auth e pareie novamente para continuar.')
+        return
       }
+
+      if (reason === DisconnectReason.connectionReplaced || reason === 409) {
+        // 409: conexão substituída por outro dispositivo. Evitar reconexão imediata.
+        console.warn('🔄 Conexão substituída por outro dispositivo (409/connectionReplaced).')
+        console.warn('   Se este não foi você, desconecte o outro dispositivo ou pareie novamente.')
+        return
+      }
+
+      if (
+        reason === DisconnectReason.restartRequired ||
+        reason === DisconnectReason.timedOut ||
+        reason === 515
+      ) {
+        // 515 / restartRequired / timedOut: desconexão temporária, tentar reconectar com backoff.
+        console.log('♻️ Desconexão temporária (515/restartRequired/timedOut). Tentando reconectar com backoff...')
+        await reconnect()
+        return
+      }
+
+      if (reason === DisconnectReason.loggedOut) {
+        // loggedOut: sessão realmente encerrada, requer novo pareamento.
+        console.error('🚪 Sessão encerrada pelo WhatsApp (loggedOut).')
+        console.error('   É necessário apagar ./auth e parear novamente.')
+        return
+      }
+
+      // Default: tratar como desconexão genérica e tentar reconectar com backoff
+      console.warn('⚠️ Desconexão genérica. Tentando reconectar com backoff...')
+      await reconnect()
     }
   })
 
@@ -125,9 +162,19 @@ async function reconnect(): Promise<void> {
 
   reconnecting = true
   try {
+    const waitSeconds = Math.round(retryDelayMs / 1000)
+    console.log(`⏲️ Aguardando ${waitSeconds}s antes de tentar reconectar...`)
+    await new Promise((res) => setTimeout(res, retryDelayMs))
+
     await createSocket()
+    console.log('🔌 Reconexão bem-sucedida!')
+    retryDelayMs = INITIAL_RETRY_DELAY_MS
   } catch (e) {
     console.error('❌ Erro ao tentar reconectar:', (e as any)?.message || e)
+    // Backoff progressivo até o máximo definido
+    retryDelayMs = Math.min(retryDelayMs * 2, MAX_RETRY_DELAY_MS)
+    const nextSeconds = Math.round(retryDelayMs / 1000)
+    console.warn(`⏳ Ajustando backoff: próxima tentativa em ~${nextSeconds}s (máx ${Math.round(MAX_RETRY_DELAY_MS/1000)}s)`)    
   } finally {
     reconnecting = false
   }
@@ -159,6 +206,9 @@ async function initApp(): Promise<void> {
     console.error('❌ Erro ao inicializar banco de dados:', error)
     process.exit(1)
   }
+
+  // Iniciar health server HTTP (porta padrão 3000 ou process.env.PORT)
+  startHealthServer()
 
   await createSocket()
 }
