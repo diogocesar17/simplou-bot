@@ -203,7 +203,20 @@ async function editarLancamentoCommand(sock, userId, texto) {
   }
 
   const idx = parseInt(match[1]) - 1;
-  const lista = await lancamentosService.buscarLancamentosRecentes(userId, 10);
+  // Priorizar a lista exibida no histórico, se disponível e ainda válida
+  let lista;
+  if (estado?.etapa === 'historico_exibido' && estado?.dadosParciais?.lista) {
+    const agora = Date.now();
+    const tempoExpiracao = 10 * 60 * 1000; // 10 minutos
+    if (agora - (estado.dadosParciais.timestamp || 0) <= tempoExpiracao) {
+      lista = estado.dadosParciais.lista;
+    }
+  }
+
+  // Fallback para buscar lançamentos recentes quando não há histórico válido
+  if (!lista) {
+    lista = await lancamentosService.buscarLancamentosRecentes(userId, 10);
+  }
   
   if (!lista || !lista[idx]) {
     await sock.sendMessage(userId, { 
