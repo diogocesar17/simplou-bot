@@ -462,7 +462,7 @@ function formatarDataParaISO(dataBR) {
 }
 
 // Funções para gerenciar cartões de crédito
-async function salvarConfiguracaoCartao(userId, nomeCartao, diaVencimento, diaFechamento = null) {
+async function salvarConfiguracaoCartao(userId: string, nomeCartao: string, diaVencimento: number, diaFechamento: number | null = null) {
   try {
     const query = `
       INSERT INTO cartoes_config (user_id, nome_cartao, dia_vencimento, dia_fechamento)
@@ -487,7 +487,7 @@ async function salvarConfiguracaoCartao(userId, nomeCartao, diaVencimento, diaFe
   }
 }
 
-async function atualizarCartaoConfigurado(userId, nomeCartao, diaVencimento, diaFechamento = null) {
+async function atualizarCartaoConfigurado(userId: string, nomeCartao: string, diaVencimento: number, diaFechamento: number | null = null) {
   try {
     const query = `
       UPDATE cartoes_config 

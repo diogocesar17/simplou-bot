@@ -5,8 +5,7 @@ import { formatarMensagem, formatarConfirmacao, gerarDicasContextuais, formatarC
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 
-// Contexto simples em memória
-const aguardandoExclusaoCartao = {};
+// Fluxo 100% baseado em Redis (stateManager)
 
 async function excluirCartaoCommand(sock, userId, texto) {
   const textoLimpo = texto.trim().toLowerCase();

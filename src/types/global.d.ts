@@ -1,10 +1,4 @@
-// Tipos globais para o projeto
-
-declare global {
-  var aguardandoEdicaoCartao: { [key: string]: any };
-  var aguardandoExclusaoCartao: { [key: string]: any };
-  var aguardandoPerguntaInteligente: { [key: string]: any };
-}
+// Tipos globais para o projeto (sem variáveis de estado globais)
 
 // Interfaces para WhatsApp/Baileys
 export interface WhatsAppSocket {

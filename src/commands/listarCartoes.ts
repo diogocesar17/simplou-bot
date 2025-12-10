@@ -36,6 +36,17 @@ async function listarCartoesCommand(sock, userId) {
       dicas: gerarDicasContextuais('cartoes')
     })
   });
+
+  // Guarda contexto leve de que a lista de cartões foi exibida,
+  // permitindo que "editar <n>" direcione para edição de cartão.
+  // TTL padrão (10min) conforme stateManager.
+  try {
+    const { definirEstado } = await import('../configs/stateManager');
+    await definirEstado(userId, 'cartoes_listados', { cartoes });
+  } catch (e) {
+    // Fail-safe: se Redis não estiver disponível, apenas segue sem estado
+    console.warn('[cartoes] Não foi possível definir estado cartoes_listados:', (e as any)?.message || e);
+  }
 }
 
 export default listarCartoesCommand; 

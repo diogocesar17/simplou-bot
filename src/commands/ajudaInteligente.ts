@@ -1,10 +1,8 @@
-// @ts-nocheck
-// Importar o contexto global (aguardandoPerguntaInteligente)
-// Nota: O contexto é gerenciado no src/index.js
+import { definirEstado } from '../configs/stateManager';
 
 async function ajudaInteligenteCommand(sock, userId) {
-  // Ativar contexto para aguardar pergunta inteligente
-  global.aguardandoPerguntaInteligente[userId] = true;
+  // Definir etapa no Redis para aguardar pergunta inteligente (TTL padrão 10min)
+  await definirEstado(userId, 'pergunta_inteligente', {});
   
   const msg = '🤖 *Assistente Inteligente Ativado*\n\n' +
     'Agora você pode fazer perguntas sobre suas finanças!\n\n' +

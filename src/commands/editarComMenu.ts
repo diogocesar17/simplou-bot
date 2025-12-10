@@ -78,6 +78,17 @@ async function editarComMenuCommand(sock, userId, texto) {
 
   // Se o usuário digitou "editar <número>", redirecionar para editar lançamento
   if (/^editar\s+\d+$/i.test(textoLower)) {
+    // Se há contexto recente de cartões listados, tratar como edição de cartão
+    const estadoAtual = await obterEstado(userId);
+    const idxMatch = textoLower.match(/^editar\s+(\d+)$/i);
+    if (estadoAtual?.etapa === 'cartoes_listados' && estadoAtual?.dadosParciais?.cartoes?.length) {
+      // Promove o estado para aguardando escolha de edição de cartão e repassa o índice
+      await definirEstado(userId, 'aguardando_escolha_edicao_cartao', { cartoes: estadoAtual.dadosParciais.cartoes });
+      await editarCartaoCommand(sock, userId, idxMatch![1]);
+      return;
+    }
+
+    // Caso contrário, assumir edição de lançamento
     await editarLancamentoCommand(sock, userId, texto);
     return;
   }

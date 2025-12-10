@@ -314,6 +314,9 @@ export function gerarDicasContextuais(comando: string, contexto?: any): Array<{t
       dicas.push(
         { texto: 'Configurar novo cartão', comando: 'configurar cartao' },
         { texto: 'Editar cartão', comando: 'editar cartao' },
+        { texto: 'Editar pelo número: editar <n>', comando: 'editar 1' },
+        { texto: 'Excluir cartão', comando: 'excluir cartao' },
+        { texto: 'Excluir pelo número: excluir <n>', comando: 'excluir 1' },
         { texto: 'Ver faturas', comando: 'fatura' }
       );
       break;

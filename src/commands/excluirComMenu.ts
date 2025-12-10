@@ -79,6 +79,17 @@ async function excluirComMenuCommand(sock, userId, texto) {
 
   // Se o usuário digitou "excluir <número>", redirecionar para excluir lançamento
   if (/^excluir\s+\d+$/i.test(textoLower)) {
+    // Se há contexto recente de cartões listados, tratar como exclusão de cartão
+    const estadoAtual = await obterEstado(userId);
+    const idxMatch = textoLower.match(/^excluir\s+(\d+)$/i);
+    if (estadoAtual?.etapa === 'cartoes_listados' && estadoAtual?.dadosParciais?.cartoes?.length) {
+      // Promove o estado para aguardando escolha de exclusão de cartão e repassa o índice
+      await definirEstado(userId, 'aguardando_escolha_exclusao_cartao', { cartoes: estadoAtual.dadosParciais.cartoes });
+      await excluirCartaoCommand(sock, userId, idxMatch![1]);
+      return;
+    }
+
+    // Caso contrário, assumir exclusão de lançamento
     await excluirLancamentoCommand(sock, userId, texto);
     return;
   }

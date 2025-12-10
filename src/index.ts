@@ -1,13 +1,4 @@
-// Contextos globais para controle de fluxo
-declare global {
-  var aguardandoEdicaoCartao: { [key: string]: any };
-  var aguardandoExclusaoCartao: { [key: string]: any };
-  var aguardandoPerguntaInteligente: { [key: string]: any };
-}
-
-global.aguardandoEdicaoCartao = {};
-global.aguardandoExclusaoCartao = {};
-global.aguardandoPerguntaInteligente = {};
+// Controle de fluxo agora é totalmente baseado em Redis (stateManager)
 
 // Imports dos comandos
 import ajudaCommand from './commands/ajuda';
@@ -65,6 +56,15 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   logger.info(`Estado: ${estado?.etapa}`);
   // Tratar qualquer etapa de fluxo (aguardando_*, confirmando_*, etc.)
   if (estado?.etapa) {
+    // Pergunta inteligente (Gemini) via stateManager
+    if (estado.etapa === 'pergunta_inteligente') {
+      const dados = await lancamentosService.buscarDadosParaAnalise(userId, 3);
+      const resposta = await geminiService.responderPerguntaFinanceira(texto, dados);
+      await sock.sendMessage(userId, { text: resposta });
+      await limparEstado(userId);
+      return;
+    }
+
     // Rotear dinamicamente com base na etapa
     if (estado.etapa.includes('edicao_cartao')) {
       await editarCartaoCommand(sock, userId, texto);
@@ -226,17 +226,7 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
 
 
 
-  // Controle de contexto para pergunta inteligente
-  if (global.aguardandoPerguntaInteligente[userId]) {
-    delete global.aguardandoPerguntaInteligente[userId];
-    
-    // Buscar dados do usuário para contexto
-    const dados = await lancamentosService.buscarDadosParaAnalise(userId, 3);
-    // Ajuste: usa a função correta responderPerguntaFinanceira
-    const resposta = await geminiService.responderPerguntaFinanceira(texto, dados);
-    await sock.sendMessage(userId, { text: resposta });
-    return;
-  }
+  // Fluxo padrão segue sem globais. Pergunta inteligente é tratada via stateManager.
 
   // Roteamento para comandos administrativos
   if (textoLower.startsWith('cadastrar ')) {
