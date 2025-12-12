@@ -42,6 +42,7 @@ import meusLembretesCommand from './commands/meuslembretes';
 
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
+import { formatarCancelamento } from './utils/formatMessages';
 import { logger, fileLogger } from './infrastructure/logger';
 import * as geminiService from './services/geminiService';
 import { initializeDatabase } from './infrastructure/databaseService';
@@ -56,6 +57,18 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   logger.info(`Estado: ${estado?.etapa}`);
   // Tratar qualquer etapa de fluxo (aguardando_*, confirmando_*, etc.)
   if (estado?.etapa) {
+    // Salvaguarda global de cancelamento em estados ativos
+    if (textoLower === '0' || textoLower === 'cancelar') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, {
+        text: formatarCancelamento('Operação', [
+          { texto: 'Ver histórico', comando: 'historico' },
+          { texto: 'Ver resumo do mês', comando: 'resumo' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
+        ])
+      });
+      return;
+    }
     // Pergunta inteligente (Gemini) via stateManager
     if (estado.etapa === 'pergunta_inteligente') {
       const dados = await lancamentosService.buscarDadosParaAnalise(userId, 3);
@@ -80,6 +93,18 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
       await editarLancamentoCommand(sock, userId, texto);
       return;
     }
+
+    // Edição de parcelado: etapa de escolha do escopo
+    if (estado.etapa.includes('escolha_parcelado_edicao')) {
+      await editarLancamentoCommand(sock, userId, texto);
+      return;
+    }
+
+    // Edição de recorrente: etapa de escolha do escopo
+    if (estado.etapa.includes('escolha_recorrente_edicao')) {
+      await editarLancamentoCommand(sock, userId, texto);
+      return;
+    }
   
     if(estado.etapa.includes('tipo_edicao')) {
       await editarComMenuCommand(sock, userId, texto);
@@ -92,6 +117,18 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     }
 
     if(estado.etapa.includes('confirmacao_exclusao_lancamento')) {
+      await excluirLancamentoCommand(sock, userId, texto);
+      return;
+    }
+
+    // Exclusão de parcelado: etapa de escolha do escopo
+    if (estado.etapa.includes('escolha_exclusao_parcelado')) {
+      await excluirLancamentoCommand(sock, userId, texto);
+      return;
+    }
+
+    // Exclusão de recorrente: etapa de escolha do escopo
+    if (estado.etapa.includes('escolha_exclusao_recorrente')) {
       await excluirLancamentoCommand(sock, userId, texto);
       return;
     }

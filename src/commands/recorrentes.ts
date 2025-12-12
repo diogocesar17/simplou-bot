@@ -2,6 +2,7 @@
 import { formatarValor } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem } from '../utils/formatMessages';
+import { definirEstado } from '../configs/stateManager';
 
 async function recorrentesCommand(sock, userId) {
   const recorrentes = await lancamentosService.buscarRecorrentesAtivos(userId, 20);
@@ -20,6 +21,9 @@ async function recorrentesCommand(sock, userId) {
     return;
   }
   
+  // Guarda contexto para permitir atalho "excluir <número>" direto desta tela
+  await definirEstado(userId, 'recorrentes_listados', { recorrentes, timestamp: Date.now() });
+
   const itensRecorrentes = recorrentes.map((recorrente, idx) => {
     const recorrenciasPagas = recorrente.recorrencias.filter(r => r.status === 'paga').length;
     const recorrenciasPendentes = recorrente.total_recorrencias - recorrenciasPagas;
@@ -39,11 +43,19 @@ async function recorrentesCommand(sock, userId) {
           titulo: 'Recorrentes',
           itens: itensRecorrentes,
           emoji: '📊'
+        },
+        {
+          titulo: 'Como editar/excluir',
+          itens: [
+            '1. Para editar: envie "editar <número>" diretamente aqui',
+            '2. Para excluir: envie "excluir <número>" diretamente aqui'
+          ],
+          emoji: '💡'
         }
       ],
       dicas: [
-        { texto: 'Excluir recorrente', comando: 'excluir <número>' },
-        { texto: 'Ver histórico detalhado', comando: 'historico' },
+        { texto: 'Ver histórico', comando: 'historico' },
+        { texto: 'Ver ajuda', comando: 'ajuda' },
         { texto: 'Ver resumo do mês', comando: 'resumo' }
       ]
     })

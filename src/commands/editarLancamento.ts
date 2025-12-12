@@ -72,23 +72,173 @@ async function editarLancamentoCommand(sock, userId, texto) {
         });
         return;
     }
-    // Avança para a próxima etapa
+    // Se for lançamento parcelado ou recorrente, perguntar se aplica só na atual ou também nas futuras
+    const ehParcelado = !!contexto?.lancamento?.parcelamento_id;
+    const ehRecorrente = !!contexto?.lancamento?.recorrente_id;
+    await limparEstado(userId);
+    if (ehParcelado) {
+      await definirEstado(userId, 'aguardando_escolha_parcelado_edicao', {
+        lancamentoId: contexto.lancamentoId,
+        lancamento: contexto.lancamento,
+        campo: campo,
+        instrucao
+      });
+      await sock.sendMessage(userId, {
+        text: formatarMensagem({
+          titulo: 'Este lançamento é parcelado',
+          emojiTitulo: '🧩',
+          secoes: [{
+            titulo: 'Como deseja aplicar a edição?',
+            itens: [
+              '1. Apenas esta parcela',
+              '2. Esta e todas as futuras parcelas'
+            ],
+            emoji: '⚙️'
+          }],
+          dicas: [
+            { texto: 'Cancelar edição', comando: '0 ou cancelar' }
+          ]
+        })
+      });
+    } else if (ehRecorrente) {
+      await definirEstado(userId, 'aguardando_escolha_recorrente_edicao', {
+        lancamentoId: contexto.lancamentoId,
+        lancamento: contexto.lancamento,
+        campo: campo,
+        instrucao
+      });
+      await sock.sendMessage(userId, {
+        text: formatarMensagem({
+          titulo: 'Este lançamento é recorrente/fixo',
+          emojiTitulo: '🔁',
+          secoes: [{
+            titulo: 'Como deseja aplicar a edição?',
+            itens: [
+              '1. Apenas esta recorrência',
+              '2. Esta e todas as futuras recorrências'
+            ],
+            emoji: '⚙️'
+          }],
+          dicas: [
+            { texto: 'Cancelar edição', comando: '0 ou cancelar' }
+          ]
+        })
+      });
+    } else {
+      await definirEstado(userId, 'aguardando_valor_edicao_lancamento', {
+        lancamentoId: contexto.lancamentoId,
+        lancamento: contexto.lancamento,
+        campo: campo,
+        aplicarEmLote: false
+      });
+      await sock.sendMessage(userId, { 
+        text: `${instrucao}\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar a edição` 
+      });
+    }
+    return;
+  }
+
+  // Se está aguardando escolha de como editar parcelas (apenas atual vs futuras também)
+  if (estado?.etapa === 'aguardando_escolha_parcelado_edicao') {
+    const { lancamentoId, lancamento, campo, instrucao } = estado.dadosParciais;
+    const textoLower = texto.toLowerCase().trim();
+    if (textoLower === 'cancelar' || texto === '0') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, {
+        text: formatarCancelamento('Edição de lançamento parcelado', [
+          { texto: 'Ver histórico', comando: 'historico' },
+          { texto: 'Ver resumo do mês', comando: 'resumo' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
+        ])
+      });
+      return;
+    }
+
+    const escolha = parseInt(texto);
+    if (![1,2].includes(escolha)) {
+      await sock.sendMessage(userId, {
+        text: formatarMensagem({
+          titulo: 'Opção inválida',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Escolha uma opção',
+            itens: ['1. Apenas esta parcela', '2. Esta e futuras parcelas'],
+            emoji: '💡'
+          }],
+          dicas: [
+            { texto: 'Cancelar edição', comando: '0 ou cancelar' }
+          ]
+        })
+      });
+      return;
+    }
+
+    const aplicarEmLote = escolha === 2;
     await limparEstado(userId);
     await definirEstado(userId, 'aguardando_valor_edicao_lancamento', {
-      lancamentoId: contexto.lancamentoId,
-      lancamento: contexto.lancamento,
-      campo: campo
+      lancamentoId,
+      lancamento,
+      campo,
+      aplicarEmLote
     });
-    
     await sock.sendMessage(userId, { 
-      text: `${instrucao}\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar a edição` 
+      text: `${instrucao}\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar a edição`
+    });
+    return;
+  }
+
+  // Se está aguardando escolha de como editar recorrente (apenas atual vs futuras também)
+  if (estado?.etapa === 'aguardando_escolha_recorrente_edicao') {
+    const { lancamentoId, lancamento, campo, instrucao } = estado.dadosParciais;
+    const textoLower = texto.toLowerCase().trim();
+    if (textoLower === 'cancelar' || texto === '0') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, {
+        text: formatarCancelamento('Edição de lançamento recorrente', [
+          { texto: 'Ver histórico', comando: 'historico' },
+          { texto: 'Ver resumo do mês', comando: 'resumo' },
+          { texto: 'Ver ajuda', comando: 'ajuda' }
+        ])
+      });
+      return;
+    }
+
+    const escolha = parseInt(texto);
+    if (![1,2].includes(escolha)) {
+      await sock.sendMessage(userId, {
+        text: formatarMensagem({
+          titulo: 'Opção inválida',
+          emojiTitulo: '❌',
+          secoes: [{
+            titulo: 'Escolha uma opção',
+            itens: ['1. Apenas esta recorrência', '2. Esta e futuras recorrências'],
+            emoji: '💡'
+          }],
+          dicas: [
+            { texto: 'Cancelar edição', comando: '0 ou cancelar' }
+          ]
+        })
+      });
+      return;
+    }
+
+    const aplicarEmLote = escolha === 2;
+    await limparEstado(userId);
+    await definirEstado(userId, 'aguardando_valor_edicao_lancamento', {
+      lancamentoId,
+      lancamento,
+      campo,
+      aplicarEmLote
+    });
+    await sock.sendMessage(userId, { 
+      text: `${instrucao}\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar a edição`
     });
     return;
   }
 
   // Se está aguardando o novo valor para um campo
   if (estado?.etapa === 'aguardando_valor_edicao_lancamento') {
-    const { lancamentoId, lancamento, campo } = estado.dadosParciais;
+    const { lancamentoId, lancamento, campo, aplicarEmLote } = estado.dadosParciais;
     
     if (texto.toLowerCase() === 'cancelar' || texto === '0') {
       await limparEstado(userId);
@@ -149,21 +299,51 @@ async function editarLancamentoCommand(sock, userId, texto) {
         }
       }
       
-      // Atualizar o lançamento
-      await lancamentosService.atualizarCampoLancamento(userId, lancamentoId, campo, novoValor);
+      // Atualizar o lançamento (único ou em lote se parcelado/recorrente)
+      if (aplicarEmLote && lancamento?.parcelamento_id && lancamento?.parcela_atual != null) {
+        const novosDados: any = {};
+        // Reaproveita validação feita acima, apenas define campo
+        novosDados[campo] = campo === 'valor' ? parseFloat(novoValor) : novoValor;
+        await lancamentosService.atualizarLancamentosParceladosApartir(
+          userId,
+          lancamento.parcelamento_id,
+          lancamento.parcela_atual,
+          novosDados
+        );
+      } else if (aplicarEmLote && lancamento?.recorrente_id) {
+        const novosDados: any = {};
+        novosDados[campo] = campo === 'valor' ? parseFloat(novoValor) : novoValor;
+        const dataSelecionada = (lancamento.data instanceof Date)
+          ? lancamento.data.toLocaleDateString('pt-BR')
+          : String(lancamento.data);
+        await (lancamentosService as any).atualizarRecorrenciasApartir(
+          userId,
+          lancamento.recorrente_id,
+          dataSelecionada,
+          novosDados
+        );
+      } else {
+        await lancamentosService.atualizarCampoLancamento(userId, lancamentoId, campo, novoValor);
+      }
       
       await limparEstado(userId);
       
-      await sock.sendMessage(userId, { 
+      const titulo = aplicarEmLote ? 'Edição aplicada em lote' : 'Lançamento atualizado com sucesso';
+      const itensExtras = aplicarEmLote && (lancamento?.parcelamento_id || lancamento?.recorrente_id) ? [
+        lancamento?.parcelamento_id ? `Parcelamento: ${lancamento.parcelamento_id}` : `Recorrente: ${lancamento.recorrente_id}`,
+        lancamento?.parcelamento_id ? `A partir da parcela: ${lancamento.parcela_atual}` : `A partir da data: ${(lancamento.data instanceof Date) ? lancamento.data.toLocaleDateString('pt-BR') : String(lancamento.data)}`
+      ] : [];
+      await sock.sendMessage(userId, {
         text: formatarMensagem({
-          titulo: 'Lançamento atualizado com sucesso',
+          titulo,
           emojiTitulo: '✅',
           secoes: [{
             titulo: 'Alteração realizada',
             itens: [
               `Campo: ${campo}`,
               `Novo valor: ${novoValor}`,
-              `Lançamento: ${lancamento.descricao}`
+              `Lançamento: ${lancamento.descricao}`,
+              ...itensExtras
             ],
             emoji: '📝'
           }],

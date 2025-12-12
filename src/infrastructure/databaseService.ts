@@ -1115,13 +1115,7 @@ async function excluirLancamentoPorId(userId, id) {
       throw new Error('Lançamento não encontrado');
     }
     
-    // Se for um lançamento parcelado, excluir todas as parcelas
-    if (lancamento.parcelamento_id) {
-      const parcelasExcluidas = await excluirParcelamentoPorId(userId, lancamento.parcelamento_id);
-      return parcelasExcluidas; // Retorna o número de parcelas excluídas
-    }
-    
-    // Se não for parcelado, excluir apenas o lançamento
+    // Excluir apenas o lançamento selecionado (não excluir em massa por padrão)
     const query = `DELETE FROM lancamentos WHERE user_id = $1 AND id = $2`;
     const deleteResult = await pool.query(query, [userId, id]);
     
@@ -1132,6 +1126,251 @@ async function excluirLancamentoPorId(userId, id) {
     return deleteResult.rowCount; // Retorna o número de lançamentos excluídos
   } catch (error: any) {
     fileLogger.error('❌ Erro ao excluir lançamento:', error);
+    throw error;
+  }
+}
+
+// Excluir parcelas futuras de um parcelamento a partir da parcela atual (ou data)
+async function excluirParcelasFuturasApartir(
+  userId: string,
+  parcelamentoId: string | number,
+  parcelaAtualSelecionada: number | null = null,
+  dataSelecionada: string | null = null
+) {
+  try {
+    const where: string[] = ['user_id = $1', 'parcelamento_id = $2'];
+    const params: any[] = [userId, parcelamentoId];
+    let idx = 3;
+
+    if (parcelaAtualSelecionada !== null && parcelaAtualSelecionada !== undefined) {
+      where.push(`parcela_atual >= $${idx}`);
+      params.push(parcelaAtualSelecionada);
+      idx++;
+    } else if (dataSelecionada) {
+      where.push(`data >= $${idx}`);
+      params.push(formatarDataParaISO(dataSelecionada));
+      idx++;
+    }
+
+    const deleteQuery = `
+      DELETE FROM lancamentos
+      WHERE ${where.join(' AND ')}
+      RETURNING id
+    `;
+    const result = await pool.query(deleteQuery, params);
+
+    const detalhes = `Parcelamento ID: ${parcelamentoId}, A partir de: ${parcelaAtualSelecionada ?? dataSelecionada}, Parcelas excluídas: ${result.rowCount}`;
+    await registrarLog(userId, 'EXCLUIR_PARCELAS_FUTURAS', detalhes);
+
+    return result.rowCount;
+  } catch (error: any) {
+    fileLogger.error('❌ Erro ao excluir parcelas futuras:', error);
+    throw error;
+  }
+}
+
+// Excluir recorrências futuras de um recorrente a partir de uma data selecionada
+async function excluirRecorrenciasFuturasApartir(
+  userId: string,
+  recorrenteId: string | number,
+  dataSelecionada: string
+) {
+  try {
+    const where: string[] = ['user_id = $1', 'recorrente_id = $2'];
+    const params: any[] = [userId, recorrenteId];
+    let idx = 3;
+
+    if (dataSelecionada) {
+      where.push(`data >= $${idx}`);
+      params.push(formatarDataParaISO(dataSelecionada));
+      idx++;
+    }
+
+    const deleteQuery = `
+      DELETE FROM lancamentos
+      WHERE ${where.join(' AND ')}
+      RETURNING id
+    `;
+    const result = await pool.query(deleteQuery, params);
+
+    const detalhes = `Recorrente ID: ${recorrenteId}, A partir de: ${dataSelecionada}, Recorrências excluídas: ${result.rowCount}`;
+    await registrarLog(userId, 'EXCLUIR_RECORRENCIAS_FUTURAS', detalhes);
+
+    return result.rowCount;
+  } catch (error: any) {
+    fileLogger.error('❌ Erro ao excluir recorrências futuras:', error);
+    throw error;
+  }
+}
+
+// Atualizar campo(s) das recorrências de um recorrente a partir de uma data específica
+async function atualizarRecorrenciasApartir(
+  userId: string,
+  recorrenteId: string | number,
+  dataSelecionada: string,
+  novosDados: { data?: string; tipo?: string; descricao?: string; valor?: number; categoria?: string; pagamento?: string } = {}
+) {
+  try {
+    const campos: string[] = [];
+    const valores: any[] = [];
+    let paramIndex = 1;
+
+    if (novosDados.data !== undefined) {
+      campos.push(`data = $${paramIndex}`);
+      valores.push(formatarDataParaISO(novosDados.data));
+      paramIndex++;
+    }
+    if (novosDados.tipo !== undefined) {
+      campos.push(`tipo = $${paramIndex}`);
+      valores.push(String(novosDados.tipo).toLowerCase());
+      paramIndex++;
+    }
+    if (novosDados.descricao !== undefined) {
+      campos.push(`descricao = $${paramIndex}`);
+      valores.push(novosDados.descricao);
+      paramIndex++;
+    }
+    if (novosDados.valor !== undefined) {
+      campos.push(`valor = $${paramIndex}`);
+      valores.push(novosDados.valor);
+      paramIndex++;
+    }
+    if (novosDados.categoria !== undefined) {
+      campos.push(`categoria = $${paramIndex}`);
+      valores.push(novosDados.categoria);
+      paramIndex++;
+    }
+    if (novosDados.pagamento !== undefined) {
+      campos.push(`pagamento = $${paramIndex}`);
+      valores.push(novosDados.pagamento);
+      paramIndex++;
+    }
+
+    if (campos.length === 0) {
+      throw new Error('Nenhum campo foi fornecido para atualização em lote');
+    }
+
+    campos.push(`atualizado_em = CURRENT_TIMESTAMP`);
+
+    // WHERE
+    const whereParts: string[] = [];
+    const whereParams: any[] = [];
+    whereParts.push(`user_id = $${paramIndex}`);
+    whereParams.push(userId);
+    paramIndex++;
+
+    whereParts.push(`recorrente_id = $${paramIndex}`);
+    whereParams.push(recorrenteId);
+    paramIndex++;
+
+    if (dataSelecionada) {
+      whereParts.push(`data >= $${paramIndex}`);
+      whereParams.push(formatarDataParaISO(dataSelecionada));
+      paramIndex++;
+    }
+
+    const updateQuery = `
+      UPDATE lancamentos
+      SET ${campos.join(', ')}
+      WHERE ${whereParts.join(' AND ')}
+      RETURNING id
+    `;
+    const result = await pool.query(updateQuery, [...valores, ...whereParams]);
+
+    const detalhes = `Recorrente ID: ${recorrenteId}, A partir de: ${dataSelecionada}, Recorrências atualizadas: ${result.rowCount}`;
+    await registrarLog(userId, 'ATUALIZAR_RECORRENTES_FUTUROS', detalhes);
+
+    return result.rowCount;
+  } catch (error: any) {
+    fileLogger.error('❌ Erro ao atualizar recorrências futuras:', error);
+    throw error;
+  }
+}
+
+// Atualizar campo(s) das parcelas de um parcelamento a partir de uma parcela específica
+async function atualizarLancamentosParceladosApartir(
+  userId: string,
+  parcelamentoId: string | number,
+  parcelaAtualSelecionada: number | null = null,
+  novosDados: { data?: string; tipo?: string; descricao?: string; valor?: number; categoria?: string; pagamento?: string } = {}
+) {
+  try {
+    const campos: string[] = [];
+    const valores: any[] = [];
+    let paramIndex = 1;
+
+    if (novosDados.data !== undefined) {
+      campos.push(`data = $${paramIndex}`);
+      valores.push(formatarDataParaISO(novosDados.data));
+      paramIndex++;
+    }
+    if (novosDados.tipo !== undefined) {
+      campos.push(`tipo = $${paramIndex}`);
+      valores.push(String(novosDados.tipo).toLowerCase());
+      paramIndex++;
+    }
+    if (novosDados.descricao !== undefined) {
+      campos.push(`descricao = $${paramIndex}`);
+      valores.push(novosDados.descricao);
+      paramIndex++;
+    }
+    if (novosDados.valor !== undefined) {
+      campos.push(`valor = $${paramIndex}`);
+      valores.push(novosDados.valor);
+      paramIndex++;
+    }
+    if (novosDados.categoria !== undefined) {
+      campos.push(`categoria = $${paramIndex}`);
+      valores.push(novosDados.categoria);
+      paramIndex++;
+    }
+    if (novosDados.pagamento !== undefined) {
+      campos.push(`pagamento = $${paramIndex}`);
+      valores.push(novosDados.pagamento);
+      paramIndex++;
+    }
+
+    if (campos.length === 0) {
+      throw new Error('Nenhum campo foi fornecido para atualização em lote');
+    }
+
+    campos.push(`atualizado_em = CURRENT_TIMESTAMP`);
+
+    // WHERE
+    const whereParts: string[] = [];
+    const whereParams: any[] = [];
+    whereParts.push(`user_id = $${paramIndex}`);
+    whereParams.push(userId);
+    paramIndex++;
+
+    whereParts.push(`parcelamento_id = $${paramIndex}`);
+    whereParams.push(parcelamentoId);
+    paramIndex++;
+
+    if (parcelaAtualSelecionada !== null && parcelaAtualSelecionada !== undefined) {
+      whereParts.push(`parcela_atual >= $${paramIndex}`);
+      whereParams.push(parcelaAtualSelecionada);
+      paramIndex++;
+    }
+
+    const query = `
+      UPDATE lancamentos
+      SET ${campos.join(', ')}
+      WHERE ${whereParts.join(' AND ')}
+      RETURNING id
+    `;
+
+    logger.debug('[DEBUG] Query de atualização (lote):', query);
+    logger.debug('[DEBUG] Valores (lote):', [...valores, ...whereParams]);
+
+    const result = await pool.query(query, [...valores, ...whereParams]);
+
+    const detalhes = `Parcelamento ID: ${parcelamentoId}, A partir da parcela: ${parcelaAtualSelecionada}, Campos atualizados: ${campos.length}, Registros afetados: ${result.rowCount}`;
+    await registrarLog(userId, 'EDITAR_LANCAMENTO_EM_LOTE', detalhes);
+
+    return result.rowCount;
+  } catch (error: any) {
+    fileLogger.error('❌ Erro ao atualizar parcelas em lote:', error);
     throw error;
   }
 }
@@ -2548,6 +2787,10 @@ export {
   getTotalGastosPorPagamento,
   excluirParcelamentoPorId,
   excluirRecorrentePorId,
+  excluirParcelasFuturasApartir,
+  atualizarLancamentosParceladosApartir,
+  excluirRecorrenciasFuturasApartir,
+  atualizarRecorrenciasApartir,
   buscarLancamentosParaExclusao,
   buscarFaturaCartao,
   getResumoReal,

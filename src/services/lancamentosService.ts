@@ -213,6 +213,43 @@ export async function excluirRecorrentePorId(userId: string, id: number): Promis
   return await databaseService.excluirRecorrentePorId(userId, id);
 }
 
+// Atualizações e exclusões em lote para parcelados
+export async function atualizarLancamentosParceladosApartir(
+  userId: string,
+  parcelamentoId: number | string,
+  parcelaAtualMin: number,
+  novosDados: Partial<DadosLancamento>
+): Promise<number> {
+  return await (databaseService as any).atualizarLancamentosParceladosApartir(userId, parcelamentoId, parcelaAtualMin, novosDados);
+}
+
+export async function excluirParcelasFuturasApartir(
+  userId: string,
+  parcelamentoId: number | string,
+  parcelaAtualMin?: number,
+  dataMinISO?: string
+): Promise<number> {
+  return await (databaseService as any).excluirParcelasFuturasApartir(userId, parcelamentoId, parcelaAtualMin ?? null, dataMinISO ?? null);
+}
+
+// Atualizações e exclusões em lote para recorrentes
+export async function atualizarRecorrenciasApartir(
+  userId: string,
+  recorrenteId: number | string,
+  dataMinISO: string,
+  novosDados: Partial<DadosLancamento>
+): Promise<number> {
+  return await (databaseService as any).atualizarRecorrenciasApartir(userId, recorrenteId, dataMinISO, novosDados);
+}
+
+export async function excluirRecorrenciasFuturasApartir(
+  userId: string,
+  recorrenteId: number | string,
+  dataMinISO: string
+): Promise<number> {
+  return await (databaseService as any).excluirRecorrenciasFuturasApartir(userId, recorrenteId, dataMinISO);
+}
+
 // Funções para vencimentos
 export async function buscarProximosVencimentos(userId: string, dias: number = 7): Promise<any> {
   return await databaseService.buscarProximosVencimentos(userId, dias);

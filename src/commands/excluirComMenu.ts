@@ -2,7 +2,7 @@
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import excluirLancamentoCommand from './excluirLancamento';
 import excluirCartaoCommand from './excluirCartao';
-import { formatarCancelamento, formatarMenuComCancelamento } from '../utils/formatMessages';
+import { formatarCancelamento, formatarMenuComCancelamento, formatarMensagem } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function excluirComMenuCommand(sock, userId, texto) {
@@ -86,6 +86,71 @@ async function excluirComMenuCommand(sock, userId, texto) {
       // Promove o estado para aguardando escolha de exclusão de cartão e repassa o índice
       await definirEstado(userId, 'aguardando_escolha_exclusao_cartao', { cartoes: estadoAtual.dadosParciais.cartoes });
       await excluirCartaoCommand(sock, userId, idxMatch![1]);
+      return;
+    }
+
+    // Se há contexto de recorrentes listados, iniciar fluxo de exclusão de recorrente
+    if (estadoAtual?.etapa === 'recorrentes_listados' && estadoAtual?.dadosParciais?.recorrentes?.length) {
+      const idx = parseInt(idxMatch![1], 10) - 1;
+      const grupos = estadoAtual.dadosParciais.recorrentes;
+      if (!grupos[idx]) {
+        await sock.sendMessage(userId, { 
+          text: '❌ Número inválido. Escolha um dos itens listados.'
+        });
+        return;
+      }
+      const grupo = grupos[idx];
+      const proximaPendente = grupo.recorrencias.find((r: any) => r.status === 'pendente');
+      if (!proximaPendente) {
+        await sock.sendMessage(userId, { 
+          text: formatarMensagem({
+            titulo: 'Nada pendente para excluir',
+            emojiTitulo: '✅',
+            secoes: [{
+              titulo: 'Recorrente selecionado',
+              itens: [
+                `📝 ${grupo.descricao}`,
+                `📂 ${grupo.categoria}`,
+                'Todas as recorrências listadas estão marcadas como pagas.'
+              ],
+              emoji: 'ℹ️'
+            }],
+            dicas: [
+              { texto: 'Ver histórico', comando: 'historico' },
+              { texto: 'Ver ajuda', comando: 'ajuda' },
+              { texto: 'Voltar aos recorrentes', comando: 'recorrentes' }
+            ]
+          })
+        });
+        return;
+      }
+
+      const lancamento = {
+        id: proximaPendente.id,
+        descricao: grupo.descricao,
+        valor: grupo.valor,
+        categoria: grupo.categoria,
+        data: proximaPendente.data,
+        recorrente_id: grupo.recorrente_id
+      };
+
+      await definirEstado(userId, 'aguardando_escolha_exclusao_recorrente', { lancamento });
+      const mensagemEscolha = formatarMensagem({
+        titulo: 'Este lançamento é recorrente/fixo',
+        emojiTitulo: '🔁',
+        secoes: [{
+          titulo: 'O que deseja excluir?',
+          itens: [
+            '1. Apenas esta recorrência',
+            '2. Esta e todas as futuras'
+          ],
+          emoji: '⚠️'
+        }],
+        dicas: [
+          { texto: 'Cancelar', comando: '0 ou cancelar' }
+        ]
+      });
+      await sock.sendMessage(userId, { text: mensagemEscolha });
       return;
     }
 
