@@ -1,5 +1,5 @@
 import * as databaseService from '../infrastructure/databaseService';
-import { Lancamento, Cartao } from '../types/global';
+import { Lancamento } from '../types/global';
 
 // Interfaces específicas para este serviço
 interface DadosLancamento {
@@ -56,13 +56,15 @@ export async function getResumoPorMes(userId: string, mes: number, ano: number):
   return await databaseService.getResumoPorMes(userId, mes, ano);
 }
 
-export async function getResumoReal(userId: string, mes: any = null, ano: any = null): Promise<ResumoFinanceiro> {
-  return await databaseService.getResumoReal(userId, mes, ano);
+export async function getResumoReal(userId: string, mes: number | null = null, ano: number | null = null): Promise<ResumoFinanceiro> {
+  // Tipagem do databaseService aceita null/undefined; fazemos cast seguro aqui
+  return await databaseService.getResumoReal(userId, mes as any, ano as any);
 }
 
 // Funções para listagem
-export async function listarLancamentos(userId: string, limite: number = 10, mes: any = null, ano: any = null): Promise<Lancamento[]> {
-  return await databaseService.listarLancamentos(userId, limite, mes, ano);
+export async function listarLancamentos(userId: string, limite: number = 10, mes: number | null = null, ano: number | null = null): Promise<Lancamento[]> {
+  // Tipagem do databaseService aceita null/undefined; fazemos cast seguro aqui
+  return await databaseService.listarLancamentos(userId, limite, mes as any, ano as any);
 }
 
 export async function getUltimosLancamentos(userId: string, limite: number = 10): Promise<Lancamento[]> {
@@ -79,7 +81,7 @@ export async function getLancamentoPorId(userId: string, id: number): Promise<La
 }
 
 // Funções para salvar/atualizar
-export async function salvarLancamento(userId: string, dados: DadosLancamento): Promise<any> {
+export async function salvarLancamento(userId: string, dados: DadosLancamento): Promise<unknown> {
   // Converter objeto para array na ordem correta dos campos
   const values = [
     dados.data,                    // $2
@@ -107,11 +109,11 @@ export async function salvarLancamento(userId: string, dados: DadosLancamento): 
   return await databaseService.appendRowToDatabase(userId, values);
 }
 
-export async function atualizarLancamentoPorId(userId: string, id: number, dados: any): Promise<any> {
+export async function atualizarLancamentoPorId(userId: string, id: number, dados: Partial<DadosLancamento>): Promise<unknown> {
   return await databaseService.atualizarLancamentoPorId(userId, id, dados);
 }
 
-export async function excluirLancamentoPorId(userId: string, id: number): Promise<any> {
+export async function excluirLancamentoPorId(userId: string, id: number): Promise<unknown> {
   return await databaseService.excluirLancamentoPorId(userId, id);
 }
 
@@ -119,12 +121,12 @@ export async function excluirLancamentoPorId(userId: string, id: number): Promis
 export async function atualizarCampoLancamento(
   userId: string,
   id: number,
-  campo: string,
-  valor: any
-): Promise<any> {
-  const novosDados: any = {};
+  campo: 'valor' | 'categoria' | 'descricao' | 'pagamento' | 'data',
+  valor: string | number
+): Promise<unknown> {
+  const novosDados: Partial<DadosLancamento> = {};
 
-  const toNumber = (v: any) => {
+  const toNumber = (v: string | number) => {
     if (typeof v === 'number') return v;
     const parsed = parseFloat(String(v).replace(',', '.'));
     return isNaN(parsed) ? undefined : parsed;
@@ -148,16 +150,16 @@ export async function atualizarCampoLancamento(
       novosDados.valor = toNumber(valor);
       break;
     case 'categoria':
-      novosDados.categoria = valor;
+      novosDados.categoria = String(valor);
       break;
     case 'descricao':
-      novosDados.descricao = valor;
+      novosDados.descricao = String(valor);
       break;
     case 'pagamento':
-      novosDados.pagamento = valor;
+      novosDados.pagamento = String(valor);
       break;
     case 'data':
-      novosDados.data = toISODate(valor);
+      novosDados.data = toISODate(String(valor));
       break;
     default:
       // Campo não suportado
@@ -185,8 +187,9 @@ export async function buscarFaturaCartao(userId: string, nomeCartao: string, mes
   return await databaseService.buscarFaturaCartao(userId, nomeCartao, mes, ano);
 }
 
-export async function buscarGastosPorCategoria(userId: string, categoria: string, limite: number = 20, mes: any = null, ano: any = null): Promise<Lancamento[]> {
-  return await databaseService.buscarGastosPorCategoria(userId, categoria, limite, mes, ano);
+export async function buscarGastosPorCategoria(userId: string, categoria: string, limite: number = 20, mes: number | null = null, ano: number | null = null): Promise<Lancamento[]> {
+  // Tipagem do databaseService aceita null/undefined; fazemos cast seguro aqui
+  return await databaseService.buscarGastosPorCategoria(userId, categoria, limite, mes as any, ano as any);
 }
 
 export async function buscarGastosValorAlto(userId: string, valorMinimo: number = 100): Promise<any[]> {

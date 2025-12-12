@@ -6,6 +6,7 @@ import {
 } from '../infrastructure/databaseService';
 import { logger } from '../infrastructure/logger';
 import * as lembretesService from './lembretesService';
+import { WASocket } from '@whiskeysockets/baileys';
 
 // Interfaces para tipagem
 interface Cartao {
@@ -423,7 +424,7 @@ async function temAlertas(userId: string): Promise<boolean> {
  * @param eLembreteFinal - Se é o lembrete final (11h)
  * @returns Estatísticas
  */
-async function verificarEEnviarAlertasAutomaticos(sock: any, eLembreteFinal: boolean = false): Promise<EstatisticasAlertas> {
+async function verificarEEnviarAlertasAutomaticos(sock: WASocket, eLembreteFinal: boolean = false): Promise<EstatisticasAlertas> {
   try {
     logger.debug(`🔔 Iniciando verificação automática de alertas${eLembreteFinal ? ' (LEMBRETE FINAL)' : ''}...`);
     

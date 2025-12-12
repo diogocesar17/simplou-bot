@@ -2,6 +2,8 @@ import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
   WASocket,
+  WAMessage,
+  MessageUpsertType,
 } from '@whiskeysockets/baileys'
 import qrcode from 'qrcode-terminal'
 import { Boom } from '@hapi/boom'
@@ -102,19 +104,29 @@ async function createSocket(): Promise<void> {
     }
   })
 
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+  sock.ev.on('messages.upsert', async ({ messages, type }: { messages: WAMessage[]; type: MessageUpsertType }) => {
     if (type !== 'notify') return
-    const msg = messages[0]
+    const msg: WAMessage = messages[0]
     console.log('📥 Mensagem recebida:', msg)
 
-    const raw: any = msg?.message
+    type IncomingTextContent = {
+      conversation?: string
+      extendedTextMessage?: { text?: string }
+      imageMessage?: { caption?: string }
+      videoMessage?: { caption?: string }
+      buttonsResponseMessage?: { selectedButtonId?: string }
+      listResponseMessage?: { title?: string }
+      [key: string]: unknown
+    }
+
+    const raw = msg?.message as IncomingTextContent | undefined
     const texto: string = (
-      raw?.conversation ||
-      raw?.extendedTextMessage?.text ||
-      raw?.imageMessage?.caption ||
-      raw?.videoMessage?.caption ||
-      raw?.buttonsResponseMessage?.selectedButtonId ||
-      raw?.listResponseMessage?.title ||
+      raw?.conversation ??
+      raw?.extendedTextMessage?.text ??
+      raw?.imageMessage?.caption ??
+      raw?.videoMessage?.caption ??
+      raw?.buttonsResponseMessage?.selectedButtonId ??
+      raw?.listResponseMessage?.title ??
       ''
     ).trim()
     if (!texto) {
