@@ -20,7 +20,7 @@ async function removerUsuarioCommand(sock, userId, texto) {
     await sock.sendMessage(userId, { text: resultado.message });
     
   } catch (error) {
-    console.error('Erro no comando removerUsuario:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro no comando removerUsuario');
     await sock.sendMessage(userId, { 
       text: '❌ Erro interno ao processar comando de remoção.' 
     });
@@ -28,3 +28,4 @@ async function removerUsuarioCommand(sock, userId, texto) {
 }
 
 export default removerUsuarioCommand; 
+import { logger } from '../infrastructure/logger';

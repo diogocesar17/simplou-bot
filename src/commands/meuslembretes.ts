@@ -5,7 +5,7 @@ import { formatarMensagem } from '../utils/formatMessages';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
 
 async function meusLembretesCommand(sock, userId, texto) {
-  console.log(`[MEUS_LEMBRETES] Comando iniciado: userId=${userId}, texto="${texto}"`);
+  logger.info({ userId, trecho: String(texto || '').slice(0, 80) }, '[MEUS_LEMBRETES] Comando iniciado');
   
   // Verificar se há estado pendente
   const estado = await obterEstado(userId);
@@ -75,7 +75,7 @@ async function meusLembretesCommand(sock, userId, texto) {
           break;
       }
     } catch (error) {
-      console.error('[MEUS_LEMBRETES] Erro ao processar ação:', error);
+  logger.error({ err: (error as any)?.message || error }, '[MEUS_LEMBRETES] Erro ao processar ação');
       await limparEstado(userId);
       await sock.sendMessage(userId, {
         text: '❌ Erro ao processar ação. Tente novamente.'
@@ -108,7 +108,7 @@ async function meusLembretesCommand(sock, userId, texto) {
         await limparEstado(userId);
         
       } catch (error) {
-        console.error('[MEUS_LEMBRETES] Erro ao excluir lembrete:', error);
+  logger.error({ err: (error as any)?.message || error }, '[MEUS_LEMBRETES] Erro ao excluir lembrete');
         await sock.sendMessage(userId, {
           text: '❌ Erro ao excluir lembrete. Tente novamente.'
         });
@@ -305,7 +305,7 @@ async function meusLembretesCommand(sock, userId, texto) {
     }
     
   } catch (error) {
-    console.error('[MEUS_LEMBRETES] Erro ao listar lembretes:', error);
+  logger.error({ err: (error as any)?.message || error }, '[MEUS_LEMBRETES] Erro ao listar lembretes');
     await sock.sendMessage(userId, {
       text: formatarMensagem({
         titulo: 'Erro ao carregar lembretes',
@@ -327,3 +327,4 @@ async function meusLembretesCommand(sock, userId, texto) {
 }
 
 export default meusLembretesCommand;
+import { logger } from '../infrastructure/logger';

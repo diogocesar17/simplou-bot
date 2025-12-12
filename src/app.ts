@@ -12,6 +12,7 @@ import { initializeDatabase } from './infrastructure/databaseService'
 import { startHealthServer } from './infrastructure/healthServer'
 import { handleMessage } from './index'
 import { getHybridAuthState } from './infrastructure/auth/authRedisStorage'
+import { logger, debug } from './infrastructure/logger'
 // Usar require para compatibilidade com CommonJS no serviço Gemini
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const geminiService = require('./services/geminiService')
@@ -111,7 +112,7 @@ async function createSocket(): Promise<void> {
   sock.ev.on('messages.upsert', async ({ messages, type }: { messages: WAMessage[]; type: MessageUpsertType }) => {
     if (type !== 'notify') return
     const msg: WAMessage = messages[0]
-    console.log('📥 Mensagem recebida:', msg)
+    const DEBUG_MESSAGES = process.env.DEBUG_MESSAGES === 'true'
 
     type IncomingTextContent = {
       conversation?: string
@@ -134,7 +135,8 @@ async function createSocket(): Promise<void> {
       ''
     ).trim()
     if (!texto) {
-      console.log('[MSG] Mensagem sem texto legível, ignorando. Tipos:', Object.keys(raw || {}))
+      const tipos = Object.keys(raw || {})
+      logger.info({ tipos }, '[MSG] Mensagem sem texto legível — ignorando')
       return
     }
     const userId = msg.key.remoteJid
@@ -143,7 +145,30 @@ async function createSocket(): Promise<void> {
     // Filtro para seu número específico
     if (userId !== '556181429135@s.whatsapp.net') return
 
-    console.log('🔔 Mensagem recebida:', texto)
+    // Determina tipo básico da mensagem
+    const tipoMensagem = raw?.conversation || raw?.extendedTextMessage?.text
+      ? 'texto'
+      : raw?.imageMessage
+      ? 'imagem'
+      : raw?.videoMessage
+      ? 'video'
+      : raw?.buttonsResponseMessage
+      ? 'botao'
+      : raw?.listResponseMessage
+      ? 'lista'
+      : 'desconhecido'
+
+    // Log enxuto para produção
+    logger.info({ userId, tipoMensagem, trecho: texto.slice(0, 100) }, 'Mensagem recebida')
+
+    // Log detalhado opcional somente em dev e quando habilitado
+    if (DEBUG_MESSAGES && process.env.NODE_ENV !== 'production') {
+      debug('Mensagem recebida (detalhe controlado)', {
+        userId,
+        keys: Object.keys(raw || {}),
+        hasQuoted: Boolean((raw as any)?.extendedTextMessage?.contextInfo?.quotedMessage),
+      })
+    }
     await handleMessage(sock!, userId, texto)
   })
 }

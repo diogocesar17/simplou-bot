@@ -178,7 +178,7 @@ async function editarCartaoCommand(sock, userId, texto) {
         })
       });
     } catch (error) {
-      console.error('Erro ao atualizar cartão:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro ao atualizar cartão');
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
         text: ERROR_MESSAGES.ERRO_INTERNO('Atualizar cartão', 'Tente novamente em alguns instantes')
@@ -231,3 +231,4 @@ async function editarCartaoCommand(sock, userId, texto) {
 }
 
 export default editarCartaoCommand;
+import { logger } from '../infrastructure/logger';

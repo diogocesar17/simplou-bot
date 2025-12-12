@@ -22,6 +22,7 @@ import { formatarValor } from '../utils/formatUtils';
 import { converterDataParaISO } from '../utils/dataUtils';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
 import { formatarMensagem } from '../utils/formatMessages';
+import { logger } from '../infrastructure/logger';
 
 // Função para gerar ID único
 function gerarIdUnico() {
@@ -30,9 +31,9 @@ function gerarIdUnico() {
 
 // Função para categorização baseada em palavras-chave
 function categorizarPorPalavrasChave(texto) {
-  console.log(`[CATEGORIZACAO] Analisando texto: "${texto}"`);
+  logger.debug?.(`[CATEGORIZACAO] Analisando texto: "${texto}"`);
   const textoLower = texto.toLowerCase();
-  console.log(`[CATEGORIZACAO] Texto em lowercase: "${textoLower}"`);
+  logger.debug?.(`[CATEGORIZACAO] Texto em lowercase: "${textoLower}"`);
   
   // Mapeamento de palavras-chave para categorias
   const categorias = {
@@ -87,16 +88,16 @@ function categorizarPorPalavrasChave(texto) {
   
   // Verificar cada categoria
   for (const [categoria, palavrasChave] of Object.entries(categorias)) {
-    console.log(`[CATEGORIZACAO] Verificando categoria: ${categoria}`);
+    logger.debug?.(`[CATEGORIZACAO] Verificando categoria: ${categoria}`);
     for (const palavra of palavrasChave) {
       if (textoLower.includes(palavra)) {
-        console.log(`[CATEGORIZACAO] ✅ Encontrou palavra-chave: "${palavra}" → Categoria: ${categoria}`);
+        logger.debug?.(`[CATEGORIZACAO] ✅ Encontrou palavra-chave: "${palavra}" → Categoria: ${categoria}`);
         return categoria;
       }
     }
   }
   
-  console.log(`[CATEGORIZACAO] ❌ Nenhuma palavra-chave encontrada`);
+  logger.debug?.(`[CATEGORIZACAO] ❌ Nenhuma palavra-chave encontrada`);
   return null; // Não encontrou correspondência
 }
 
@@ -106,11 +107,11 @@ function categorizarPorPalavrasChave(texto) {
 async function analisarLancamentoComIA(userId, texto) {
   try {
     const TIMEOUT_MS = Math.max(3000, Number(process.env.GEMINI_TIMEOUT_MS || 7000));
-    console.log(`[IA_ANALISE] Iniciando análise. textoLen=${(texto || '').length}, timeoutMs=${TIMEOUT_MS}`);
+    logger.info({ textoLen: (texto || '').length, timeoutMs: TIMEOUT_MS }, '[IA_ANALISE] Iniciando análise');
     
     // Primeiro, tentar categorizar por palavras-chave
     const categoriaPorPalavrasChave = categorizarPorPalavrasChave(texto);
-    console.log(`[IA_ANALISE] Categoria por palavras-chave: ${categoriaPorPalavrasChave}`);
+    logger.debug?.(`[IA_ANALISE] Categoria por palavras-chave: ${categoriaPorPalavrasChave}`);
     
     const prompt = `
 Analise a seguinte mensagem e extraia informações de um lançamento financeiro.
@@ -169,18 +170,18 @@ Data atual: ${new Date().toLocaleDateString('pt-BR')}
       TIMEOUT_MS
     );
     if (analiseGemini) {
-      console.log(`[IA_ANALISE] OK. tipo=${analiseGemini.tipo}; valor=${analiseGemini.valor}; cat=${analiseGemini.categoria}; fp=${analiseGemini.formaPagamento}`);
+  logger.info({ tipo: analiseGemini.tipo, valor: analiseGemini.valor, categoria: analiseGemini.categoria, formaPagamento: analiseGemini.formaPagamento }, '[IA_ANALISE] OK');
     } else {
-      console.log('[IA_ANALISE] ❌ IA retornou nulo (sem resposta útil)');
+  logger.info('[IA_ANALISE] ❌ IA retornou nulo (sem resposta útil)');
     }
     if (!analiseGemini) {
-      console.log('[IA_ANALISE] ❌ IA indisponível/sem resposta. Abortando fallback.');
+  logger.info('[IA_ANALISE] ❌ IA indisponível/sem resposta. Abortando fallback.');
       return null;
     }
     
     // Validar se tem os campos essenciais
     if (!analiseGemini.tipo || !analiseGemini.valor || !analiseGemini.descricao) {
-      console.log(`[IA_ANALISE] ❌ Campos essenciais faltando`);
+  logger.info('[IA_ANALISE] ❌ Campos essenciais faltando');
       return null;
     }
     
@@ -214,15 +215,15 @@ Data atual: ${new Date().toLocaleDateString('pt-BR')}
       recorrente: false
     };
     
-    console.log(`[IA_ANALISE] Resultado final resumido → tipo=${resultado.tipo}; valor=${resultado.valor}; cat=${resultado.categoria}; pagamento=${resultado.pagamento}`);
-    console.log(`[IA_ANALISE] Categoria final: ${resultado.categoria} (chave=${categoriaPorPalavrasChave || 'nenhuma'} | ia=${analiseGemini.categoria || 'n/a'})`);
+  logger.info({ tipo: resultado.tipo, valor: resultado.valor, categoria: resultado.categoria, pagamento: resultado.pagamento }, '[IA_ANALISE] Resultado final resumido');
+  logger.info({ categoriaFinal: resultado.categoria, chave: categoriaPorPalavrasChave || 'nenhuma', ia: analiseGemini.categoria || 'n/a' }, '[IA_ANALISE] Categoria final');
     
     return resultado;
   } catch (error) {
     if (String(error && error.message) === 'IA_TIMEOUT') {
-      console.log('[IA_ANALISE] ⏱️ Timeout atingido na análise de IA');
+  logger.warn('[IA_ANALISE] ⏱️ Timeout atingido na análise de IA');
     } else {
-      console.log('[IA_ANALISE] Erro tratado na análise de IA:', (error && error.message) || String(error));
+  logger.error({ err: (error as any)?.message || error }, '[IA_ANALISE] Erro tratado na análise de IA');
     }
     return null;
   }
@@ -381,7 +382,7 @@ async function gerarMensagemSucesso(parsed, cartao = null) {
 }
 
 async function lancamentoCommand(sock, userId, texto) {
-  console.log(`[LANCAMENTO] Comando iniciado: userId=${userId}, textoLen=${(texto || '').length})`);
+  logger.info({ userId, textoLen: (texto || '').length }, '[LANCAMENTO] Comando iniciado');
   
   // 1. Fluxo aguardando confirmação da IA
   const estado = await obterEstado(userId);
@@ -551,7 +552,7 @@ async function lancamentoCommand(sock, userId, texto) {
     }
     
     const cartaoEscolhido = cartoes[escolha];
-    console.log('🔔 Cartão escolhido:', cartaoEscolhido);
+  logger.debug?.({ cartaoEscolhido }, '🔔 Cartão escolhido');
     
     // Processar com base em parcelamento/recorrente ou simples
     if (parsed.parcelamento && parsed.numParcelas > 1) {
@@ -600,7 +601,7 @@ async function lancamentoCommand(sock, userId, texto) {
       status_fatura: 'pendente',
       data_vencimento: converterDataParaISO(parsed.dataVencimento)
     };
-    console.log(`🔔 Dados do lançamento (resumo) → tipo=${dados.tipo}; valor=${dados.valor}; cat=${dados.categoria}; pagamento=${dados.pagamento}; cartao=${dados.cartao_nome}`);
+  logger.info({ tipo: dados.tipo, valor: dados.valor, categoria: dados.categoria, pagamento: dados.pagamento, cartao: dados.cartao_nome }, '🔔 Dados do lançamento (resumo)');
     await lancamentosService.salvarLancamento(userId, dados);
     await limparEstado(userId);
     await sock.sendMessage(userId, { text: await gerarMensagemSucesso(parsed, cartaoEscolhido) });
@@ -610,11 +611,11 @@ async function lancamentoCommand(sock, userId, texto) {
   // 4. Parsear mensagem
   let parsed = parseMessage(texto);
   const parsedNormal = parsed;
-  console.log(`[LANCAMENTO] Parse normal resumo → valor=${parsed?.valor ?? 'n/a'}; cat=${parsed?.categoria ?? 'n/a'}; pagamento=${parsed?.pagamento ?? 'n/a'}`);
+  logger.info({ valor: parsed?.valor ?? 'n/a', categoria: parsed?.categoria ?? 'n/a', pagamento: parsed?.pagamento ?? 'n/a' }, '[LANCAMENTO] Parse normal resumo');
   
   // Se o parse normal falhou ou categoria é incerta, tentar com IA
   if (!parsed || !parsed.valor || parsed.categoria === 'Outros' || parsed.confiancaCategoria === 'nenhuma') {
-    console.log(`[LANCAMENTO] Parse normal falhou, tentando com IA...`);
+  logger.info('[LANCAMENTO] Parse normal falhou, tentando com IA...');
     // Aviso imediato ao usuário para reduzir latência percebida
     await sock.sendMessage(userId, { 
       text: '⌛ Estou analisando sua mensagem, só um instante.' 
@@ -623,7 +624,7 @@ async function lancamentoCommand(sock, userId, texto) {
     const parsedIA = await analisarLancamentoComIA(userId, texto);
     
     if (parsedIA && parsedIA.valor) {
-      console.log('[LANCAMENTO] ✅ IA fallback retornou um parsed válido.');
+  logger.info('[LANCAMENTO] ✅ IA fallback retornou um parsed válido.');
       
       // Confirmar com o usuário se a IA entendeu corretamente
       await sock.sendMessage(userId, {
@@ -634,7 +635,7 @@ async function lancamentoCommand(sock, userId, texto) {
       await definirEstado(userId, 'aguardando_confirmacao_ia', parsedIA);
       return;
     } else {
-      console.log('[LANCAMENTO] ❌ IA falhou ou atingiu timeout. Comunicando usuário e seguindo padrão.');
+  logger.warn('[LANCAMENTO] ❌ IA falhou ou atingiu timeout. Comunicando usuário e seguindo padrão.');
       // Resposta amigável ao usuário (evitar duplicidade posteriormente)
       await sock.sendMessage(userId, { 
         text: '⏱️ A análise inteligente demorou demais ou não foi possível entender.\n\nTente um formato mais simples, por exemplo:\n• "mercado 50 pix"\n• "gasto 100 uber credito"\n• "receita 5000 salario"' 
@@ -657,7 +658,7 @@ async function lancamentoCommand(sock, userId, texto) {
   }
 
   // Se chegou aqui, o parser normal funcionou e a IA não será usada
-  console.log('[LANCAMENTO] Parser normal entendeu a mensagem. IA não será usada.');
+  logger.info('[LANCAMENTO] Parser normal entendeu a mensagem. IA não será usada.');
 
   // 5. Falta forma de pagamento
   if (parsed.faltaFormaPagamento || parsed.pagamento === 'NÃO INFORMADO') {
@@ -764,7 +765,7 @@ async function processarLancamento(sock, userId, parsed) {
     
     if (cartoes.length > 1) {
       // Múltiplos cartões, pedir para escolher
-      console.log('🔔 Múltiplos cartões, pedir para escolher');
+  logger.info('🔔 Múltiplos cartões, pedir para escolher');
       await definirEstado(userId, 'aguardando_escolha_cartao', parsed);
       let msg = formatarMensagem({
         titulo: 'Escolha o Cartão',

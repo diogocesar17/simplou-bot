@@ -10,8 +10,8 @@ import { ERROR_MESSAGES } from '../utils/errorMessages';
 async function excluirCartaoCommand(sock, userId, texto) {
   const textoLimpo = texto.trim().toLowerCase();
   const estado = await obterEstado(userId);
-  console.log('estado excluir cartao', estado);
-  console.log('texto excluir cartao', texto);
+  logger.debug?.({ estado }, '[EXCLUIR_CARTAO] estado inicial');
+  logger.info({ trecho: String(texto || '').slice(0, 80) }, '[EXCLUIR_CARTAO] texto recebido');
 
   // 1. Se está aguardando escolha do cartão
   if (estado?.etapa === 'aguardando_escolha_exclusao_cartao') {
@@ -64,8 +64,8 @@ async function excluirCartaoCommand(sock, userId, texto) {
 
   // 2. Se está aguardando confirmação
   if (estado?.etapa === 'aguardando_confirmacao_exclusao_cartao') {
-    console.log('estado confirmacao cartao', estado);
-    console.log('texto confirmacao cartao', texto);
+  logger.debug?.({ estado }, '[EXCLUIR_CARTAO] estado confirmação');
+  logger.info({ trecho: String(texto || '').slice(0, 80) }, '[EXCLUIR_CARTAO] texto confirmação');
     const confirmacao = texto.trim().toLowerCase();
     if (confirmacao === 'cancelar' || confirmacao === '2' || confirmacao === 'nao' || confirmacao === '0') {
       await limparEstado(userId);
@@ -155,3 +155,4 @@ async function excluirCartaoCommand(sock, userId, texto) {
 }
 
 export default excluirCartaoCommand; 
+import { logger } from '../infrastructure/logger';

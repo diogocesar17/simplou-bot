@@ -26,7 +26,7 @@ async function cadastrarUsuarioCommand(sock, userId, texto) {
     }
     
   } catch (error) {
-    console.error('Erro no comando cadastrarUsuario:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro no comando cadastrarUsuario');
     await sock.sendMessage(userId, { 
       text: '❌ Erro interno ao processar comando de cadastro.' 
     });
@@ -34,3 +34,4 @@ async function cadastrarUsuarioCommand(sock, userId, texto) {
 }
 
 export default cadastrarUsuarioCommand; 
+import { logger } from '../infrastructure/logger';

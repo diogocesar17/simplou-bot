@@ -49,7 +49,7 @@ async function logsCommand(sock, userId) {
       });
     }
   } catch (error) {
-    console.error('Erro ao gerar logs:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro ao gerar logs');
     await sock.sendMessage(userId, { 
       text: ERROR_MESSAGES.ERRO_INTERNO('Gerar logs de auditoria', 'Tente novamente em alguns instantes')
     });
@@ -57,3 +57,4 @@ async function logsCommand(sock, userId) {
 }
 
 export default logsCommand; 
+import { logger } from '../infrastructure/logger';

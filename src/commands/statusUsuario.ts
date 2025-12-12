@@ -20,7 +20,7 @@ async function statusUsuarioCommand(sock, userId, texto) {
     await sock.sendMessage(userId, { text: resultado.message });
     
   } catch (error) {
-    console.error('Erro no comando statusUsuario:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro no comando statusUsuario');
     await sock.sendMessage(userId, { 
       text: '❌ Erro interno ao processar comando de status.' 
     });
@@ -28,3 +28,4 @@ async function statusUsuarioCommand(sock, userId, texto) {
 }
 
 export default statusUsuarioCommand; 
+import { logger } from '../infrastructure/logger';

@@ -5,11 +5,11 @@ import { formatarMensagem, formatarConfirmacao, gerarDicasContextuais } from '..
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function excluirLancamentoCommand(sock, userId, texto) {
-  console.log('texto', texto);
+  logger.info({ trecho: String(texto || '').slice(0, 80) }, '[EXCLUIR_LANCAMENTO] texto recebido');
   
   // Verificar se há um estado ativo primeiro
   const estado = await obterEstado(userId);
-  console.log('estado excluir lancamento', estado);
+  logger.debug?.({ estado }, '[EXCLUIR_LANCAMENTO] estado inicial');
   
   // Se está aguardando confirmação, processar a resposta
   if (estado?.etapa === 'aguardando_confirmacao_exclusao_lancamento') {
@@ -67,7 +67,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
           });
         }
       } catch (error) {
-        console.error('Erro ao excluir lançamento:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro ao excluir lançamento');
         await limparEstado(userId);
         await sock.sendMessage(userId, { 
           text: ERROR_MESSAGES.ERRO_INTERNO('Excluir lançamento', 'Tente novamente em alguns instantes')
@@ -101,9 +101,9 @@ async function excluirLancamentoCommand(sock, userId, texto) {
   
   // Se não está aguardando confirmação, validar formato do comando
   const match = texto.toLowerCase().match(/^excluir\s+(\d+)$/i);
-  console.log('match', match);
+  logger.debug?.({ match }, '[EXCLUIR_LANCAMENTO] match');
   if (!match) {
-    console.log('match invalido');
+  logger.info('[EXCLUIR_LANCAMENTO] match inválido');
     await sock.sendMessage(userId, { 
       text: ERROR_MESSAGES.FORMATO_INVALIDO('Comando excluir', 'excluir 3', 'excluir 1, excluir 2, excluir 5') 
     });
@@ -114,7 +114,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
   
   // Verificar se há um histórico exibido no estado
   if (!estado || estado.etapa !== 'historico_exibido') {
-    console.log('estado invalido');
+  logger.info('[EXCLUIR_LANCAMENTO] estado inválido');
     await sock.sendMessage(userId, { 
       text: ERROR_MESSAGES.ESTADO_INVALIDO('excluir lançamento')
     });
@@ -189,3 +189,4 @@ async function excluirLancamentoCommand(sock, userId, texto) {
 }
 
 export default excluirLancamentoCommand; 
+import { logger } from '../infrastructure/logger';

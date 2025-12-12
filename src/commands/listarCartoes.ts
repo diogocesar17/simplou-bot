@@ -45,8 +45,9 @@ async function listarCartoesCommand(sock, userId) {
     await definirEstado(userId, 'cartoes_listados', { cartoes });
   } catch (e) {
     // Fail-safe: se Redis não estiver disponível, apenas segue sem estado
-    console.warn('[cartoes] Não foi possível definir estado cartoes_listados:', (e as any)?.message || e);
+    logger.warn({ err: (e as any)?.message || e }, '[cartoes] Não foi possível definir estado cartoes_listados');
   }
 }
 
 export default listarCartoesCommand; 
+import { logger } from '../infrastructure/logger';

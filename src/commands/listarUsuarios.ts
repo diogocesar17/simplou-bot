@@ -38,7 +38,7 @@ async function listarUsuariosCommand(sock, userId, texto) {
     });
     
   } catch (error) {
-    console.error('Erro no comando listarUsuarios:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro no comando listarUsuarios');
     await sock.sendMessage(userId, { 
       text: ERROR_MESSAGES.ERRO_INTERNO('Listar usuários', 'Tente novamente em alguns instantes')
     });
@@ -46,3 +46,4 @@ async function listarUsuariosCommand(sock, userId, texto) {
 }
 
 export default listarUsuariosCommand; 
+import { logger } from '../infrastructure/logger';

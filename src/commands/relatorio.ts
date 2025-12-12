@@ -92,10 +92,10 @@ async function relatorioCommand(sock, userId, texto) {
             caption: `📊 Relatório de ${getNomeMes(mesAno.mes - 1)}/${mesAno.ano}`
           });
         } else {
-          console.error('Arquivo CSV não encontrado:', resultado.caminhoArquivo);
+  logger.error({ caminhoArquivo: resultado.caminhoArquivo }, 'Arquivo CSV não encontrado');
         }
       } catch (fileError) {
-        console.error('Erro ao enviar arquivo CSV:', fileError);
+  logger.error({ err: (fileError as any)?.message || fileError }, 'Erro ao enviar arquivo CSV');
         await sock.sendMessage(userId, {
           text: formatarMensagem({
             titulo: 'Arquivo não disponível',
@@ -152,7 +152,7 @@ async function relatorioCommand(sock, userId, texto) {
       }
     }
   } catch (error) {
-    console.error('Erro ao gerar relatório:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro ao gerar relatório');
     await sock.sendMessage(userId, {
       text: formatarMensagem({
         titulo: 'Erro interno',
@@ -169,3 +169,4 @@ async function relatorioCommand(sock, userId, texto) {
 }
 
 export default relatorioCommand; 
+import { logger } from '../infrastructure/logger';

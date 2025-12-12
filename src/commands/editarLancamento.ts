@@ -172,7 +172,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
       });
       
     } catch (error) {
-      console.error('Erro ao atualizar lançamento:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro ao atualizar lançamento');
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
         text: ERROR_MESSAGES.ERRO_INTERNO('Atualizar lançamento', 'Tente novamente em alguns instantes')
@@ -285,7 +285,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
     })
   });
   
-  console.log('lancamento: ', lancamento.id);
+  logger.debug?.({ id: lancamento.id }, '[EDITAR_LANCAMENTO] lancamento id');
 
   await definirEstado(userId, 'aguardando_campo_edicao_lancamento', {
     lancamentoId: lancamento.id,
@@ -295,3 +295,4 @@ async function editarLancamentoCommand(sock, userId, texto) {
 }
 
 export default editarLancamentoCommand; 
+import { logger } from '../infrastructure/logger';

@@ -7,7 +7,7 @@ import { definirEstado, obterEstado, limparEstado } from '../configs/stateManage
 import { converterDataParaISO } from '../utils/dataUtils';
 
 async function lembreteCommand(sock, userId, texto) {
-  console.log(`[LEMBRETE] Comando iniciado: userId=${userId}, texto="${texto}"`);
+  logger.info({ userId, trecho: String(texto || '').slice(0, 80) }, '[LEMBRETE] Comando iniciado');
   
   // Verificar se há estado pendente
   const estado = await obterEstado(userId);
@@ -312,7 +312,7 @@ async function lembreteCommand(sock, userId, texto) {
       
     } catch (error) {
       await limparEstado(userId);
-      console.error('[LEMBRETE] Erro ao criar lembrete:', error);
+  logger.error({ err: (error as any)?.message || error }, '[LEMBRETE] Erro ao criar lembrete');
       
       await sock.sendMessage(userId, {
         text: formatarMensagem({
@@ -400,7 +400,7 @@ async function lembreteCommand(sock, userId, texto) {
       });
       
     } catch (error) {
-      console.error('[LEMBRETE] Erro ao verificar limite:', error);
+  logger.error({ err: (error as any)?.message || error }, '[LEMBRETE] Erro ao verificar limite');
       await sock.sendMessage(userId, {
         text: '❌ Erro interno. Tente novamente mais tarde.'
       });
@@ -453,3 +453,4 @@ async function lembreteCommand(sock, userId, texto) {
 }
 
 export default lembreteCommand;
+import { logger } from '../infrastructure/logger';

@@ -43,7 +43,7 @@ async function backupCommand(sock, userId) {
       });
     }
   } catch (error) {
-    console.error('Erro ao gerar backup:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro ao gerar backup');
     await sock.sendMessage(userId, { 
       text: ERROR_MESSAGES.ERRO_INTERNO('Gerar backup', 'Tente novamente em alguns instantes')
     });
@@ -51,3 +51,4 @@ async function backupCommand(sock, userId) {
 }
 
 export default backupCommand; 
+import { logger } from '../infrastructure/logger';

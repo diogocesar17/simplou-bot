@@ -26,7 +26,7 @@ async function promoverPremiumCommand(sock, userId, texto) {
     }
     
   } catch (error) {
-    console.error('Erro no comando promoverPremium:', error);
+  logger.error({ err: (error as any)?.message || error }, 'Erro no comando promoverPremium');
     await sock.sendMessage(userId, { 
       text: '❌ Erro interno ao processar comando de promoção.' 
     });
@@ -34,3 +34,4 @@ async function promoverPremiumCommand(sock, userId, texto) {
 }
 
 export default promoverPremiumCommand; 
+import { logger } from '../infrastructure/logger';
