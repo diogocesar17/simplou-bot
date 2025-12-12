@@ -28,6 +28,10 @@ let reconnecting = false
 const INITIAL_RETRY_DELAY_MS = 5000
 const MAX_RETRY_DELAY_MS = 60000
 let retryDelayMs = INITIAL_RETRY_DELAY_MS
+// Controle para evitar múltiplos timers de alertas em reconexões
+let alertasIniciados = false
+let alertasIntervalId: NodeJS.Timeout | null = null
+let sockRef: WASocket | null = null
 
 async function createSocket(): Promise<void> {
   const { state, saveCreds } = await getHybridAuthState()
@@ -170,31 +174,57 @@ async function reconnect(): Promise<void> {
 }
 
 function iniciarSistemaAlertas(sock: WASocket): void {
+  // Atualiza referência do socket sempre, mesmo em reconexões
+  sockRef = sock
+
+  // Se já iniciado, não cria novos timers
+  if (alertasIniciados) {
+    console.log('🔕 Alertas já iniciados anteriormente — ignorando nova configuração de timers.')
+    return
+  }
+
+  alertasIniciados = true
   console.log('🔔 Sistema de alertas automáticos iniciado')
 
-  setInterval(async () => {
+  alertasIntervalId = setInterval(async () => {
     if (estaNoHorarioAlertas()) {
       const agora = new Date()
       const hora = agora.getHours()
       console.log(`⏰ Verificando alertas automáticos às ${hora}h...`)
 
+      const s = sockRef
+      if (!s) {
+        console.warn('⚠️ Socket ausente ao verificar alertas — aguardando reconexão.')
+        return
+      }
+
       if (ePrimeiraVerificacaoDoDia()) {
         console.log('🌅 Primeira verificação do dia - enviando todos os alertas')
-        await verificarEEnviarAlertasAutomaticos(sock, false)
+        await verificarEEnviarAlertasAutomaticos(s, false)
       } else if (eVerificacaoFinalDoDia()) {
         console.log('🌆 Última verificação do dia - enviando lembretes finais')
-        await verificarEEnviarAlertasAutomaticos(sock, true)
+        await verificarEEnviarAlertasAutomaticos(s, true)
       } else {
         console.log('📋 Verificação intermediária - enviando novos alertas')
-        await verificarEEnviarAlertasAutomaticos(sock, false)
+        await verificarEEnviarAlertasAutomaticos(s, false)
       }
     }
   }, 60 * 60 * 1000)
 
   if (estaNoHorarioAlertas()) {
     console.log('🚀 Verificação inicial de alertas...')
-    verificarEEnviarAlertasAutomaticos(sock, false)
+    verificarEEnviarAlertasAutomaticos(sockRef!, false)
   }
+}
+
+export function resetSistemaAlertas(): void {
+  if (alertasIntervalId) {
+    clearInterval(alertasIntervalId)
+    alertasIntervalId = null
+  }
+  alertasIniciados = false
+  sockRef = null
+  console.log('🔄 Sistema de alertas resetado — timers limpos e flag reiniciada.')
 }
 
 export async function bootstrap(): Promise<void> {
