@@ -1,3 +1,3 @@
-import { parseMessage } from '../../messageParser';
- 
+import { parseMessage } from './messageParser';
+
 export { parseMessage };

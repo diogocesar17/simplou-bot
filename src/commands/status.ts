@@ -1,6 +1,6 @@
 import * as usuariosService from '../services/usuariosService';
 import * as sistemaService from '../services/sistemaService';
-import { SYSTEM_CONFIG } from '../../config';
+import { SYSTEM_CONFIG } from '../config/config';
 import { formatarMensagem } from '../utils/formatMessages';
 
 async function statusCommand(sock, userId) {

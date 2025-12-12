@@ -2,7 +2,7 @@ import { Pool } from 'pg';
 import { logger, fileLogger } from './logger';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { ADMIN_USERS, AUTHORIZED_USERS } from '../../config';
+import { ADMIN_USERS, AUTHORIZED_USERS } from '../config/config';
 
 // Configuração otimizada da conexão com PostgreSQL
 const pool = new Pool({
