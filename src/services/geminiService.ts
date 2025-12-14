@@ -17,6 +17,8 @@ interface TesteConexao {
 
 // 🔧 Configuração de modelo (texto e, futuramente, imagens de vouchers)
 const GEMINI_TEXT_MODEL = 'gemini-2.5-flash';
+// Usar o mesmo modelo para multimodal conforme instrução do projeto
+const GEMINI_VISION_MODEL = GEMINI_TEXT_MODEL;
 
 // Configuração do Gemini
 let gemini: GoogleGenerativeAI | null = null;
@@ -52,6 +54,15 @@ function getTextModel(): GenerativeModel | null {
     return null;
   }
   return gemini.getGenerativeModel({ model: GEMINI_TEXT_MODEL });
+}
+
+// Função helper para pegar o modelo multimodal (imagens/documentos)
+function getVisionModel(): GenerativeModel | null {
+  if (!isGeminiAvailable || !gemini) {
+    console.log('[GEMINI] Não disponível (vision), usando parser padrão');
+    return null;
+  }
+  return gemini.getGenerativeModel({ model: GEMINI_VISION_MODEL });
 }
 
 // Função para analisar transação com Gemini
@@ -264,3 +275,213 @@ export async function testarConexaoGemini(): Promise<TesteConexao> {
 }
 
 export { isGeminiAvailable };
+
+// Novo método: análise de voucher financeiro (imagem/PDF)
+export async function analisarVoucherFinanceiro(
+  fileBuffer: Buffer,
+  mimeType: string,
+  userId: string
+): Promise<{
+  tipo: string;
+  valor: number;
+  categoria: string;
+  formaPagamento: string;
+  descricao: string;
+  data: string;
+} | null> {
+  const model = getVisionModel();
+  if (!model) {
+    console.log('[GEMINI][analisarVoucherFinanceiro] Gemini indisponível');
+    return null;
+  }
+
+  try {
+    const base64Data = fileBuffer.toString('base64');
+    const prompt = `Você é uma IA que lê comprovantes financeiros (voucher/recibo/extrato) e extrai os campos abaixo. Atenção: responda APENAS um JSON válido.
+
+Campos obrigatórios no JSON de saída:
+{
+  "tipo": "gasto" ou "receita",
+  "valor": número (ex.: 123.45),
+  "categoria": texto simples compatível com categorias usuais (ex.: Mercado, Restaurante, Salário),
+  "formaPagamento": "pix" | "credito" | "debito" | "dinheiro" | "boleto" | "outro",
+  "descricao": frase curta (ex.: Compra no mercado XYZ),
+  "data": "YYYY-MM-DD" (data do comprovante; se não houver com segurança, use a data atual)
+}
+
+
+Regras:
+- Não inclua texto extra fora do JSON.
+- Valores devem vir sem símbolo de moeda.
+- Se não houver data clara, use a data atual em formato ISO.
+- Se não identificar claramente forma de pagamento, defina "outro".
+`;
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType || 'application/octet-stream',
+        },
+      },
+      { text: prompt },
+    ]);
+    const response = await result.response;
+    const textResp = response.text();
+
+    const jsonMatch = textResp.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log('[GEMINI][analisarVoucherFinanceiro] Não conseguiu extrair JSON da resposta');
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    // Validação mínima
+    if (!parsed || !parsed.valor || !parsed.tipo) {
+      console.log('[GEMINI][analisarVoucherFinanceiro] JSON sem campos essenciais');
+      return null;
+    }
+
+    // Normalizações leves
+    const fp = String(parsed.formaPagamento || parsed.forma_pagamento || '').toLowerCase();
+    const formaPagamentoNormalizada = fp && ['pix', 'credito', 'debito', 'dinheiro', 'boleto'].includes(fp)
+      ? fp
+      : 'outro';
+
+    let dataISO = String(parsed.data || '').trim();
+    if (!dataISO || dataISO.length !== 10 || !dataISO.includes('-')) {
+      const agora = new Date();
+      const y = agora.getFullYear();
+      const m = String(agora.getMonth() + 1).padStart(2, '0');
+      const d = String(agora.getDate()).padStart(2, '0');
+      dataISO = `${y}-${m}-${d}`;
+    }
+
+    const resultado = {
+      tipo: String(parsed.tipo).toLowerCase() === 'receita' ? 'receita' : 'gasto',
+      valor: Number(parsed.valor),
+      categoria: parsed.categoria || 'Outros',
+      formaPagamento: formaPagamentoNormalizada,
+      descricao: parsed.descricao || 'Lançamento por voucher',
+      data: dataISO,
+    };
+
+    console.log('[GEMINI][analisarVoucherFinanceiro] OK →', {
+      tipo: resultado.tipo,
+      valor: resultado.valor,
+      categoria: resultado.categoria,
+      formaPagamento: resultado.formaPagamento,
+      data: resultado.data,
+    });
+
+    return resultado;
+  } catch (error: any) {
+    console.error('[GEMINI][analisarVoucherFinanceiro] Erro:', error?.message || error);
+    return null;
+  }
+}
+
+// Novo método: transcrição e extração de dados financeiros a partir de áudio
+export async function transcreverAudioFinanceiro(
+  audioBuffer: Buffer,
+  mimeType: string,
+  userId: string
+): Promise<{
+  transcricao: string;
+  tipo: string;
+  valor: number;
+  categoria: string;
+  formaPagamento: string;
+  descricao: string;
+  data: string;
+} | null> {
+  const model = getVisionModel();
+  if (!model) {
+    console.log('[GEMINI][transcreverAudioFinanceiro] Gemini indisponível');
+    return null;
+  }
+
+  try {
+    const base64Data = audioBuffer.toString('base64');
+    const prompt = `Você receberá um áudio (mensagem de voz). Tarefas:
+1) Transcreva fielmente o conteúdo em português.
+2) A partir da transcrição, extraia uma transação financeira com os seguintes campos e responda APENAS um JSON válido:
+{
+  "transcricao": string,
+  "tipo": "gasto" ou "receita",
+  "valor": número (ex.: 123.45),
+  "categoria": texto simples (ex.: Mercado, Restaurante, Salário),
+  "formaPagamento": "pix" | "credito" | "debito" | "dinheiro" | "boleto" | "outro",
+  "descricao": frase curta (ex.: Compra no mercado XYZ),
+  "data": "YYYY-MM-DD" (se não houver data explícita na fala, use a data atual)
+}
+
+Regras:
+- Não inclua texto fora do JSON.
+- Valores sem símbolo de moeda.
+- Se forma de pagamento não for clara, use "outro".
+`;
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType || 'audio/ogg',
+        },
+      },
+      { text: prompt },
+    ]);
+
+    const response = await result.response;
+    const textResp = response.text();
+    const jsonMatch = textResp.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log('[GEMINI][transcreverAudioFinanceiro] Não conseguiu extrair JSON da resposta');
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed || !parsed.transcricao || !parsed.valor || !parsed.tipo) {
+      console.log('[GEMINI][transcreverAudioFinanceiro] JSON sem campos essenciais');
+      return null;
+    }
+
+    const fp = String(parsed.formaPagamento || parsed.forma_pagamento || '').toLowerCase();
+    const formaPagamentoNormalizada = fp && ['pix', 'credito', 'debito', 'dinheiro', 'boleto'].includes(fp)
+      ? fp
+      : 'outro';
+
+    let dataISO = String(parsed.data || '').trim();
+    if (!dataISO || dataISO.length !== 10 || !dataISO.includes('-')) {
+      const agora = new Date();
+      const y = agora.getFullYear();
+      const m = String(agora.getMonth() + 1).padStart(2, '0');
+      const d = String(agora.getDate()).padStart(2, '0');
+      dataISO = `${y}-${m}-${d}`;
+    }
+
+    const resultado = {
+      transcricao: String(parsed.transcricao || ''),
+      tipo: String(parsed.tipo).toLowerCase() === 'receita' ? 'receita' : 'gasto',
+      valor: Number(parsed.valor),
+      categoria: parsed.categoria || 'Outros',
+      formaPagamento: formaPagamentoNormalizada,
+      descricao: parsed.descricao || 'Lançamento por áudio',
+      data: dataISO,
+    };
+
+    console.log('[GEMINI][transcreverAudioFinanceiro] OK →', {
+      tipo: resultado.tipo,
+      valor: resultado.valor,
+      categoria: resultado.categoria,
+      formaPagamento: resultado.formaPagamento,
+      data: resultado.data,
+      transcricaoLen: resultado.transcricao.length,
+    });
+
+    return resultado;
+  } catch (error: any) {
+    console.error('[GEMINI][transcreverAudioFinanceiro] Erro:', error?.message || error);
+    return null;
+  }
+}

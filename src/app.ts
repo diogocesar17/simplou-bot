@@ -4,6 +4,7 @@ import makeWASocket, {
   WASocket,
   WAMessage,
   MessageUpsertType,
+  downloadContentFromMessage,
 } from '@whiskeysockets/baileys'
 import qrcode from 'qrcode-terminal'
 import { Boom } from '@hapi/boom'
@@ -16,6 +17,8 @@ import { logger, debug } from './infrastructure/logger'
 // Usar require para compatibilidade com CommonJS no serviço Gemini
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const geminiService = require('./services/geminiService')
+import { definirEstado } from './configs/stateManager'
+import { formatarValor } from './utils/formatUtils'
 
 import {
   verificarEEnviarAlertasAutomaticos,
@@ -134,11 +137,6 @@ async function createSocket(): Promise<void> {
       raw?.listResponseMessage?.title ??
       ''
     ).trim()
-    if (!texto) {
-      const tipos = Object.keys(raw || {})
-      logger.info({ tipos }, '[MSG] Mensagem sem texto legível — ignorando')
-      return
-    }
     const userId = msg.key.remoteJid
     if (!userId) return
 
@@ -150,6 +148,10 @@ async function createSocket(): Promise<void> {
       ? 'texto'
       : raw?.imageMessage
       ? 'imagem'
+      : (raw as any)?.audioMessage
+      ? 'audio'
+      : raw?.documentMessage
+      ? 'documento'
       : raw?.videoMessage
       ? 'video'
       : raw?.buttonsResponseMessage
@@ -169,6 +171,106 @@ async function createSocket(): Promise<void> {
         hasQuoted: Boolean((raw as any)?.extendedTextMessage?.contextInfo?.quotedMessage),
       })
     }
+    // Fluxo de áudio: prioridade sobre texto
+    const hasAudio = Boolean((raw as any)?.audioMessage)
+    if (hasAudio) {
+      try {
+        // Aviso pré-processamento de IA para áudio
+        await sock!.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
+        const audioMessage = (raw as any)?.audioMessage
+        const stream = await downloadContentFromMessage(audioMessage, 'audio')
+        const chunks: Buffer[] = []
+        for await (const chunk of stream) {
+          chunks.push(chunk as Buffer)
+        }
+        const fileBuffer = Buffer.concat(chunks)
+        const mimeType: string = (audioMessage as any)?.mimetype || 'audio/ogg'
+
+        const analiseAudio = await geminiService.transcreverAudioFinanceiro(fileBuffer, mimeType, userId)
+
+        if (!analiseAudio) {
+          await sock!.sendMessage(userId, {
+            text: '❌ Não consegui entender o áudio. Você pode enviar o lançamento em texto? Ex.: "mercado 50 pix"',
+          })
+          return
+        }
+
+        await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'audio', ...analiseAudio })
+
+        const valorFmt = formatarValor(analiseAudio.valor)
+        const transcricaoExibicao = String(analiseAudio.transcricao || '').slice(0, 400)
+        const resumo = `🗣️ Transcrição:\n${transcricaoExibicao}\n\n` +
+          `🤖 Interpretação:\n` +
+          `📅 Data: ${analiseAudio.data}\n` +
+          `💰 Valor: R$ ${valorFmt}\n` +
+          `📂 Categoria: ${analiseAudio.categoria}\n` +
+          `💳 Pagamento: ${analiseAudio.formaPagamento}\n` +
+          `📝 Descrição: ${analiseAudio.descricao}\n\n` +
+          `✅ Confirmar lançamento? Responda com "S" para salvar ou "N" para cancelar.`
+
+        await sock!.sendMessage(userId, { text: resumo })
+        return
+      } catch (err) {
+        logger.error({ err: (err as any)?.message || err }, '[AUDIO] Erro ao processar áudio')
+        await sock!.sendMessage(userId, { text: '⚠️ Ocorreu um erro ao ler o áudio. Tente novamente mais tarde ou envie em texto.' })
+        return
+      }
+    }
+
+    // Fluxo de voucher: tratar imagens ou documentos como comprovantes
+    const hasVoucherMedia = Boolean((raw as any)?.imageMessage || (raw as any)?.documentMessage)
+
+    if (hasVoucherMedia) {
+      try {
+        // Aviso pré-processamento de IA para imagem/documento (voucher)
+        await sock!.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
+        const isImage = Boolean((raw as any)?.imageMessage)
+        const mediaMessage = (raw as any)?.imageMessage || (raw as any)?.documentMessage
+        const stream = await downloadContentFromMessage(mediaMessage, isImage ? 'image' : 'document')
+        const chunks: Buffer[] = []
+        for await (const chunk of stream) {
+          chunks.push(chunk as Buffer)
+        }
+        const fileBuffer = Buffer.concat(chunks)
+        const mimeType: string = (mediaMessage as any)?.mimetype || (isImage ? 'image/jpeg' : 'application/pdf')
+
+        const analise = await geminiService.analisarVoucherFinanceiro(fileBuffer, mimeType, userId)
+
+        if (!analise) {
+          await sock!.sendMessage(userId, {
+            text: '❌ Não consegui interpretar o comprovante. Você pode enviar o lançamento em texto? Ex.: "mercado 50 pix"',
+          })
+          return
+        }
+
+        // Definir estado para confirmação via IA
+        await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'voucher', ...analise })
+
+        const valorFmt = formatarValor(analise.valor)
+        const resumo = `🤖 Análise do comprovante:\n\n` +
+          `📅 Data: ${analise.data}\n` +
+          `💰 Valor: R$ ${valorFmt}\n` +
+          `📂 Categoria: ${analise.categoria}\n` +
+          `💳 Pagamento: ${analise.formaPagamento}\n` +
+          `📝 Descrição: ${analise.descricao}\n\n` +
+          `✅ Confirmar lançamento? Responda com "S" para confirmar ou "N" para cancelar.`
+
+        await sock!.sendMessage(userId, { text: resumo })
+        return
+      } catch (err) {
+        logger.error({ err: (err as any)?.message || err }, '[VOUCHER] Erro ao processar comprovante')
+        await sock!.sendMessage(userId, { text: '⚠️ Ocorreu um erro ao ler o comprovante. Tente novamente mais tarde ou envie em texto.' })
+        return
+      }
+    }
+
+    // Se não houver mídia de voucher, seguir fluxo normal de texto
+    if (!texto) {
+      const tipos = Object.keys(raw || {})
+      logger.info({ tipos }, '[MSG] Mensagem sem texto legível — ignorando')
+      return
+    }
+
     await handleMessage(sock!, userId, texto)
   })
 }

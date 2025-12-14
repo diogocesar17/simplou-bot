@@ -388,7 +388,140 @@ async function lancamentoCommand(sock, userId, texto) {
   const estado = await obterEstado(userId);
   if (estado?.etapa === 'aguardando_confirmacao_ia') {
     const parsed = estado.dadosParciais;
-    
+    // Tratamento específico para áudio
+    if (parsed?.origem === 'audio') {
+      const resposta = texto.toLowerCase().trim();
+
+      // Permitir ajuste de categoria também para áudios
+      if (resposta.startsWith('categoria ')) {
+        const novaCategoria = resposta.replace('categoria ', '').trim();
+        const categoriasValidas = [
+          'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia',
+          'Lazer', 'Vestuário', 'Serviços', 'Casa', 'Trabalho', 'Renda', 'Outros'
+        ];
+
+        if (categoriasValidas.includes(novaCategoria)) {
+          parsed.categoria = novaCategoria;
+          const pagamentoView = parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO';
+          await sock.sendMessage(userId, {
+            text: `✅ Categoria alterada para: ${novaCategoria}\n\n🗣️ Transcrição:\n${String(parsed.transcricao || '').slice(0, 400)}\n\n🤖 *Interpretação:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${pagamentoView}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+          });
+          return;
+        } else {
+          await sock.sendMessage(userId, {
+            text: `❌ Categoria inválida. Categorias disponíveis:\n\n${categoriasValidas.map(cat => `• ${cat}`).join('\n')}\n\n💡 Digite: "categoria [nome_da_categoria]"`
+          });
+          return;
+        }
+      }
+
+      const opcaoConfirmacao = parseInt(resposta, 10);
+      const confirmou = (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 1) || ['s', 'sim', 'y', 'yes'].includes(resposta);
+      const negou = (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 2) || ['n', 'nao', 'não', 'no'].includes(resposta);
+
+      if (confirmou) {
+        const dataBR = (() => {
+          try {
+            const [yy, mm, dd] = String(parsed.data || '').split('-');
+            if (yy && mm && dd) return `${dd}/${mm}/${yy}`;
+          } catch {}
+          return new Date().toLocaleDateString('pt-BR');
+        })();
+
+        const parsedCompat = {
+          tipo: parsed.tipo || 'gasto',
+          valor: parsed.valor,
+          descricao: parsed.descricao,
+          categoria: parsed.categoria || 'Outros',
+          pagamento: parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO',
+          data: dataBR,
+          faltaFormaPagamento: false,
+          faltaDataVencimento: false,
+          parcelamento: false,
+          recorrente: false,
+        };
+
+        await limparEstado(userId);
+        return await processarLancamento(sock, userId, parsedCompat);
+      }
+
+      if (negou) {
+        await limparEstado(userId);
+        await sock.sendMessage(userId, { text: '❌ Lançamento cancelado.' });
+        return;
+      }
+
+      await sock.sendMessage(userId, { text: '❌ Opção inválida. Responda com 1 (Sim) ou 2 (Não), ou "S"/"N".' });
+      return;
+    }
+    // Tratamento específico para voucher
+    if (parsed?.origem === 'voucher') {
+      const resposta = texto.toLowerCase().trim();
+
+      // Permitir ajuste de categoria também para vouchers
+      if (resposta.startsWith('categoria ')) {
+        const novaCategoria = resposta.replace('categoria ', '').trim();
+        const categoriasValidas = [
+          'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia',
+          'Lazer', 'Vestuário', 'Serviços', 'Casa', 'Trabalho', 'Renda', 'Outros'
+        ];
+
+        if (categoriasValidas.includes(novaCategoria)) {
+          parsed.categoria = novaCategoria;
+          const pagamentoView = parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO';
+          await sock.sendMessage(userId, {
+            text: `✅ Categoria alterada para: ${novaCategoria}\n\n🤖 *Análise do comprovante:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${pagamentoView}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+          });
+          return;
+        } else {
+          await sock.sendMessage(userId, {
+            text: `❌ Categoria inválida. Categorias disponíveis:\n\n${categoriasValidas.map(cat => `• ${cat}`).join('\n')}\n\n💡 Digite: "categoria [nome_da_categoria]"`
+          });
+          return;
+        }
+      }
+
+      const opcaoConfirmacao = parseInt(resposta, 10);
+      const confirmou = (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 1) || ['s', 'sim', 'y', 'yes'].includes(resposta);
+      const negou = (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 2) || ['n', 'nao', 'não', 'no'].includes(resposta);
+
+      if (confirmou) {
+        // Montar parsed compatível com processarLancamento para reaproveitar fluxo (cartão, parcelamento, etc.)
+        const dataBR = (() => {
+          try {
+            const [yy, mm, dd] = String(parsed.data || '').split('-');
+            if (yy && mm && dd) return `${dd}/${mm}/${yy}`;
+          } catch {}
+          return new Date().toLocaleDateString('pt-BR');
+        })();
+
+        const parsedCompat = {
+          tipo: parsed.tipo || 'gasto',
+          valor: parsed.valor,
+          descricao: parsed.descricao,
+          categoria: parsed.categoria || 'Outros',
+          pagamento: parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO',
+          data: dataBR,
+          faltaFormaPagamento: false,
+          faltaDataVencimento: false,
+          parcelamento: false,
+          recorrente: false,
+        };
+
+        await limparEstado(userId);
+        return await processarLancamento(sock, userId, parsedCompat);
+      }
+
+      if (negou) {
+        await limparEstado(userId);
+        await sock.sendMessage(userId, { text: '❌ Lançamento cancelado.' });
+        return;
+      }
+
+      await sock.sendMessage(userId, { text: '❌ Opção inválida. Responda com 1 (Sim) ou 2 (Não), ou "S"/"N".' });
+      return;
+    }
+
     const resposta = texto.toLowerCase().trim();
     
     // Verificar se quer alterar categoria
