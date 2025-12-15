@@ -454,13 +454,18 @@ export async function buscarLembretesParaEnvio(): Promise<Lembrete[]> {
     const amanha = new Date(hoje);
     amanha.setDate(amanha.getDate() + 1);
 
+    // Seleciona lembretes com envio programado para hoje OU com vencimento hoje
     const result = await pool.query(`
       SELECT * FROM lembretes 
       WHERE ativo = true 
-        AND proximo_envio >= $1 
-        AND proximo_envio < $2
-      ORDER BY proximo_envio ASC
+        AND (
+          (proximo_envio >= $1 AND proximo_envio < $2)
+          OR (data_vencimento >= $1 AND data_vencimento < $2)
+        )
+      ORDER BY proximo_envio ASC, data_vencimento ASC
     `, [hoje, amanha]);
+
+    logger.debug(`🔔 Lembretes encontrados para hoje: ${result.rows.length}`);
 
     return result.rows.map(row => ({
       id: row.id,
