@@ -247,12 +247,14 @@ async function createSocket(): Promise<void> {
         await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'voucher', ...analise })
 
         const valorFmt = formatarValor(analise.valor)
+        const parceladoTexto = analise.parcelado ? `\n🔢 Parcelado: Sim (${analise.parcelas}x)` : '';
         const resumo = `🤖 Análise do comprovante:\n\n` +
           `📅 Data: ${analise.data}\n` +
           `💰 Valor: R$ ${valorFmt}\n` +
           `📂 Categoria: ${analise.categoria}\n` +
           `💳 Pagamento: ${analise.formaPagamento}\n` +
-          `📝 Descrição: ${analise.descricao}\n\n` +
+          `📝 Descrição: ${analise.descricao}` +
+          parceladoTexto + `\n\n` +
           `✅ Confirmar lançamento? Responda com "S" para confirmar ou "N" para cancelar.`
 
         await sock!.sendMessage(userId, { text: resumo })

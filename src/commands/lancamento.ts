@@ -437,7 +437,10 @@ async function lancamentoCommand(sock, userId, texto) {
           data: dataBR,
           faltaFormaPagamento: false,
           faltaDataVencimento: false,
-          parcelamento: false,
+          parcelamento: parsed.parcelado || false,
+          numParcelas: parsed.parcelas || 1,
+          parcelas_totais: parsed.parcelas || 1,
+          parcela_atual: 1,
           recorrente: false,
         };
 
@@ -469,8 +472,10 @@ async function lancamentoCommand(sock, userId, texto) {
         if (categoriasValidas.includes(novaCategoria)) {
           parsed.categoria = novaCategoria;
           const pagamentoView = parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO';
+          const parceladoTexto = parsed.parcelado ? `\n🔢 Parcelado: Sim (${parsed.parcelas}x)` : '';
+          
           await sock.sendMessage(userId, {
-            text: `✅ Categoria alterada para: ${novaCategoria}\n\n🤖 *Análise do comprovante:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${pagamentoView}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+            text: `✅ Categoria alterada para: ${novaCategoria}\n\n🤖 *Análise do comprovante:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${pagamentoView}\n📅 Data: ${parsed.data}${parceladoTexto}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
           });
           return;
         } else {
@@ -504,7 +509,10 @@ async function lancamentoCommand(sock, userId, texto) {
           data: dataBR,
           faltaFormaPagamento: false,
           faltaDataVencimento: false,
-          parcelamento: false,
+          parcelamento: parsed.parcelado || false,
+          numParcelas: parsed.parcelas || 1,
+          parcelas_totais: parsed.parcelas || 1,
+          parcela_atual: 1,
           recorrente: false,
         };
 
@@ -771,7 +779,7 @@ async function lancamentoCommand(sock, userId, texto) {
   logger.warn('[LANCAMENTO] ❌ IA falhou ou atingiu timeout. Comunicando usuário e seguindo padrão.');
       // Resposta amigável ao usuário (evitar duplicidade posteriormente)
       await sock.sendMessage(userId, { 
-        text: '⏱️ A análise inteligente demorou demais ou não foi possível entender.\n\nTente um formato mais simples, por exemplo:\n• "mercado 50 pix"\n• "gasto 100 uber credito"\n• "receita 5000 salario"' 
+        text: '⏱️ A análise inteligente demorou demais ou não foi possível entender.\n\nTente um formato mais simples, por exemplo:\n• "mercado 50 pix"\n• "gasto 100 com uber credito"\n• "receita 5000 salario"' 
       });
       parsed = parsedNormal;
       // Se o parse normal também não tiver valor, encerrar aqui para não duplicar mensagens

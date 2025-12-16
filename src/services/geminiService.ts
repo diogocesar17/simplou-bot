@@ -288,6 +288,8 @@ export async function analisarVoucherFinanceiro(
   formaPagamento: string;
   descricao: string;
   data: string;
+  parcelado?: boolean;
+  parcelas?: number;
 } | null> {
   const model = getVisionModel();
   if (!model) {
@@ -302,11 +304,13 @@ export async function analisarVoucherFinanceiro(
 Campos obrigatórios no JSON de saída:
 {
   "tipo": "gasto" ou "receita",
-  "valor": número (ex.: 123.45),
+  "valor": número (ex.: 123.45). Se houver "TOTAL", use o valor total da compra, não o valor da parcela.
   "categoria": texto simples compatível com categorias usuais (ex.: Mercado, Restaurante, Salário),
   "formaPagamento": "pix" | "credito" | "debito" | "dinheiro" | "boleto" | "outro",
   "descricao": frase curta (ex.: Compra no mercado XYZ),
-  "data": "YYYY-MM-DD" (data do comprovante; se não houver com segurança, use a data atual)
+  "data": "YYYY-MM-DD" (data do comprovante; se não houver com segurança, use a data atual),
+  "parcelado": booleano (true se identificar indícios de parcelamento como "X/Y", "QTDE PARCELAS", "PARC", caso contrário false),
+  "parcelas": número (quantidade total de parcelas. Se não identificar, use 1)
 }
 
 
@@ -315,6 +319,7 @@ Regras:
 - Valores devem vir sem símbolo de moeda.
 - Se não houver data clara, use a data atual em formato ISO.
 - Se não identificar claramente forma de pagamento, defina "outro".
+- Para identificar parcelamento, procure por termos como "QTDE PARCELAS", "X/Y" (ex: 01/03), "PARC". Se encontrar, defina "parcelado": true e extraia o total de parcelas.
 `;
 
     const result = await model.generateContent([
@@ -364,6 +369,8 @@ Regras:
       formaPagamento: formaPagamentoNormalizada,
       descricao: parsed.descricao || 'Lançamento por voucher',
       data: dataISO,
+      parcelado: parsed.parcelado === true,
+      parcelas: typeof parsed.parcelas === 'number' ? parsed.parcelas : 1
     };
 
     console.log('[GEMINI][analisarVoucherFinanceiro] OK →', {
@@ -372,6 +379,8 @@ Regras:
       categoria: resultado.categoria,
       formaPagamento: resultado.formaPagamento,
       data: resultado.data,
+      parcelado: resultado.parcelado,
+      parcelas: resultado.parcelas
     });
 
     return resultado;
