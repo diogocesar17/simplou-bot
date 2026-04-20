@@ -11,6 +11,14 @@ async function analisarCommand(sock, userId) {
   }
   // Gerar análise usando IA real
   const analise = await geminiService.analisarPadroesGastos(userId, dados);
+  if (!analise) {
+    await sock.sendMessage(userId, {
+      text:
+        '❌ IA indisponível no momento.\n\n' +
+        'Se você estiver rodando localmente, verifique a variável GEMINI_API_KEY no .env e reinicie o bot.',
+    });
+    return;
+  }
   await sock.sendMessage(userId, { text: analise });
 }
 

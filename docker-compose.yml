@@ -4,7 +4,7 @@ services:
   simplou:
     build: .
     env_file:
-      .env
+      - .env
     container_name: simplou
     restart: always  # Reinicia automaticamente se parar
     ports:

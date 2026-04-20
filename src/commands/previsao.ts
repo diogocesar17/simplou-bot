@@ -11,6 +11,14 @@ async function previsaoCommand(sock, userId) {
   }
   // Gerar previsão usando IA real
   const previsao = await geminiService.preverGastosFuturos(userId, dados);
+  if (!previsao) {
+    await sock.sendMessage(userId, {
+      text:
+        '❌ IA indisponível no momento.\n\n' +
+        'Se você estiver rodando localmente, verifique a variável GEMINI_API_KEY no .env e reinicie o bot.',
+    });
+    return;
+  }
   await sock.sendMessage(userId, { text: previsao });
 }
 

@@ -2,8 +2,21 @@ import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
 
-// Configuração do nível de log para o console
-const level = process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'warn' : 'debug');
+const isProd =
+  process.env.NODE_ENV === 'production' ||
+  process.env.RENDER === 'true' ||
+  Boolean(process.env.FLY_APP_NAME) ||
+  Boolean(process.env.DYNO);
+
+function clampProdLevel(desired: string): string {
+  const values = pino.levels.values as Record<string, number>;
+  const desiredValue = values[desired] ?? values.warn;
+  const warnValue = values.warn;
+  if (desiredValue < warnValue) return 'warn';
+  return desired;
+}
+
+const level = isProd ? clampProdLevel(process.env.LOG_LEVEL || 'warn') : (process.env.LOG_LEVEL || 'debug');
 
 // Logger para console (colorido, legível)
 const consoleStream = pino(
@@ -65,7 +78,7 @@ const fileStream = createFileLogger();
 
 // Função para logs de debug (só em desenvolvimento)
 function debug(message: string, ...args: any[]): void {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.DEBUG_MESSAGES === 'true') {
     console.log(`[DEBUG] ${message}`, ...args);
   }
 }

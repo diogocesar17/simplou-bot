@@ -72,7 +72,16 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     // Pergunta inteligente (Gemini) via stateManager
     if (estado.etapa === 'pergunta_inteligente') {
       const dados = await lancamentosService.buscarDadosParaAnalise(userId, 3);
-      const resposta = await geminiService.responderPerguntaFinanceira(texto, dados);
+      const resposta = await geminiService.responderPerguntaFinanceira(userId, texto, dados);
+      if (!resposta) {
+        await sock.sendMessage(userId, {
+          text:
+            '❌ Assistente inteligente indisponível no momento.\n\n' +
+            'Se você estiver rodando localmente, verifique a variável GEMINI_API_KEY no .env e reinicie o bot.',
+        });
+        await limparEstado(userId);
+        return;
+      }
       await sock.sendMessage(userId, { text: resposta });
       await limparEstado(userId);
       return;

@@ -45,6 +45,10 @@ async function createSocket(): Promise<void> {
     auth: state,
     version,
     browser: ['Ubuntu', 'Chrome', '22.04.4'],
+    connectTimeoutMs: 60_000,
+    defaultQueryTimeoutMs: 60_000,
+    keepAliveIntervalMs: 30_000,
+    syncFullHistory: false,
   })
 
   if (!state.creds?.registered && process.env.WHATSAPP_PAIRING_NUMBER) {
@@ -141,7 +145,7 @@ async function createSocket(): Promise<void> {
     if (!userId) return
 
     // Filtro para seu número específico
-    if (userId !== '556181429135@s.whatsapp.net') return
+    // if (userId !== '556181429135@s.whatsapp.net') return
 
     // Determina tipo básico da mensagem
     const tipoMensagem = raw?.conversation || raw?.extendedTextMessage?.text
