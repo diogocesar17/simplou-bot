@@ -3,7 +3,7 @@ name: Deploy Simplou
 on:
   push:
     branches:
-      - main  # ou 'master' dependendo do seu branch
+      - main
 
 jobs:
   deploy:
@@ -13,14 +13,28 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v3
 
-      - name: Conectar via SSH e fazer pull
+      - name: Conectar via SSH e fazer deploy
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd ~/app/simplou-bot
-            git pull origin main
+            set -e
+            cd /root/app/simplou-bot
+            echo "Pasta atual:"
+            pwd
+            echo "Arquivos:"
+            ls -la
+            echo "Branch atual:"
+            git branch
+            echo "Status do git:"
+            git status
+            echo "Atualizando código..."
+            git fetch origin
+            git reset --hard origin/main
+            echo "Subindo containers..."
             docker compose down
             docker compose up -d --build
+            echo "Containers ativos:"
+            docker compose ps
