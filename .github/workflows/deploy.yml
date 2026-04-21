@@ -1,4 +1,4 @@
-name: Deploy Simplou Bot
+name: Deploy Simplou
 
 on:
   push:
@@ -10,25 +10,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout código
         uses: actions/checkout@v3
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Deploy no servidor
-        run: |
-          ssh root@${{ secrets.SERVER_HOST }} << 'EOF'
-            cd /root
-            if [ ! -d "simplou-bot" ]; then
-              git clone https://github.com/diogocesar17/simplou-bot.git
-            fi
-            cd simplou-bot
-            git pull origin main
+      - name: Conectar via SSH e fazer deploy
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            cd /root/app/simplou-bot
+            echo "Pasta atual:"
+            pwd
+            echo "Arquivos:"
+            ls -la
+            echo "Branch atual:"
+            git branch
+            echo "Status do git:"
+            git status
+            echo "Atualizando código..."
+            git fetch origin
+            git reset --hard origin/main
+            echo "Subindo containers..."
             docker compose down
             docker compose up -d --build
-          EOF
+            echo "Containers ativos:"
+            docker compose ps
