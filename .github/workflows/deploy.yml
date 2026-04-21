@@ -25,7 +25,7 @@ jobs:
           ssh root@${{ secrets.SERVER_HOST }} << 'EOF'
             cd /root
             if [ ! -d "simplou-bot" ]; then
-              git clone https://github.com/SEU_USUARIO/simplou-bot.git
+              git clone https://github.com/diogocesar17/simplou-bot.git
             fi
             cd simplou-bot
             git pull origin main
