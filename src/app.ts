@@ -14,8 +14,6 @@ import { startHealthServer } from './infrastructure/healthServer'
 import { handleMessage } from './index'
 import { getHybridAuthState } from './infrastructure/auth/authRedisStorage'
 import { logger, debug } from './infrastructure/logger'
-// Usar require para compatibilidade com CommonJS no serviço Gemini
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const geminiService = require('./services/geminiService')
 import { definirEstado } from './configs/stateManager'
 import { formatarValor } from './utils/formatUtils'
@@ -32,12 +30,33 @@ let reconnecting = false
 const INITIAL_RETRY_DELAY_MS = 5000
 const MAX_RETRY_DELAY_MS = 60000
 let retryDelayMs = INITIAL_RETRY_DELAY_MS
-// Controle para evitar múltiplos timers de alertas em reconexões
 let alertasIniciados = false
 let alertasIntervalId: NodeJS.Timeout | null = null
 let sockRef: WASocket | null = null
 
+async function safeCloseSocket(reason = 'Fechando socket atual'): Promise<void> {
+  if (!sock) return
+
+  try {
+    sock.ev.removeAllListeners('connection.update')
+    sock.ev.removeAllListeners('messages.upsert')
+    sock.ev.removeAllListeners('creds.update')
+  } catch (e) {
+    console.warn('⚠️ Erro ao remover listeners do socket:', (e as any)?.message || e)
+  }
+
+  try {
+    sock.end(new Error(reason))
+  } catch (e) {
+    console.warn('⚠️ Erro ao encerrar socket:', (e as any)?.message || e)
+  }
+
+  sock = null
+}
+
 async function createSocket(): Promise<void> {
+  await safeCloseSocket('Criando novo socket')
+
   const { state, saveCreds } = await getHybridAuthState()
   const { version } = await fetchLatestBaileysVersion()
 
@@ -45,10 +64,11 @@ async function createSocket(): Promise<void> {
     auth: state,
     version,
     browser: ['Ubuntu', 'Chrome', '22.04.4'],
-    connectTimeoutMs: 60_000,
-    defaultQueryTimeoutMs: 60_000,
-    keepAliveIntervalMs: 30_000,
+    connectTimeoutMs: 120_000,
+    defaultQueryTimeoutMs: 120_000,
+    keepAliveIntervalMs: 20_000,
     syncFullHistory: false,
+    markOnlineOnConnect: false,
   })
 
   if (!state.creds?.registered && process.env.WHATSAPP_PAIRING_NUMBER) {
@@ -73,39 +93,44 @@ async function createSocket(): Promise<void> {
       retryDelayMs = INITIAL_RETRY_DELAY_MS
       reconnecting = false
       iniciarSistemaAlertas(sock!)
+      return
     }
 
     if (connection === 'close') {
       const error = lastDisconnect?.error as Boom | Error | undefined
       const statusCode = (error as Boom | undefined)?.output?.statusCode
+
       console.log('⚠️ Conexão encerrada.')
       console.log('   Mensagem:', (error as Error | undefined)?.message)
       console.log('   StatusCode:', statusCode)
-      const reason = statusCode as number | undefined
 
-      if (reason === DisconnectReason.badSession || reason === 401) {
+      if (statusCode === DisconnectReason.badSession || statusCode === 401) {
         console.error('🛑 Sessão inválida ou expirada (401/badSession).')
         console.error('   Apague a pasta ./auth e pareie novamente para continuar.')
         return
       }
 
-      if (reason === DisconnectReason.connectionReplaced || reason === 409) {
+      if (statusCode === DisconnectReason.connectionReplaced || statusCode === 409) {
         console.warn('🔄 Conexão substituída por outro dispositivo (409/connectionReplaced).')
         console.warn('   Se este não foi você, desconecte o outro dispositivo ou pareie novamente.')
         return
       }
 
       if (
-        reason === DisconnectReason.restartRequired ||
-        reason === DisconnectReason.timedOut ||
-        reason === 515
+        statusCode === DisconnectReason.restartRequired ||
+        statusCode === DisconnectReason.timedOut ||
+        statusCode === 408 ||
+        statusCode === 428 ||
+        statusCode === 500 ||
+        statusCode === 503 ||
+        statusCode === 515
       ) {
-        console.log('♻️ Desconexão temporária (515/restartRequired/timedOut). Tentando reconectar com backoff...')
+        console.log('♻️ Desconexão temporária. Tentando reconectar com backoff...')
         await reconnect()
         return
       }
 
-      if (reason === DisconnectReason.loggedOut) {
+      if (statusCode === DisconnectReason.loggedOut) {
         console.error('🚪 Sessão encerrada pelo WhatsApp (loggedOut).')
         console.error('   É necessário apagar ./auth e parear novamente.')
         return
@@ -119,6 +144,9 @@ async function createSocket(): Promise<void> {
   sock.ev.on('messages.upsert', async ({ messages, type }: { messages: WAMessage[]; type: MessageUpsertType }) => {
     if (type !== 'notify') return
     const msg: WAMessage = messages[0]
+    if (!msg?.message) return
+    if ((msg.message as any)?.protocolMessage) return
+
     const DEBUG_MESSAGES = process.env.DEBUG_MESSAGES === 'true'
 
     type IncomingTextContent = {
@@ -128,6 +156,7 @@ async function createSocket(): Promise<void> {
       videoMessage?: { caption?: string }
       buttonsResponseMessage?: { selectedButtonId?: string }
       listResponseMessage?: { title?: string }
+      documentMessage?: { caption?: string }
       [key: string]: unknown
     }
 
@@ -137,17 +166,15 @@ async function createSocket(): Promise<void> {
       raw?.extendedTextMessage?.text ??
       raw?.imageMessage?.caption ??
       raw?.videoMessage?.caption ??
+      raw?.documentMessage?.caption ??
       raw?.buttonsResponseMessage?.selectedButtonId ??
       raw?.listResponseMessage?.title ??
       ''
     ).trim()
+
     const userId = msg.key.remoteJid
     if (!userId) return
 
-    // Filtro para seu número específico
-    // if (userId !== '556181429135@s.whatsapp.net') return
-
-    // Determina tipo básico da mensagem
     const tipoMensagem = raw?.conversation || raw?.extendedTextMessage?.text
       ? 'texto'
       : raw?.imageMessage
@@ -164,10 +191,8 @@ async function createSocket(): Promise<void> {
       ? 'lista'
       : 'desconhecido'
 
-    // Log enxuto para produção
     logger.info({ userId, tipoMensagem, trecho: texto.slice(0, 100) }, 'Mensagem recebida')
 
-    // Log detalhado opcional somente em dev e quando habilitado
     if (DEBUG_MESSAGES && process.env.NODE_ENV !== 'production') {
       debug('Mensagem recebida (detalhe controlado)', {
         userId,
@@ -175,21 +200,21 @@ async function createSocket(): Promise<void> {
         hasQuoted: Boolean((raw as any)?.extendedTextMessage?.contextInfo?.quotedMessage),
       })
     }
-    // Fluxo de áudio: prioridade sobre texto
+
     const hasAudio = Boolean((raw as any)?.audioMessage)
     if (hasAudio) {
       try {
-        // Aviso pré-processamento de IA para áudio
         await sock!.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
         const audioMessage = (raw as any)?.audioMessage
         const stream = await downloadContentFromMessage(audioMessage, 'audio')
         const chunks: Buffer[] = []
+
         for await (const chunk of stream) {
           chunks.push(chunk as Buffer)
         }
+
         const fileBuffer = Buffer.concat(chunks)
         const mimeType: string = (audioMessage as any)?.mimetype || 'audio/ogg'
-
         const analiseAudio = await geminiService.transcreverAudioFinanceiro(fileBuffer, mimeType, userId)
 
         if (!analiseAudio) {
@@ -203,7 +228,8 @@ async function createSocket(): Promise<void> {
 
         const valorFmt = formatarValor(analiseAudio.valor)
         const transcricaoExibicao = String(analiseAudio.transcricao || '').slice(0, 400)
-        const resumo = `🗣️ Transcrição:\n${transcricaoExibicao}\n\n` +
+        const resumo =
+          `🗣️ Transcrição:\n${transcricaoExibicao}\n\n` +
           `🤖 Interpretação:\n` +
           `📅 Data: ${analiseAudio.data}\n` +
           `💰 Valor: R$ ${valorFmt}\n` +
@@ -221,23 +247,21 @@ async function createSocket(): Promise<void> {
       }
     }
 
-    // Fluxo de voucher: tratar imagens ou documentos como comprovantes
     const hasVoucherMedia = Boolean((raw as any)?.imageMessage || (raw as any)?.documentMessage)
-
     if (hasVoucherMedia) {
       try {
-        // Aviso pré-processamento de IA para imagem/documento (voucher)
         await sock!.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
         const isImage = Boolean((raw as any)?.imageMessage)
         const mediaMessage = (raw as any)?.imageMessage || (raw as any)?.documentMessage
         const stream = await downloadContentFromMessage(mediaMessage, isImage ? 'image' : 'document')
         const chunks: Buffer[] = []
+
         for await (const chunk of stream) {
           chunks.push(chunk as Buffer)
         }
+
         const fileBuffer = Buffer.concat(chunks)
         const mimeType: string = (mediaMessage as any)?.mimetype || (isImage ? 'image/jpeg' : 'application/pdf')
-
         const analise = await geminiService.analisarVoucherFinanceiro(fileBuffer, mimeType, userId)
 
         if (!analise) {
@@ -247,19 +271,19 @@ async function createSocket(): Promise<void> {
           return
         }
 
-        // Definir estado para confirmação via IA
         await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'voucher', ...analise })
 
         const valorFmt = formatarValor(analise.valor)
-        const parceladoTexto = analise.parcelado ? `\n🔢 Parcelado: Sim (${analise.parcelas}x)` : '';
-        const resumo = `🤖 Análise do comprovante:\n\n` +
+        const parceladoTexto = analise.parcelado ? `\n🔢 Parcelado: Sim (${analise.parcelas}x)` : ''
+        const resumo =
+          `🤖 Análise do comprovante:\n\n` +
           `📅 Data: ${analise.data}\n` +
           `💰 Valor: R$ ${valorFmt}\n` +
           `📂 Categoria: ${analise.categoria}\n` +
           `💳 Pagamento: ${analise.formaPagamento}\n` +
           `📝 Descrição: ${analise.descricao}` +
-          parceladoTexto + `\n\n` +
-          `✅ Confirmar lançamento? Responda com "S" para confirmar ou "N" para cancelar.`
+          parceladoTexto +
+          `\n\n✅ Confirmar lançamento? Responda com "S" para confirmar ou "N" para cancelar.`
 
         await sock!.sendMessage(userId, { text: resumo })
         return
@@ -270,10 +294,7 @@ async function createSocket(): Promise<void> {
       }
     }
 
-    // Se não houver mídia de voucher, seguir fluxo normal de texto
     if (!texto) {
-      const tipos = Object.keys(raw || {})
-      logger.info({ tipos }, '[MSG] Mensagem sem texto legível — ignorando')
       return
     }
 
@@ -288,6 +309,7 @@ async function reconnect(): Promise<void> {
   }
 
   reconnecting = true
+
   try {
     const waitSeconds = Math.round(retryDelayMs / 1000)
     console.log(`⏲️ Aguardando ${waitSeconds}s antes de tentar reconectar...`)
@@ -300,17 +322,15 @@ async function reconnect(): Promise<void> {
     console.error('❌ Erro ao tentar reconectar:', (e as any)?.message || e)
     retryDelayMs = Math.min(retryDelayMs * 2, MAX_RETRY_DELAY_MS)
     const nextSeconds = Math.round(retryDelayMs / 1000)
-    console.warn(`⏳ Ajustando backoff: próxima tentativa em ~${nextSeconds}s (máx ${Math.round(MAX_RETRY_DELAY_MS/1000)}s)`)    
+    console.warn(`⏳ Ajustando backoff: próxima tentativa em ~${nextSeconds}s (máx ${Math.round(MAX_RETRY_DELAY_MS / 1000)}s)`)
   } finally {
     reconnecting = false
   }
 }
 
 function iniciarSistemaAlertas(sock: WASocket): void {
-  // Atualiza referência do socket sempre, mesmo em reconexões
   sockRef = sock
 
-  // Se já iniciado, não cria novos timers
   if (alertasIniciados) {
     console.log('🔕 Alertas já iniciados anteriormente — ignorando nova configuração de timers.')
     return
@@ -361,7 +381,6 @@ export function resetSistemaAlertas(): void {
 }
 
 export async function bootstrap(): Promise<void> {
-  // Gemini
   try {
     const ok = geminiService.initializeGemini()
     if (!ok) {
@@ -371,7 +390,6 @@ export async function bootstrap(): Promise<void> {
     console.error('[INIT] Erro ao inicializar Gemini:', (e as any)?.message || e)
   }
 
-  // Banco
   try {
     console.log('🔌 Inicializando banco de dados...')
     await initializeDatabase()
@@ -383,9 +401,6 @@ export async function bootstrap(): Promise<void> {
     process.exit(1)
   }
 
-  // Health server
   startHealthServer()
-
-  // Socket
   await createSocket()
 }
