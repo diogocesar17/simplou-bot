@@ -34,7 +34,7 @@ jobs:
             git fetch origin
             git reset --hard origin/main
             echo "Subindo containers..."
-            docker-compose down
-            docker-compose up -d --build
+            docker compose down
+            docker compose up -d --build
             echo "Containers ativos:"
-            docker-compose ps
+            docker compose ps
