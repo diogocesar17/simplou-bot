@@ -210,9 +210,10 @@ function validarValor(valor, categoria, tipo, texto) {
     validacoes.push(`⚠️ Valor baixo para ${categoria}: R$ ${valor.toFixed(2)} (mínimo: R$ ${limites.min.toFixed(2)})`);
   }
   
-  // Validação de valor máximo por categoria (não aplicar para receitas)
+  // Não bloquear lançamento por valor máximo de categoria.
+  // Em vez de erro, apenas registrar alerta para revisão humana.
   if (valor > limites.max && tipo !== 'receita') {
-    return { error: `Valor muito alto para ${categoria}: R$ ${valor.toFixed(2)} (máximo: R$ ${limites.max.toFixed(2)})` };
+    validacoes.push(`🚨 Valor acima da faixa usual para ${categoria}: R$ ${valor.toFixed(2)} (referência: até R$ ${limites.max.toFixed(2)})`);
   }
   
   // Alerta para valores altos
