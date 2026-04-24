@@ -577,7 +577,17 @@ async function excluirCartaoConfigurado(userId, nomeCartao) {
 
 // Calcular data de contabilização baseada no dia de vencimento e fechamento
 function calcularDataContabilizacao(dataLancamento, diaVencimento, diaFechamento = null) {
-  const lancamento = new Date(dataLancamento);
+  const lancamento = (() => {
+    const s = String(dataLancamento || '').trim();
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) {
+      const y = Number(m[1]);
+      const mo = Number(m[2]);
+      const d = Number(m[3]);
+      return new Date(y, mo - 1, d);
+    }
+    return new Date(s);
+  })();
   const dia = lancamento.getDate();
   const mesIndex = lancamento.getMonth(); // 0-11
   const ano = lancamento.getFullYear();

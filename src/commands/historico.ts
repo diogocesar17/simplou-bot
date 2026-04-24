@@ -74,6 +74,25 @@ async function historicoCommand(sock, userId, texto) {
     timestamp: Date.now()
   });
 
+  let totalEntradas = 0;
+  let totalSaidas = 0;
+  for (const l of ultimos) {
+    const v = typeof l.valor === 'string' ? parseFloat(l.valor) : Number(l.valor);
+    if (!isNaN(v)) {
+      if (l.tipo === 'receita') totalEntradas += v;
+      else totalSaidas += v;
+    }
+  }
+  const totalMovimentado = totalEntradas + totalSaidas;
+  const saldo = totalEntradas - totalSaidas;
+  const itensResumo = [
+    `Total: R$ ${formatarValor(totalMovimentado)}`,
+    `Entradas: R$ ${formatarValor(totalEntradas)}`,
+    `Saídas: R$ ${formatarValor(totalSaidas)}`,
+    `Saldo: R$ ${formatarValor(saldo)}`,
+    `Lançamentos: ${ultimos.length}`
+  ];
+
   // Formatar lançamentos
   const itensLancamentos = ultimos.map((l, idx) => {
     // Quando sem filtro de mês/ano, o histórico é dos "últimos lançamentos" (por criado_em)
@@ -136,6 +155,11 @@ async function historicoCommand(sock, userId, texto) {
       titulo: titulo,
       emojiTitulo: '📋',
       secoes: [
+        {
+          titulo: 'Resumo',
+          itens: itensResumo,
+          emoji: '💰'
+        },
         {
           titulo: 'Lançamentos',
           itens: itensLancamentos,
