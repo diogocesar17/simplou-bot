@@ -16,7 +16,7 @@ async function historicoCommand(sock, userId, texto) {
   if (partes.length > 1) {
     const resto = partes.slice(1).join(' ');
     mesAno = parseMesAno(resto);
-    if (mesAno) limite = 20;
+    if (mesAno) limite = 9999;
   }
   
   // Validar se não é mês futuro (apenas se especificado um mês)
@@ -150,25 +150,36 @@ async function historicoCommand(sock, userId, texto) {
     );
   }
 
-  await sock.sendMessage(userId, {
-    text: formatarMensagem({
-      titulo: titulo,
-      emojiTitulo: '📋',
-      secoes: [
-        {
-          titulo: 'Resumo',
-          itens: itensResumo,
-          emoji: '💰'
-        },
-        {
-          titulo: 'Lançamentos',
-          itens: itensLancamentos,
-          emoji: '📊'
-        }
-      ],
-      dicas: dicas
-    })
-  });
+  const MAX_ITENS_POR_MENSAGEM = 35;
+  const totalPartes = Math.max(1, Math.ceil(itensLancamentos.length / MAX_ITENS_POR_MENSAGEM));
+
+  for (let parte = 0; parte < totalPartes; parte++) {
+    const inicio = parte * MAX_ITENS_POR_MENSAGEM;
+    const fim = inicio + MAX_ITENS_POR_MENSAGEM;
+    const chunk = itensLancamentos.slice(inicio, fim);
+
+    const secoes = parte === 0
+      ? [
+          { titulo: 'Resumo', itens: itensResumo, emoji: '💰' },
+          { titulo: 'Lançamentos', itens: chunk, emoji: '📊' }
+        ]
+      : [
+          { titulo: 'Lançamentos', itens: chunk, emoji: '📊' }
+        ];
+
+    const tituloParte = totalPartes > 1
+      ? `${titulo} (${parte + 1}/${totalPartes})`
+      : titulo;
+
+    await sock.sendMessage(userId, {
+      text: formatarMensagem({
+        titulo: tituloParte,
+        emojiTitulo: '📋',
+        secoes,
+        dicas: parte === totalPartes - 1 ? dicas : []
+      })
+    });
+  }
 }
 
 export default historicoCommand; 
