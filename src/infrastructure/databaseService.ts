@@ -1597,6 +1597,79 @@ async function buscarFaturaCartao(userId, nomeCartao, mes, ano) {
   return result.rows;
 }
 
+async function buscarResumoFaturaCartao(userId, nomeCartao, mes, ano) {
+  const nomeCartaoNormalizado = normalizarTexto(nomeCartao);
+
+  const cartoesQuery = `
+    SELECT nome_cartao
+    FROM cartoes_config 
+    WHERE user_id = $1
+  `;
+
+  const cartoesResult = await pool.query(cartoesQuery, [userId]);
+  const cartoes = cartoesResult.rows;
+
+  let nomeCartaoExato = null;
+  for (const cartao of cartoes) {
+    if (normalizarTexto(cartao.nome_cartao) === nomeCartaoNormalizado) {
+      nomeCartaoExato = cartao.nome_cartao;
+      break;
+    }
+  }
+
+  if (!nomeCartaoExato) {
+    nomeCartaoExato = nomeCartao;
+  }
+
+  const query = `
+    SELECT 
+      COALESCE(SUM(valor), 0) as total,
+      COUNT(*)::int as quantidade,
+      MIN(data_contabilizacao) as data_contabilizacao
+    FROM lancamentos
+    WHERE user_id = $1
+      AND cartao_nome ILIKE $2
+      AND mes_fatura = $3
+      AND ano_fatura = $4
+  `;
+
+  const result = await pool.query(query, [userId, `%${nomeCartaoExato}%`, mes, ano]);
+  const row = result.rows[0] || {};
+  return {
+    total: parseFloat(row.total || 0),
+    quantidade: parseInt(row.quantidade || 0),
+    data_contabilizacao: row.data_contabilizacao || null
+  };
+}
+
+async function buscarTotaisFaturasFuturas(userId, meses = 6) {
+  const query = `
+    WITH limites AS (
+      SELECT (DATE_TRUNC('month', CURRENT_DATE) + ($2 || ' months')::interval) as fim
+    )
+    SELECT
+      cartao_nome,
+      mes_fatura,
+      ano_fatura,
+      MIN(dia_vencimento) as dia_vencimento,
+      MIN(data_contabilizacao) as data_vencimento,
+      COALESCE(SUM(valor), 0) as total
+    FROM lancamentos, limites
+    WHERE user_id = $1
+      AND cartao_nome IS NOT NULL
+      AND mes_fatura IS NOT NULL
+      AND ano_fatura IS NOT NULL
+      AND data_contabilizacao IS NOT NULL
+      AND data_contabilizacao >= CURRENT_DATE
+      AND data_contabilizacao < limites.fim
+    GROUP BY cartao_nome, mes_fatura, ano_fatura
+    ORDER BY ano_fatura ASC, mes_fatura ASC, cartao_nome ASC
+  `;
+
+  const result = await pool.query(query, [userId, meses]);
+  return result.rows;
+}
+
 // Resumo real (excluindo gastos de cartão pendentes)
 async function getResumoReal(userId, mes = null, ano = null) {
   let query = `
@@ -2803,6 +2876,8 @@ export {
   atualizarRecorrenciasApartir,
   buscarLancamentosParaExclusao,
   buscarFaturaCartao,
+  buscarResumoFaturaCartao,
+  buscarTotaisFaturasFuturas,
   getResumoReal,
   buscarCartoesVencimentoProximo,
   buscarBoletosVencimentoProximo,

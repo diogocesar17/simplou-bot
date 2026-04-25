@@ -187,6 +187,14 @@ export async function buscarFaturaCartao(userId: string, nomeCartao: string, mes
   return await databaseService.buscarFaturaCartao(userId, nomeCartao, mes, ano);
 }
 
+export async function buscarResumoFaturaCartao(userId: string, nomeCartao: string, mes: number, ano: number): Promise<any> {
+  return await (databaseService as any).buscarResumoFaturaCartao(userId, nomeCartao, mes, ano);
+}
+
+export async function buscarTotaisFaturasFuturas(userId: string, meses: number = 6): Promise<any[]> {
+  return await (databaseService as any).buscarTotaisFaturasFuturas(userId, meses);
+}
+
 export async function buscarGastosPorCategoria(userId: string, categoria: string, limite: number = 20, mes: number | null = null, ano: number | null = null): Promise<Lancamento[]> {
   // Tipagem do databaseService aceita null/undefined; fazemos cast seguro aqui
   return await databaseService.buscarGastosPorCategoria(userId, categoria, limite, mes as any, ano as any);

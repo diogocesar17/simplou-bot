@@ -212,7 +212,12 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   }
 
   // Roteamento para o comando de fatura
-  if (textoLower.startsWith('fatura ')) {
+  if (
+    /^(fatura)(\s|$)/i.test(textoLower) ||
+    /^(detalhar\s+fatura)(\s|$)/i.test(textoLower) ||
+    /^(ver\s+compras)(\s|$)/i.test(textoLower) ||
+    /quanto\s+vou\s+pagar\s+no\s+cart(ao|ão)/i.test(textoLower)
+  ) {
     await faturaCommand(sock, userId, texto);
     return;
   }
