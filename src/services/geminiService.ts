@@ -56,6 +56,23 @@ function getTextModel(): GenerativeModel | null {
   return gemini.getGenerativeModel({ model: GEMINI_TEXT_MODEL });
 }
 
+export async function gerarJSONComGemini(prompt: string): Promise<any | null> {
+  const model = getTextModel();
+  if (!model) return null;
+
+  try {
+    const result = await model.generateContent(String(prompt || ''));
+    const response = await result.response;
+    const textResp = response.text();
+    const jsonMatch = textResp.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    return JSON.parse(jsonMatch[0]);
+  } catch (error: any) {
+    console.error('[GEMINI][gerarJSONComGemini] Erro:', error?.message || error);
+    return null;
+  }
+}
+
 // Função helper para pegar o modelo multimodal (imagens/documentos)
 function getVisionModel(): GenerativeModel | null {
   if (!isGeminiAvailable || !gemini) {

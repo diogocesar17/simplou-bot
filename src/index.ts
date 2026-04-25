@@ -47,6 +47,7 @@ import { logger, fileLogger } from './infrastructure/logger';
 import * as geminiService from './services/geminiService';
 import { initializeDatabase } from './infrastructure/databaseService';
 import * as lancamentosService from './services/lancamentosService';
+import { routeIntent } from './intents/intentRouter';
 
 // Exemplo de função de roteamento (simples)
 async function handleMessage(sock: any, userId: string, texto: string): Promise<void> {
@@ -171,6 +172,13 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     // ... outros fluxos aqui se necessário
   }
   
+  try {
+    const handled = await routeIntent(sock, userId, texto);
+    if (handled) return;
+  } catch (e: any) {
+    logger.warn({ err: e?.message || e }, '[INTENT] erro no roteamento');
+  }
+
   // Roteamento para o comando de ajuda
   if (["ajuda", "menu", "help"].includes(textoLower)) {
     await ajudaCommand(sock, userId);

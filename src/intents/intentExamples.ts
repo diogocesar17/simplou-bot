@@ -1,0 +1,40 @@
+export const intentExamples = {
+  INVOICE_SUMMARY: [
+    'fatura',
+    'qual valor da fatura?',
+    'valor da fatura',
+    'quanto está minha fatura?',
+    'quanto ta minha fatura?',
+    'quanto deu minha fatura?',
+    'quanto deu o cartão?',
+    'quanto está o cartão?',
+    'fatura itau',
+    'fatura nubank',
+    'fatura abril',
+    'fatura itau abril',
+    'fatura aberta',
+  ],
+  INVOICE_DETAIL: [
+    'detalhar fatura',
+    'detalhar fatura itau',
+    'detalhar fatura itau abril',
+    'ver compras itau',
+    'compras do cartão',
+    'compras da fatura',
+    'mostrar lançamentos da fatura',
+  ],
+  CARD_PAYMENT_FORECAST: [
+    'quanto vou pagar no cartão?',
+    'próximas faturas',
+    'proximas faturas',
+    'faturas a pagar',
+    'quanto vou pagar de cartão?',
+    'valor dos cartões',
+  ],
+  CLOSED: [
+    'fatura fechada',
+    'minha fatura fechou?',
+    'fatura a pagar',
+  ],
+} as const;
+
