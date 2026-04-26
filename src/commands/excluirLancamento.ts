@@ -4,6 +4,30 @@ import { obterEstado, limparEstado, definirEstado } from '../configs/stateManage
 import { formatarMensagem, formatarConfirmacao, gerarDicasContextuais } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
+function formatarDataParaExibicao(data: any): string {
+  if (!data) return '';
+  if (data instanceof Date) {
+    return data.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  }
+  if (typeof data === 'string') {
+    const s = data.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [ano, mes, dia] = s.split('-');
+      return `${dia}/${mes}/${ano}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    }
+    return s;
+  }
+  try {
+    const d = new Date(data);
+    if (!isNaN(d.getTime())) return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  } catch {}
+  return String(data);
+}
+
 async function excluirLancamentoCommand(sock, userId, texto) {
   logger.info({ trecho: String(texto || '').slice(0, 80) }, '[EXCLUIR_LANCAMENTO] texto recebido');
   
@@ -404,7 +428,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
         `📝 Descrição: ${lancamento.descricao}`,
         `💰 Valor: R$ ${lancamento.valor}`,
         `📂 Categoria: ${lancamento.categoria}`,
-        `📅 Data: ${lancamento.data instanceof Date ? lancamento.data.toLocaleDateString('pt-BR') : lancamento.data}`
+          `📅 Data: ${formatarDataParaExibicao(lancamento.data)}`
       ],
       ['Confirmar', 'Cancelar'],
       'Dados do Lançamento'
