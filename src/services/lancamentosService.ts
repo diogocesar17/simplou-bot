@@ -4,7 +4,7 @@ import { Lancamento } from '../types/global';
 // Interfaces específicas para este serviço
 interface DadosLancamento {
   data: string;
-  tipo: 'receita' | 'despesa';
+  tipo: 'receita' | 'gasto';
   descricao: string;
   valor: number;
   categoria: string;

@@ -558,7 +558,7 @@ async function lancamentoCommand(sock, userId, texto) {
     if (!isNaN(opcaoConfirmacao)) {
       if (opcaoConfirmacao === 1) {
         // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
-        if (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento) {
+        if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento)) {
           await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
           await sock.sendMessage(userId, { 
             text: '💳 Qual foi a forma de pagamento?\n\n1. PIX\n2. Dinheiro\n3. Crédito\n4. Débito\n5. Boleto\n6. Transferência\n\nDigite o número da opção:' 
@@ -583,7 +583,7 @@ async function lancamentoCommand(sock, userId, texto) {
     // Backward compatibility: aceitar textos
     if (resposta === 'sim' || resposta === 's' || resposta === 'yes' || resposta === 'y') {
       // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
-      if (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento) {
+      if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento)) {
         await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
         await sock.sendMessage(userId, { 
           text: '💳 Qual foi a forma de pagamento?\n\n1. PIX\n2. Dinheiro\n3. Crédito\n4. Débito\n5. Boleto\n6. Transferência\n\nDigite o número da opção:' 
@@ -824,6 +824,11 @@ async function lancamentoCommand(sock, userId, texto) {
 }
 
 async function processarLancamento(sock, userId, parsed) {
+  const tipoNormalizado = String(parsed?.tipo || 'gasto').toLowerCase();
+  if (tipoNormalizado !== 'gasto' && tipoNormalizado !== 'receita') {
+    parsed.tipo = 'gasto';
+  }
+
   // Detectar gasto no cartão de crédito
   const pagamentoNormalizado = removerAcentos((parsed.pagamento || '').toLowerCase());
   
