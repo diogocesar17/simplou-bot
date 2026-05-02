@@ -34,7 +34,7 @@ function calcularReferenciaFatura(cartao: any, status: 'OPEN' | 'CLOSED', now: D
 
   if (diaFechamento !== null && diaFechamento !== undefined) {
     if (status === 'OPEN') {
-      if (diaHoje <= diaFechamento) return { mes: mesAtual, ano: anoAtual };
+      if (diaHoje < diaFechamento) return { mes: mesAtual, ano: anoAtual };
       if (mesAtual === 12) return { mes: 1, ano: anoAtual + 1 };
       return { mes: mesAtual + 1, ano: anoAtual };
     }
@@ -350,4 +350,3 @@ export async function routeIntent(sock: any, userId: string, message: string): P
   logger.info({ userId, decision: 'LEGACY', reason: 'UNKNOWN_OR_LOW_CONF', intent: parsed.intent, confidence: parsed.confidence }, '[INTENT] decisao');
   return false;
 }
-

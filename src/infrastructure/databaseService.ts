@@ -614,7 +614,7 @@ function calcularDataContabilizacao(dataLancamento, diaVencimento, diaFechamento
 
   // Lógica com fechamento: decidir mês/ano da fatura usando índices 0-11
   let monthIndex, anoFatura;
-  if (dia <= diaFechamento) {
+  if (dia < diaFechamento) {
     // Antes ou no fechamento: fatura do mês corrente
     monthIndex = mesIndex;
     anoFatura = ano;
