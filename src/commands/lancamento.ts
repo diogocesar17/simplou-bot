@@ -802,7 +802,7 @@ async function lancamentoCommand(sock, userId, texto) {
   logger.info('[LANCAMENTO] Parser normal entendeu a mensagem. IA não será usada.');
 
   // 5. Falta forma de pagamento
-  if (parsed.faltaFormaPagamento || parsed.pagamento === 'NÃO INFORMADO') {
+  if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (parsed.faltaFormaPagamento || parsed.pagamento === 'NÃO INFORMADO')) {
     await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
     await sock.sendMessage(userId, { 
       text: '💳 Qual foi a forma de pagamento?\n\n1. PIX\n2. Dinheiro\n3. Crédito\n4. Débito\n5. Boleto\n6. Transferência\n\nDigite o número da opção:' 
