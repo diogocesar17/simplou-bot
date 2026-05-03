@@ -352,7 +352,9 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     textoLower === "meuslembretes" ||
     textoLower.startsWith("meuslembretes ") ||
     textoLower === "meus lembretes" ||
-    textoLower.startsWith("meus lembretes ")
+    textoLower.startsWith("meus lembretes ") ||
+    textoLower === "lembretes" ||
+    textoLower.startsWith("lembretes ")
   ) {
     await meusLembretesCommand(sock, userId, texto);
     return;
