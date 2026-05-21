@@ -975,6 +975,14 @@ async function processarLancamento(sock, userId, parsed) {
   await lancamentosService.salvarLancamento(userId, dados);
   logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'simples' }, '[LANCAMENTO] Salvo');
   await sock.sendMessage(userId, { text: await gerarMensagemSucesso(parsed) });
+
+  // Alerta se gasto > R$ 500 (threshold configurável)
+  const THRESHOLD_GASTO_ALTO = Number(process.env.THRESHOLD_GASTO_ALTO || 500);
+  if (parsed.tipo === 'gasto' && parsed.valor > THRESHOLD_GASTO_ALTO) {
+    await sock.sendMessage(userId, {
+      text: `⚠️ *Gasto alto registrado!*\n\nVocê acabou de registrar um gasto de R$ ${formatarValor(parsed.valor)}.\n\nDigite *resumo* para ver como está seu mês.`
+    });
+  }
 }
 
 export default lancamentoCommand;
