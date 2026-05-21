@@ -38,6 +38,7 @@ import alertasCommand from './commands/alertas';
 import relatorioCommand from './commands/relatorio';
 import lembreteCommand from './commands/lembrete';
 import meusLembretesCommand from './commands/meuslembretes';
+import assinarCommand from './commands/assinar';
 
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
@@ -410,6 +411,12 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   }
   if (["ajuda inteligente", "ajuda financeira", "consulta", "pergunta"].includes(textoLower)) {
     await ajudaInteligenteCommand(sock, userId);
+    return;
+  }
+
+  // Roteamento para o fluxo de assinatura premium
+  if (["assinar", "premium", "planos", "assine"].includes(textoLower)) {
+    await assinarCommand(sock, userId);
     return;
   }
 
