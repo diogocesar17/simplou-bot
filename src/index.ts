@@ -49,6 +49,7 @@ import { initializeDatabase } from './infrastructure/databaseService';
 import * as lancamentosService from './services/lancamentosService';
 import { routeIntent } from './intents/intentRouter';
 import { buscarUsuario, cadastrarUsuario } from './services/usuariosService';
+import { verificarRateLimit } from './services/rateLimitService';
 
 // Exemplo de função de roteamento (simples)
 async function handleMessage(sock: any, userId: string, texto: string): Promise<void> {
@@ -72,6 +73,15 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
         '• *lembrete* — criar um lembrete de conta\n' +
         '• *ajuda* — ver todos os comandos disponíveis\n\n' +
         'Para começar, tente registrar seu primeiro gasto! Ex: *gastei 30 no almoço*'
+    });
+    return;
+  }
+
+  // Rate limiting: bloquear usuários que excederam 40 mensagens/hora
+  const permitido = await verificarRateLimit(userId);
+  if (!permitido) {
+    await sock.sendMessage(userId, {
+      text: '⏳ Você enviou muitas mensagens. Aguarde alguns minutos antes de continuar.'
     });
     return;
   }
