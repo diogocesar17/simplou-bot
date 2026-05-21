@@ -1,4 +1,6 @@
 import http from 'http'
+import { logger } from './logger'
+import { getPoolStats } from './databaseService'
 
 let server: http.Server | null = null
 let started = false
@@ -11,14 +13,15 @@ export function startHealthServer(port?: number): void {
   const listenPort = Number(process.env.PORT || port || 3000)
 
   server = http.createServer((req, res) => {
-    // Only GET /health
     if (req.method === 'GET' && req.url === '/health') {
-      const payload = JSON.stringify({ status: 'ok' })
+      const pool = getPoolStats()
+      const payload = JSON.stringify({ status: 'ok', pool })
       res.writeHead(200, {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(payload),
       })
       res.end(payload)
+      logger.debug({ pool }, '[HEALTH] health check')
       return
     }
 
@@ -27,12 +30,12 @@ export function startHealthServer(port?: number): void {
   })
 
   server.on('error', (err) => {
-    console.error('[HEALTH] Erro no servidor de health:', (err as any)?.message || err)
+    logger.error({ err: (err as any)?.message || err }, '[HEALTH] Erro no servidor de health')
   })
 
   server.listen(listenPort, () => {
     started = true
-    console.log(`[HEALTH] Health server ouvindo na porta ${listenPort}`)
+    logger.info({ port: listenPort }, '[HEALTH] Health server ouvindo')
   })
 }
 
