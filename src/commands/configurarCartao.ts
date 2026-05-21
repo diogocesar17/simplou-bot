@@ -1,7 +1,7 @@
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import * as cartoesService from '../services/cartoesService';
 import { formatarCancelamento } from '../utils/formatMessages';
-import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/errorMessages';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function configurarCartaoCommand(sock, userId, texto) {
   const textoLimpo = texto.trim().toLowerCase();
@@ -52,51 +52,11 @@ async function configurarCartaoCommand(sock, userId, texto) {
       return;
     }
 
-    const dados = {
-      ...(estado.dadosParciais as any),
-      diaVencimento: dia
-    };
-    await definirEstado(userId, 'aguardando_fechamento_cartao', dados);
-    await sock.sendMessage(userId, {
-      text: `📅 Qual dia de fechamento da fatura do ${dados.nomeCartao}? (1-31)\nExemplo: 7\nOu digite "padrão" para usar 7 dias antes do vencimento.\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar`
-    });
-    return;
-  }
-
-  // 3. Se está aguardando o fechamento
-  if (estado?.etapa === 'aguardando_fechamento_cartao') {
-    if (textoLimpo === 'cancelar' || texto === '0') {
-      await limparEstado(userId);
-      await sock.sendMessage(userId, { 
-        text: formatarCancelamento('Configuração de cartão', [
-          { texto: 'Ver cartões', comando: 'cartoes' },
-          { texto: 'Ver ajuda', comando: 'ajuda' }
-        ])
-      });
-      return;
-    }
-
-    const dadosParciais = estado.dadosParciais as any;
-    let diaFechamento;
-    if (['padrao', 'padrão'].includes(textoLimpo)) {
-      diaFechamento = dadosParciais.diaVencimento - 7;
-      if (diaFechamento < 1) diaFechamento = 1;
-    } else {
-      diaFechamento = parseInt(texto);
-      if (isNaN(diaFechamento) || diaFechamento < 1 || diaFechamento > 31) {
-        await sock.sendMessage(userId, {
-          text: ERROR_MESSAGES.VALOR_INVALIDO('Dia de fechamento', 'Número entre 1 e 31\nOu digite "padrão" para usar 7 dias antes do vencimento')
-        });
-        return;
-      }
-    }
-
-    const { nomeCartao, diaVencimento } = dadosParciais;
-    await cartoesService.salvarConfiguracaoCartao(userId, nomeCartao, diaVencimento, diaFechamento);
+    const { nomeCartao } = estado.dadosParciais as any;
+    await cartoesService.salvarConfiguracaoCartao(userId, nomeCartao, dia, null);
     await limparEstado(userId);
-
     await sock.sendMessage(userId, {
-      text: SUCCESS_MESSAGES.CARTAO_CONFIGURADO(nomeCartao, diaVencimento, diaFechamento)
+      text: `✅ *Cartão ${nomeCartao} configurado!*\n\n📅 Vencimento: dia ${dia}\n\n💡 Agora você pode usar "${nomeCartao}" nos seus lançamentos.`
     });
     return;
   }

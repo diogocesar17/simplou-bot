@@ -259,8 +259,7 @@ async function criarParcelamento(userId, parsed, cartaoInfo: any = null) {
     if (cartaoInfo) {
       resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(
         dataParcela.split('/').reverse().join('-'),
-        cartaoInfo.dia_vencimento,
-        cartaoInfo.dia_fechamento
+        cartaoInfo.dia_vencimento
       );
     }
     
@@ -308,7 +307,7 @@ async function criarRecorrente(userId, parsed, cartaoInfo: any = null) {
     // Calcular data de contabilização se for cartão
     let resultadoContabilizacao = null;
     if (cartaoInfo) {
-      resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(dataRecorrente.split('/').reverse().join('-'), cartaoInfo.dia_vencimento, cartaoInfo.dia_fechamento);
+      resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(dataRecorrente.split('/').reverse().join('-'), cartaoInfo.dia_vencimento);
     }
     
     const dados = {
@@ -351,7 +350,7 @@ async function gerarMensagemSucesso(parsed, cartao: any = null) {
   const pagamentoSemAcentosMsg = removerAcentos((parsed.pagamento || '').toLowerCase());
   if (cartao && !isReceita && (pagamentoSemAcentosMsg.includes('credito') || pagamentoSemAcentosMsg.includes('cartao'))) {
     // Calcular data de contabilização
-    const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartao.dia_vencimento, cartao.dia_fechamento);
+    const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartao.dia_vencimento);
     const dataContabilizacao = resultadoContabilizacao.dataContabilizacao;
     const dataContabilizacaoFormatada = formatarDateParaISO(dataContabilizacao).split('-').reverse().join('/');
     
@@ -722,8 +721,7 @@ async function lancamentoCommand(sock, userId, texto) {
     // Gasto simples no cartão
     const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(
       parsed.data.split('/').reverse().join('-'),
-      cartaoEscolhido.dia_vencimento,
-      cartaoEscolhido.dia_fechamento
+      cartaoEscolhido.dia_vencimento
     );
     const dados = {
       data: parsed.data.split('/').reverse().join('-'),
@@ -887,7 +885,7 @@ async function processarLancamento(sock, userId, parsed) {
       }
 
       // Gasto simples no cartão
-      const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartao.dia_vencimento, cartao.dia_fechamento);
+      const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartao.dia_vencimento);
 
       const dados = {
         data: parsed.data.split('/').reverse().join('-'),

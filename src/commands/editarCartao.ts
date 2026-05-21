@@ -50,8 +50,7 @@ async function editarCartaoCommand(sock, userId, texto) {
       text: formatarMenuComCancelamento(
         `Editar Cartão: ${cartaoEscolhido.nome_cartao}`,
         [
-          'Vencimento',
-          'Fechamento'
+          'Vencimento'
         ],
         'Escolha o campo que deseja editar',
         true
@@ -64,12 +63,11 @@ async function editarCartaoCommand(sock, userId, texto) {
   if (estado?.etapa === 'aguardando_campo_edicao_cartao') {
     let campo = textoLimpo;
     if (["1", "vencimento"].includes(campo)) campo = 'vencimento';
-    else if (["2", "fechamento"].includes(campo)) campo = 'fechamento';
-    else if (["3", "cancelar"].includes(campo)) campo = 'cancelar';
+    else if (["2", "cancelar"].includes(campo)) campo = 'cancelar';
 
     if (campo === 'cancelar' || texto === '0') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { 
+      await sock.sendMessage(userId, {
         text: formatarCancelamento('Edição de cartão', [
           { texto: 'Ver cartões', comando: 'cartoes' },
           { texto: 'Configurar cartão', comando: 'configurar cartao' },
@@ -79,14 +77,14 @@ async function editarCartaoCommand(sock, userId, texto) {
       return;
     }
 
-    if (!['vencimento', 'fechamento'].includes(campo)) {
+    if (!['vencimento'].includes(campo)) {
       await sock.sendMessage(userId, {
         text: formatarMensagem({
           titulo: 'Campo inválido',
           emojiTitulo: '❌',
           secoes: [{
             titulo: 'Solução',
-            itens: ['Digite: 1, 2, 3 ou o nome do campo'],
+            itens: ['Digite: 1 ou "vencimento"'],
             emoji: '💡'
           }],
           dicas: [
@@ -106,12 +104,10 @@ async function editarCartaoCommand(sock, userId, texto) {
 
     await definirEstado(userId, 'aguardando_novo_valor_edicao_cartao', dados);
     
-    const instrucao = campo === 'vencimento'
-      ? `📅 Digite o novo dia de vencimento para ${(dados as any).cartaoEscolhido?.nome_cartao} (1-31):`
-      : `📅 Digite o novo dia de fechamento para ${(dados as any).cartaoEscolhido?.nome_cartao} (1-31):`;
-    
-    await sock.sendMessage(userId, { 
-      text: `${instrucao}\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar a edição` 
+    const instrucao = `📅 Digite o novo dia de vencimento para ${(dados as any).cartaoEscolhido?.nome_cartao} (1-31):`;
+
+    await sock.sendMessage(userId, {
+      text: `${instrucao}\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar a edição`
     });
     return;
   }
@@ -150,14 +146,10 @@ async function editarCartaoCommand(sock, userId, texto) {
       return;
     }
 
-    const { cartaoEscolhido, campoEscolhido } = estado.dadosParciais as any;
+    const { cartaoEscolhido } = estado.dadosParciais as any;
 
     try {
-      if (campoEscolhido === 'vencimento') {
-        await cartoesService.atualizarVencimentoCartao(userId, cartaoEscolhido.nome_cartao, dia);
-      } else {
-        await cartoesService.atualizarFechamentoCartao(userId, cartaoEscolhido.nome_cartao, dia);
-      }
+      await cartoesService.atualizarVencimentoCartao(userId, cartaoEscolhido.nome_cartao, dia);
 
       await limparEstado(userId);
 
@@ -169,7 +161,7 @@ async function editarCartaoCommand(sock, userId, texto) {
             titulo: 'Alteração realizada',
             itens: [
               `Cartão: ${cartaoEscolhido.nome_cartao}`,
-              `${campoEscolhido === 'vencimento' ? 'Vencimento' : 'Fechamento'}: dia ${dia}`
+              `Vencimento: dia ${dia}`
             ],
             emoji: '💳'
           }],
