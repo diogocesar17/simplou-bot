@@ -142,8 +142,9 @@ async function historicoCommand(sock, userId, texto) {
     : `Últimos ${ultimos.length} de ${totalRegistros} lançamentos`;
 
   const dicas = [
-    { texto: 'Editar lançamento', comando: 'editar <número>' },
-    { texto: 'Excluir lançamento', comando: 'excluir <número>' }
+    { texto: 'Editar item 3 da lista', comando: 'editar 3' },
+    { texto: 'Excluir item 3 da lista', comando: 'excluir 3' },
+    { texto: 'Use o número da lista acima', comando: '(1, 2, 3...)' }
   ];
 
   if (!mesAno) {
