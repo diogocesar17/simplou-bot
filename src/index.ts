@@ -23,8 +23,7 @@ import statusCommand from './commands/status';
 import limparCommand from './commands/limpar';
 import backupCommand from './commands/backup';
 import logsCommand from './commands/logs';
-import meuidCommand from './commands/meuid';
-import quemsouCommand from './commands/quemsou';
+import perfilCommand from './commands/perfil';
 import analisarCommand from './commands/analisar';
 import sugestoesCommand from './commands/sugestoes';
 import previsaoCommand from './commands/previsao';
@@ -48,12 +47,43 @@ import * as geminiService from './services/geminiService';
 import { initializeDatabase } from './infrastructure/databaseService';
 import * as lancamentosService from './services/lancamentosService';
 import { routeIntent } from './intents/intentRouter';
+import { buscarUsuario, cadastrarUsuario } from './services/usuariosService';
+import { verificarRateLimit } from './services/rateLimitService';
 
 // Exemplo de função de roteamento (simples)
 async function handleMessage(sock: any, userId: string, texto: string): Promise<void> {
   const textoLower = texto.toLowerCase().trim();
 
   const estado = await obterEstado(userId);
+
+  // Onboarding: cadastrar e dar boas-vindas a novos usuários
+  const usuario = await buscarUsuario(userId);
+  if (!usuario) {
+    await cadastrarUsuario(userId, { nome: 'Usuário' });
+    await sock.sendMessage(userId, {
+      text:
+        '👋 *Olá! Bem-vindo ao Simplou!*\n\n' +
+        '💰 Sou seu assistente financeiro pessoal. Vou te ajudar a organizar suas finanças de forma simples e rápida pelo WhatsApp!\n\n' +
+        '📋 *Comandos básicos:*\n' +
+        '• *gastei 50 no mercado* — registrar um gasto\n' +
+        '• *recebi 1000 salário* — registrar uma receita\n' +
+        '• *resumo* — ver o resumo do mês\n' +
+        '• *historico* — ver seus últimos lançamentos\n' +
+        '• *lembrete* — criar um lembrete de conta\n' +
+        '• *ajuda* — ver todos os comandos disponíveis\n\n' +
+        'Para começar, tente registrar seu primeiro gasto! Ex: *gastei 30 no almoço*'
+    });
+    return;
+  }
+
+  // Rate limiting: bloquear usuários que excederam 40 mensagens/hora
+  const permitido = await verificarRateLimit(userId);
+  if (!permitido) {
+    await sock.sendMessage(userId, {
+      text: '⏳ Você enviou muitas mensagens. Aguarde alguns minutos antes de continuar.'
+    });
+    return;
+  }
 
   logger.info(`Estado: ${estado?.etapa}`);
   // Tratar qualquer etapa de fluxo (aguardando_*, confirmando_*, etc.)
@@ -152,6 +182,12 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
 
     if (estado.etapa.includes('cartao')) {
       await configurarCartaoCommand(sock, userId, texto);
+      return;
+    }
+
+    // Confirmação do comando limpar
+    if (estado.etapa === 'aguardando_confirmacao_limpar') {
+      await limparCommand(sock, userId, texto);
       return;
     }
 
@@ -316,7 +352,7 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     return;
   }
   if (textoLower === 'limpar') {
-    await limparCommand(sock, userId);
+    await limparCommand(sock, userId, texto);
     return;
   }
   if (textoLower.startsWith('relatorio') || textoLower.startsWith('relatório')) {
@@ -331,12 +367,8 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     await logsCommand(sock, userId);
     return;
   }
-  if (textoLower === 'meuid') {
-    await meuidCommand(sock, userId);
-    return;
-  }
-  if (textoLower === 'quemsou') {
-    await quemsouCommand(sock, userId);
+  if (["perfil", "minha conta", "meuid", "quemsou"].includes(textoLower)) {
+    await perfilCommand(sock, userId);
     return;
   }
 
