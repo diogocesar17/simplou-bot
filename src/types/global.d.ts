@@ -25,7 +25,7 @@ export interface Lancamento {
   user_id: string;
   valor: number;
   descricao: string;
-  tipo: 'receita' | 'despesa';
+  tipo: 'receita' | 'gasto';
   categoria: string;
   forma_pagamento: string;
   data: string;

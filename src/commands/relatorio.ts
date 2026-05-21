@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import { formatarValor } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
@@ -11,7 +10,7 @@ async function relatorioCommand(sock, userId, texto) {
   // Extrair mês/ano do comando
   const partes = texto.trim().split(/\s+/);
   
-  let mesAno = null;
+  let mesAno: { mes: number; ano: number } | null = null;
   
   if (partes.length > 1) {
     const resto = partes.slice(1).join(' ');
@@ -31,8 +30,10 @@ async function relatorioCommand(sock, userId, texto) {
   const agora = new Date();
   const mesAtual = agora.getMonth() + 1;
   const anoAtual = agora.getFullYear();
-  
-  if (mesAno.ano > anoAtual || (mesAno.ano === anoAtual && mesAno.mes > mesAtual + 1)) {
+  const absolutoAtual = anoAtual * 12 + mesAtual;
+  const absolutoSolicitado = mesAno.ano * 12 + mesAno.mes;
+
+  if (absolutoSolicitado > absolutoAtual + 1) {
     await sock.sendMessage(userId, {
       text: formatarMensagem({
         titulo: 'Mês futuro não permitido',

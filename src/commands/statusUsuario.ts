@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Comando para verificar status de usuário específico (apenas para admins)
 import * as usuariosService from '../services/usuariosService';
 
@@ -14,10 +13,9 @@ async function statusUsuarioCommand(sock, userId, texto) {
     }
 
     // Processar comando de status
-    const resultado = await usuariosService.processarComandoStatus(texto);
-    
-    // Enviar resposta
-    await sock.sendMessage(userId, { text: resultado.message });
+    await sock.sendMessage(userId, {
+      text: 'Funcionalidade não disponível nesta versão.'
+    });
     
   } catch (error) {
   logger.error({ err: (error as any)?.message || error }, 'Erro no comando statusUsuario');

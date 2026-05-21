@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as geminiService from '../services/geminiService';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';

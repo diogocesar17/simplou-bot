@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import * as cartoesService from '../services/cartoesService';
 import { formatarCancelamento } from '../utils/formatMessages';
@@ -54,7 +53,7 @@ async function configurarCartaoCommand(sock, userId, texto) {
     }
 
     const dados = {
-      ...estado.dadosParciais,
+      ...(estado.dadosParciais as any),
       diaVencimento: dia
     };
     await definirEstado(userId, 'aguardando_fechamento_cartao', dados);
@@ -77,9 +76,10 @@ async function configurarCartaoCommand(sock, userId, texto) {
       return;
     }
 
+    const dadosParciais = estado.dadosParciais as any;
     let diaFechamento;
     if (['padrao', 'padrão'].includes(textoLimpo)) {
-      diaFechamento = estado.dadosParciais.diaVencimento - 7;
+      diaFechamento = dadosParciais.diaVencimento - 7;
       if (diaFechamento < 1) diaFechamento = 1;
     } else {
       diaFechamento = parseInt(texto);
@@ -91,7 +91,7 @@ async function configurarCartaoCommand(sock, userId, texto) {
       }
     }
 
-    const { nomeCartao, diaVencimento } = estado.dadosParciais;
+    const { nomeCartao, diaVencimento } = dadosParciais;
     await cartoesService.salvarConfiguracaoCartao(userId, nomeCartao, diaVencimento, diaFechamento);
     await limparEstado(userId);
 

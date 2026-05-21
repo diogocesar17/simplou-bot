@@ -74,8 +74,3 @@ export async function queryDatabase(query: string, params: any[] = []): Promise<
   return { success: false, message: 'Função não implementada' };
 }
 
-// Função para contar lançamentos
-export async function contarLancamentos(): Promise<number> {
-  // Implementação simplificada sem queryDatabase
-  return 0;
-}

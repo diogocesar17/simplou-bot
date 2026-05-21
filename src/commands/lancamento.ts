@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Utilitário simples para remover acentos/diacríticos
 function removerAcentos(texto: string): string {
   return (texto || '')
@@ -168,7 +167,7 @@ Data atual: ${new Date().toLocaleDateString('pt-BR')}
     const analiseGemini = await withTimeout(
       geminiService.analisarTransacaoComGemini(texto, userId),
       TIMEOUT_MS
-    );
+    ) as any;
     if (analiseGemini) {
   logger.info({ tipo: analiseGemini.tipo, valor: analiseGemini.valor, categoria: analiseGemini.categoria, formaPagamento: analiseGemini.formaPagamento }, '[IA_ANALISE] OK');
     } else {
@@ -220,7 +219,7 @@ Data atual: ${new Date().toLocaleDateString('pt-BR')}
     
     return resultado;
   } catch (error) {
-    if (String(error && error.message) === 'IA_TIMEOUT') {
+    if (String(error && (error as any).message) === 'IA_TIMEOUT') {
   logger.warn('[IA_ANALISE] ⏱️ Timeout atingido na análise de IA');
     } else {
   logger.error({ err: (error as any)?.message || error }, '[IA_ANALISE] Erro tratado na análise de IA');
@@ -242,15 +241,15 @@ function calcularDataFutura(dataInicial: Date, mesesAdicionar: number) {
 }
 
 // Função para criar parcelamento
-async function criarParcelamento(userId, parsed, cartaoInfo = null) {
+async function criarParcelamento(userId, parsed, cartaoInfo: any = null) {
   const parcelamentoId = gerarIdUnico();
   const valorParcela = parsed.valor / parsed.numParcelas;
   // Evitar timezone: construir Date com componentes locais dd/mm/aaaa
   const [diaStr, mesStr, anoStr] = parsed.data.split('/');
   const dataInicial = new Date(parseInt(anoStr, 10), parseInt(mesStr, 10) - 1, parseInt(diaStr, 10));
   
-  let lancamentosCriados = [];
-  
+  let lancamentosCriados: any[] = [];
+
   for (let i = 0; i < parsed.numParcelas; i++) {
     const dataParcela = calcularDataFutura(dataInicial, i);
     const descricaoParcela = `${parsed.descricao} (${i + 1}/${parsed.numParcelas})`;
@@ -280,29 +279,29 @@ async function criarParcelamento(userId, parsed, cartaoInfo = null) {
       recorrente_id: null,
       cartao_nome: cartaoInfo ? cartaoInfo.nome_cartao : null,
       data_lancamento: cartaoInfo ? formatarDateParaISO(new Date()) : null,
-      data_contabilizacao: cartaoInfo ? formatarDateParaISO(resultadoContabilizacao.dataContabilizacao) : null,
-      mes_fatura: cartaoInfo ? resultadoContabilizacao.mesFatura : null,
-      ano_fatura: cartaoInfo ? resultadoContabilizacao.anoFatura : null,
+      data_contabilizacao: cartaoInfo ? formatarDateParaISO((resultadoContabilizacao as any).dataContabilizacao) : null,
+      mes_fatura: cartaoInfo ? (resultadoContabilizacao as any).mesFatura : null,
+      ano_fatura: cartaoInfo ? (resultadoContabilizacao as any).anoFatura : null,
       dia_vencimento: cartaoInfo ? cartaoInfo.dia_vencimento : null,
       status_fatura: cartaoInfo ? 'pendente' : null,
       data_vencimento: converterDataParaISO(parsed.dataVencimento)
     };
-    
-    await lancamentosService.salvarLancamento(userId, dados);
-    lancamentosCriados.push({ data: dataParcela, valor: valorParcela, parcela: i + 1 });
+
+    await lancamentosService.salvarLancamento(userId, dados as any);
+    lancamentosCriados.push({ data: dataParcela, valor: valorParcela, parcela: i + 1 } as any);
   }
   
   return { parcelamentoId, lancamentosCriados };
 }
 
 // Função para criar recorrente
-async function criarRecorrente(userId, parsed, cartaoInfo = null) {
+async function criarRecorrente(userId, parsed, cartaoInfo: any = null) {
   const recorrenteId = gerarIdUnico();
   const dataInicial = new Date(parsed.data.split('/').reverse().join('-'));
   const dataFim = calcularDataFutura(dataInicial, parsed.recorrenteMeses - 1);
-  
-  let lancamentosCriados = [];
-  
+
+  let lancamentosCriados: any[] = [];
+
   for (let i = 0; i < parsed.recorrenteMeses; i++) {
     const dataRecorrente = calcularDataFutura(dataInicial, i);
     
@@ -327,15 +326,15 @@ async function criarRecorrente(userId, parsed, cartaoInfo = null) {
       recorrente_id: recorrenteId,
       cartao_nome: cartaoInfo ? cartaoInfo.nome_cartao : null,
       data_lancamento: cartaoInfo ? formatarDateParaISO(new Date()) : null,
-      data_contabilizacao: cartaoInfo ? formatarDateParaISO(resultadoContabilizacao.dataContabilizacao) : null,
-      mes_fatura: cartaoInfo ? resultadoContabilizacao.mesFatura : null,
-      ano_fatura: cartaoInfo ? resultadoContabilizacao.anoFatura : null,
+      data_contabilizacao: cartaoInfo ? formatarDateParaISO((resultadoContabilizacao as any).dataContabilizacao) : null,
+      mes_fatura: cartaoInfo ? (resultadoContabilizacao as any).mesFatura : null,
+      ano_fatura: cartaoInfo ? (resultadoContabilizacao as any).anoFatura : null,
       dia_vencimento: cartaoInfo ? cartaoInfo.dia_vencimento : null,
       status_fatura: cartaoInfo ? 'pendente' : null,
       data_vencimento: converterDataParaISO(parsed.dataVencimento)
     };
-    
-    await lancamentosService.salvarLancamento(userId, dados);
+
+    await lancamentosService.salvarLancamento(userId, dados as any);
     lancamentosCriados.push({ data: dataRecorrente, valor: parsed.valor, mes: i + 1 });
   }
   
@@ -343,7 +342,7 @@ async function criarRecorrente(userId, parsed, cartaoInfo = null) {
 }
 
 // Função para gerar mensagem de sucesso
-async function gerarMensagemSucesso(parsed, cartao = null) {
+async function gerarMensagemSucesso(parsed, cartao: any = null) {
   const isReceita = parsed.tipo && parsed.tipo.toLowerCase() === 'receita';
   const tipoTexto = isReceita ? 'Receita' : 'Gasto';
   const emoji = isReceita ? '💰' : '💸';
@@ -387,7 +386,7 @@ async function lancamentoCommand(sock, userId, texto) {
   // 1. Fluxo aguardando confirmação da IA
   const estado = await obterEstado(userId);
   if (estado?.etapa === 'aguardando_confirmacao_ia') {
-    const parsed = estado.dadosParciais;
+    const parsed = estado.dadosParciais as any;
     // Tratamento específico para áudio
     if (parsed?.origem === 'audio') {
       const resposta = texto.toLowerCase().trim();
@@ -607,7 +606,7 @@ async function lancamentoCommand(sock, userId, texto) {
 
   // 2. Fluxo aguardando forma de pagamento
   if (estado?.etapa === 'aguardando_forma_pagamento') {
-    const parsed = estado.dadosParciais;
+    const parsed = estado.dadosParciais as any;
     await limparEstado(userId);
     
     // Validar forma de pagamento
@@ -627,7 +626,7 @@ async function lancamentoCommand(sock, userId, texto) {
 
   // 2. Fluxo aguardando data de vencimento
   if (estado?.etapa === 'aguardando_data_vencimento') {
-    const parsed = estado.dadosParciais;
+    const parsed = estado.dadosParciais as any;
     await limparEstado(userId);
     
     // Validar data
@@ -645,7 +644,7 @@ async function lancamentoCommand(sock, userId, texto) {
 
   // 3. Fluxo aguardando escolha de cartão
   if (estado?.etapa === 'aguardando_escolha_cartao') {
-    const parsed = estado.dadosParciais;
+    const parsed = estado.dadosParciais as any;
     await limparEstado(userId);
     
     // Verificar se o usuário quer cancelar
@@ -743,7 +742,7 @@ async function lancamentoCommand(sock, userId, texto) {
       data_vencimento: converterDataParaISO(parsed.dataVencimento)
     };
   logger.info({ tipo: dados.tipo, valor: dados.valor, categoria: dados.categoria, pagamento: dados.pagamento, cartao: dados.cartao_nome }, '🔔 Dados do lançamento (resumo)');
-    await lancamentosService.salvarLancamento(userId, dados);
+    await lancamentosService.salvarLancamento(userId, dados as any);
     await limparEstado(userId);
     await sock.sendMessage(userId, { text: await gerarMensagemSucesso(parsed, cartaoEscolhido) });
     return;

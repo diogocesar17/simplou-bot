@@ -174,11 +174,11 @@ export async function buscarDadosParaAnalise(userId: string, meses: number = 6):
   return await databaseService.getDatabaseData(userId);
 }
 
-export async function buscarDadosParaSugestoes(userId: string): Promise<any> {
+export async function buscarDadosParaSugestoes(userId: string, _meses?: number): Promise<any> {
   return await databaseService.getDatabaseData(userId);
 }
 
-export async function buscarDadosParaPrevisao(userId: string): Promise<any> {
+export async function buscarDadosParaPrevisao(userId: string, _meses?: number): Promise<any> {
   return await databaseService.getDatabaseData(userId);
 }
 
@@ -200,16 +200,16 @@ export async function buscarGastosPorCategoria(userId: string, categoria: string
   return await databaseService.buscarGastosPorCategoria(userId, categoria, limite, mes as any, ano as any);
 }
 
-export async function buscarGastosValorAlto(userId: string, valorMinimo: number = 100): Promise<any[]> {
+export async function buscarGastosValorAlto(userId: string, valorMinimo: number = 100, _limite?: number): Promise<any[]> {
   return await databaseService.buscarGastosValorAlto(userId, valorMinimo);
 }
 
 // Funções para parcelamentos e recorrentes
-export async function buscarParceladosAtivos(userId: string): Promise<any[]> {
+export async function buscarParceladosAtivos(userId: string, _limite?: number): Promise<any[]> {
   return await databaseService.buscarParceladosAtivos(userId);
 }
 
-export async function buscarRecorrentesAtivos(userId: string): Promise<any[]> {
+export async function buscarRecorrentesAtivos(userId: string, _limite?: number): Promise<any[]> {
   return await databaseService.buscarRecorrentesAtivos(userId);
 }
 

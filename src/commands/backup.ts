@@ -1,10 +1,17 @@
-// @ts-nocheck
 import * as sistemaService from '../services/sistemaService';
+import * as usuariosService from '../services/usuariosService';
 import { formatarMensagem } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function backupCommand(sock, userId) {
   try {
+    const isAdmin = await usuariosService.verificarAdmin(userId);
+    if (!isAdmin) {
+      await sock.sendMessage(userId, {
+        text: ERROR_MESSAGES.SEM_PERMISSAO('Gerar backup', 'Apenas administradores podem executar este comando')
+      });
+      return;
+    }
     const resultado = await sistemaService.gerarBackupCSV(userId);
     
     if (resultado && resultado.sucesso) {

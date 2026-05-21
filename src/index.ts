@@ -59,7 +59,9 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   // Tratar qualquer etapa de fluxo (aguardando_*, confirmando_*, etc.)
   if (estado?.etapa) {
     // Salvaguarda global de cancelamento em estados ativos
-    if (textoLower === '0' || textoLower === 'cancelar') {
+    // Exceção: "0" é válido como dias_antecedencia no wizard de lembrete (G-03)
+    const isAntecedenciaStep = estado.etapa === 'aguardando_dias_antecedencia_lembrete';
+    if ((textoLower === '0' && !isAntecedenciaStep) || textoLower === 'cancelar') {
       await limparEstado(userId);
       await sock.sendMessage(userId, {
         text: formatarCancelamento('Operação', [
@@ -157,7 +159,8 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     if (
       estado.etapa.includes('selecao_lembrete') ||
       estado.etapa.includes('acao_lembrete') ||
-      estado.etapa.includes('confirmando_exclusao_lembrete')
+      estado.etapa.includes('confirmando_exclusao_lembrete') ||
+      estado.etapa.includes('edicao_lembrete')
     ) {
       await meusLembretesCommand(sock, userId, texto);
       return;

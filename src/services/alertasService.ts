@@ -1,5 +1,5 @@
-import { 
-  buscarAlertasDoDia, 
+import {
+  buscarAlertasDoDia,
   gerarMensagemAlertas,
   buscarUsuariosPremiumExpiracao,
   listarUsuarios
@@ -7,6 +7,7 @@ import {
 import { logger } from '../infrastructure/logger';
 import * as lembretesService from './lembretesService';
 import { WASocket } from '@whiskeysockets/baileys';
+import Redis from 'ioredis';
 
 // Interfaces para tipagem
 interface Cartao {
@@ -40,44 +41,26 @@ interface EstatisticasAlertas {
   erros: number;
 }
 
-// Cache para controlar alertas já enviados no dia
-const alertasEnviadosHoje = new Map<string, Date>();
+// Redis dedup cache — survives restarts; TTL expires at midnight
+const redisDedup = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const PREFIXO_DEDUP = 'alerta:';
 
-/**
- * Limpa o cache de alertas enviados (chamado diariamente)
- */
-function limparCacheAlertas(): void {
-  const hoje = new Date().toDateString();
-  const ultimaLimpeza = alertasEnviadosHoje.get('ultima_limpeza');
-  
-  if (!ultimaLimpeza || ultimaLimpeza.toDateString() !== hoje) {
-    alertasEnviadosHoje.clear();
-    alertasEnviadosHoje.set('ultima_limpeza', new Date());
-    logger.debug('🧹 Cache de alertas limpo para o novo dia');
-  }
+function ttlAteMeiaNoit(): number {
+  const agora = new Date();
+  const meiaNoit = new Date(agora);
+  meiaNoit.setHours(24, 0, 0, 0);
+  return Math.max(1, Math.ceil((meiaNoit.getTime() - agora.getTime()) / 1000));
 }
 
-/**
- * Verifica se um alerta já foi enviado hoje
- * @param userId - ID do usuário
- * @param tipoAlerta - Tipo do alerta (vencimento/premium)
- * @param identificador - Identificador único do alerta
- * @returns True se já foi enviado
- */
-function alertaJaEnviado(userId: string, tipoAlerta: string, identificador: string): boolean {
-  const chave = `${userId}_${tipoAlerta}_${identificador}`;
-  return alertasEnviadosHoje.has(chave);
+async function alertaJaEnviado(userId: string, tipoAlerta: string, identificador: string): Promise<boolean> {
+  const chave = `${PREFIXO_DEDUP}${userId}_${tipoAlerta}_${identificador}`;
+  const valor = await redisDedup.get(chave);
+  return valor !== null;
 }
 
-/**
- * Marca um alerta como enviado
- * @param userId - ID do usuário
- * @param tipoAlerta - Tipo do alerta
- * @param identificador - Identificador único do alerta
- */
-function marcarAlertaEnviado(userId: string, tipoAlerta: string, identificador: string): void {
-  const chave = `${userId}_${tipoAlerta}_${identificador}`;
-  alertasEnviadosHoje.set(chave, new Date());
+async function marcarAlertaEnviado(userId: string, tipoAlerta: string, identificador: string): Promise<void> {
+  const chave = `${PREFIXO_DEDUP}${userId}_${tipoAlerta}_${identificador}`;
+  await redisDedup.set(chave, '1', 'EX', ttlAteMeiaNoit());
 }
 
 /**
@@ -138,25 +121,23 @@ async function buscarAlertasVencimento(userId: string, eLembreteFinal: boolean =
     // Filtrar cartões não enviados
     for (const cartao of alertas.cartoes) {
       const idCartao = gerarIdCartao(cartao);
-      
-      if (!alertaJaEnviado(userId, 'vencimento', idCartao)) {
+
+      if (!await alertaJaEnviado(userId, 'vencimento', idCartao)) {
         alertasFiltrados.cartoes.push(cartao);
-        marcarAlertaEnviado(userId, 'vencimento', idCartao);
+        await marcarAlertaEnviado(userId, 'vencimento', idCartao);
       } else if (eLembreteFinal) {
-        // Para lembrete final, incluir mesmo se já foi enviado
         alertasFiltrados.cartoes.push(cartao);
       }
     }
-    
+
     // Filtrar boletos não enviados
     for (const boleto of alertas.boletos) {
       const idBoleto = gerarIdBoleto(boleto);
-      
-      if (!alertaJaEnviado(userId, 'vencimento', idBoleto)) {
+
+      if (!await alertaJaEnviado(userId, 'vencimento', idBoleto)) {
         alertasFiltrados.boletos.push(boleto);
-        marcarAlertaEnviado(userId, 'vencimento', idBoleto);
+        await marcarAlertaEnviado(userId, 'vencimento', idBoleto);
       } else if (eLembreteFinal) {
-        // Para lembrete final, incluir mesmo se já foi enviado
         alertasFiltrados.boletos.push(boleto);
       }
     }
@@ -229,9 +210,8 @@ async function buscarAlertaPremium(userId: string, eLembreteFinal: boolean = fal
     const diasRestantes = Math.ceil((new Date(usuario.data_expiracao_premium!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     const idPremium = `premium_${diasRestantes}dias_${userId}`;
     
-    // Verificar se já foi enviado
-    if (!alertaJaEnviado(userId, 'premium', idPremium) || eLembreteFinal) {
-      marcarAlertaEnviado(userId, 'premium', idPremium);
+    if (!await alertaJaEnviado(userId, 'premium', idPremium) || eLembreteFinal) {
+      await marcarAlertaEnviado(userId, 'premium', idPremium);
       
       if (diasRestantes <= 0) {
         return `⚠️ *SEU PLANO PREMIUM EXPIROU*\n\n` +
@@ -275,9 +255,9 @@ async function buscarAlertasLembretes(userId: string, eLembreteFinal: boolean = 
     for (const lembrete of lembretesDoUsuario) {
       const idLembrete = `lembrete_${lembrete.id}`;
       
-      if (!alertaJaEnviado(userId, 'lembrete', idLembrete)) {
+      if (!await alertaJaEnviado(userId, 'lembrete', idLembrete)) {
         alertasFiltrados.push(lembrete);
-        marcarAlertaEnviado(userId, 'lembrete', idLembrete);
+        await marcarAlertaEnviado(userId, 'lembrete', idLembrete);
         
         // Marcar lembrete como enviado no banco
         await lembretesService.marcarLembreteEnviado(lembrete.id);
@@ -362,9 +342,6 @@ async function buscarAlertasLembretes(userId: string, eLembreteFinal: boolean = 
  */
 async function buscarTodosAlertas(userId: string, eLembreteFinal: boolean = false): Promise<string | null> {
   try {
-    // Limpar cache se necessário
-    limparCacheAlertas();
-    
     const alertaVencimento = await buscarAlertasVencimento(userId, eLembreteFinal);
     const alertaPremium = await buscarAlertaPremium(userId, eLembreteFinal);
     const alertaLembretes = await buscarAlertasLembretes(userId, eLembreteFinal);

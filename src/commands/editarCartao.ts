@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import * as cartoesService from '../services/cartoesService';
 import { formatarMensagem, gerarDicasContextuais, formatarCancelamento, formatarMenuComCancelamento } from '../utils/formatMessages';
@@ -23,7 +22,7 @@ async function editarCartaoCommand(sock, userId, texto) {
     }
 
     const idx = parseInt(texto);
-    const cartoes = estado.dadosParciais.cartoes;
+    const cartoes = (estado.dadosParciais as any).cartoes;
 
     if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
       await sock.sendMessage(userId, {
@@ -107,9 +106,9 @@ async function editarCartaoCommand(sock, userId, texto) {
 
     await definirEstado(userId, 'aguardando_novo_valor_edicao_cartao', dados);
     
-    const instrucao = campo === 'vencimento' 
-      ? `📅 Digite o novo dia de vencimento para ${dados.cartaoEscolhido.nome_cartao} (1-31):`
-      : `📅 Digite o novo dia de fechamento para ${dados.cartaoEscolhido.nome_cartao} (1-31):`;
+    const instrucao = campo === 'vencimento'
+      ? `📅 Digite o novo dia de vencimento para ${(dados as any).cartaoEscolhido?.nome_cartao} (1-31):`
+      : `📅 Digite o novo dia de fechamento para ${(dados as any).cartaoEscolhido?.nome_cartao} (1-31):`;
     
     await sock.sendMessage(userId, { 
       text: `${instrucao}\n\n💡 Digite \`0\` ou \`cancelar\` para cancelar a edição` 
@@ -151,17 +150,17 @@ async function editarCartaoCommand(sock, userId, texto) {
       return;
     }
 
-    const { cartaoEscolhido, campoEscolhido } = estado.dadosParciais;
-    
+    const { cartaoEscolhido, campoEscolhido } = estado.dadosParciais as any;
+
     try {
       if (campoEscolhido === 'vencimento') {
         await cartoesService.atualizarVencimentoCartao(userId, cartaoEscolhido.nome_cartao, dia);
       } else {
         await cartoesService.atualizarFechamentoCartao(userId, cartaoEscolhido.nome_cartao, dia);
       }
-      
+
       await limparEstado(userId);
-      
+
       await sock.sendMessage(userId, {
         text: formatarMensagem({
           titulo: 'Cartão atualizado com sucesso',

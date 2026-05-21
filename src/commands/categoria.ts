@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { formatarValor } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem } from '../utils/formatMessages';
@@ -38,9 +37,9 @@ async function categoriaCommand(sock, userId, texto) {
   
   let totalCategoria = 0;
   const itensGastos = gastos.map((gasto, idx) => {
-    const dataBR = gasto.data instanceof Date 
-      ? gasto.data.toLocaleDateString('pt-BR')
-      : new Date(gasto.data).toLocaleDateString('pt-BR');
+    const dataBR = (gasto.data as any) instanceof Date
+      ? (gasto.data as any).toLocaleDateString('pt-BR')
+      : new Date(gasto.data as any).toLocaleDateString('pt-BR');
     totalCategoria += gasto.valor;
     return `${idx + 1}. ${dataBR} | 💰 R$ ${formatarValor(gasto.valor)} | 💳 ${gasto.pagamento}\n   📝 ${gasto.descricao}`;
   });

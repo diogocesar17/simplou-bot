@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { formatarValor } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
@@ -55,24 +54,24 @@ async function resumoDetalhadoCommand(sock, userId, texto) {
     const saidas = todos.filter(l => l.tipo === 'gasto');
 
     // Calcular estatísticas por categoria
-    const categoriasGastos = {};
+    const categoriasGastos: Record<string, { total: number; count: number }> = {};
     saidas.forEach(l => {
         if (!categoriasGastos[l.categoria]) {
             categoriasGastos[l.categoria] = { total: 0, count: 0 };
         }
-        categoriasGastos[l.categoria].total += parseFloat(l.valor);
+        categoriasGastos[l.categoria].total += parseFloat(l.valor as any);
         categoriasGastos[l.categoria].count += 1;
     });
 
     // Ordenar categorias por valor total
     const categoriasOrdenadas = Object.entries(categoriasGastos)
-        .sort(([,a], [,b]) => b.total - a.total);
+        .sort(([, a], [, b]) => b.total - a.total);
 
     let msg = `📋 *Resumo Detalhado - ${getNomeMes(parsed.mes - 1)}/${parsed.ano}*\n\n`;
 
     // Estatísticas gerais
-    const totalEntradas = entradas.reduce((acc, l) => acc + parseFloat(l.valor), 0);
-    const totalSaidas = saidas.reduce((acc, l) => acc + parseFloat(l.valor), 0);
+    const totalEntradas = entradas.reduce((acc, l) => acc + parseFloat(l.valor as any), 0);
+    const totalSaidas = saidas.reduce((acc, l) => acc + parseFloat(l.valor as any), 0);
     const saldo = totalEntradas - totalSaidas;
     const totalLancamentos = todos.length;
 
@@ -102,7 +101,7 @@ async function resumoDetalhadoCommand(sock, userId, texto) {
         const lancamentosAnterior = await lancamentosService.listarLancamentos(userId, 9999, mesAnterior, anoAnterior);
         if (lancamentosAnterior && lancamentosAnterior.length > 0) {
             const saidasAnterior = lancamentosAnterior.filter(l => l.tipo === 'gasto');
-            const totalSaidasAnterior = saidasAnterior.reduce((acc, l) => acc + parseFloat(l.valor), 0);
+            const totalSaidasAnterior = saidasAnterior.reduce((acc, l) => acc + parseFloat(l.valor as any), 0);
             
             if (totalSaidasAnterior > 0) {
                 const variacao = ((totalSaidas - totalSaidasAnterior) / totalSaidasAnterior * 100);

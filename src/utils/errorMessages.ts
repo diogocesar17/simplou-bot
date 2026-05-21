@@ -40,13 +40,13 @@ export function gerarMensagemErro(config: ErrorConfig): string {
  */
 export const ERROR_MESSAGES = {
   // Erros de formato
-  FORMATO_INVALIDO: (comando: string, exemplo: string) => gerarMensagemErro({
+  FORMATO_INVALIDO: (comando: string, exemplo: string, _extras?: string) => gerarMensagemErro({
     titulo: 'Formato inválido',
     causa: 'O formato do comando não está correto',
     solucao: `Use o formato correto para ${comando}`,
     exemplo: exemplo,
-    dica: comando.includes('excluir') ? 
-      'Use "historico" primeiro, depois "excluir 1"' : 
+    dica: comando.includes('excluir') ?
+      'Use "historico" primeiro, depois "excluir 1"' :
       'Digite "ajuda" para ver todos os comandos disponíveis'
   }),
 
@@ -62,7 +62,7 @@ export const ERROR_MESSAGES = {
   }),
 
   // Erros de validação
-  VALOR_INVALIDO: (campo: string, formato?: string) => gerarMensagemErro({
+  VALOR_INVALIDO: (campo: string, formato?: string, _extras?: string) => gerarMensagemErro({
     titulo: `${campo} inválido`,
     causa: `O valor informado para ${campo.toLowerCase()} não é válido`,
     solucao: `Digite um ${campo.toLowerCase()} válido`,
@@ -71,17 +71,17 @@ export const ERROR_MESSAGES = {
   }),
 
   // Erros de permissão
-  SEM_PERMISSAO: (acao: string) => gerarMensagemErro({
+  SEM_PERMISSAO: (acao: string, mensagem?: string) => gerarMensagemErro({
     titulo: 'Sem permissão',
-    causa: `Você não tem permissão para ${acao}`,
+    causa: mensagem || `Você não tem permissão para ${acao}`,
     solucao: 'Entre em contato com o administrador',
     dica: 'Apenas usuários premium podem executar esta ação'
   }),
 
   // Erros de banco de dados
-  ERRO_BANCO: (operacao: string) => gerarMensagemErro({
+  ERRO_BANCO: (operacao: string, detalhes?: string) => gerarMensagemErro({
     titulo: 'Erro no banco de dados',
-    causa: `Falha ao ${operacao}`,
+    causa: detalhes ? `Falha ao ${operacao}: ${detalhes}` : `Falha ao ${operacao}`,
     solucao: 'Tente novamente em alguns instantes',
     dica: 'Se o problema persistir, entre em contato com o suporte'
   }),

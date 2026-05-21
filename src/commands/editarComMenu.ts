@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import editarLancamentoCommand from './editarLancamento';
 import editarCartaoCommand from './editarCartao';
@@ -81,17 +80,17 @@ async function editarComMenuCommand(sock, userId, texto) {
     // Se há contexto recente de cartões listados, tratar como edição de cartão
     const estadoAtual = await obterEstado(userId);
     const idxMatch = textoLower.match(/^editar\s+(\d+)$/i);
-    if (estadoAtual?.etapa === 'cartoes_listados' && estadoAtual?.dadosParciais?.cartoes?.length) {
+    if (estadoAtual?.etapa === 'cartoes_listados' && (estadoAtual?.dadosParciais as any)?.cartoes?.length) {
       // Promove o estado para aguardando escolha de edição de cartão e repassa o índice
-      await definirEstado(userId, 'aguardando_escolha_edicao_cartao', { cartoes: estadoAtual.dadosParciais.cartoes });
+      await definirEstado(userId, 'aguardando_escolha_edicao_cartao', { cartoes: (estadoAtual.dadosParciais as any).cartoes });
       await editarCartaoCommand(sock, userId, idxMatch![1]);
       return;
     }
 
     // Se há contexto de recorrentes listados, iniciar fluxo de edição de recorrente diretamente
-    if (estadoAtual?.etapa === 'recorrentes_listados' && estadoAtual?.dadosParciais?.recorrentes?.length) {
+    if (estadoAtual?.etapa === 'recorrentes_listados' && (estadoAtual?.dadosParciais as any)?.recorrentes?.length) {
       const idx = parseInt(idxMatch![1], 10) - 1;
-      const grupos = estadoAtual.dadosParciais.recorrentes;
+      const grupos = (estadoAtual.dadosParciais as any).recorrentes;
       if (!grupos[idx]) {
         await sock.sendMessage(userId, { 
           text: '❌ Número inválido. Escolha um dos itens listados.'

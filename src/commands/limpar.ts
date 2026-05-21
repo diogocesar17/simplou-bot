@@ -1,8 +1,17 @@
 import * as sistemaService from '../services/sistemaService';
+import * as usuariosService from '../services/usuariosService';
 import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function limparCommand(sock: any, userId: string) {
-  // Limpar dados antigos reais
+  const isAdmin = await usuariosService.verificarAdmin(userId);
+  if (!isAdmin) {
+    await sock.sendMessage(userId, {
+      text: ERROR_MESSAGES.SEM_PERMISSAO('Limpar dados', 'Apenas administradores podem executar este comando')
+    });
+    return;
+  }
+
   const resultado = await sistemaService.limparDadosAntigos();
   if (resultado.sucesso) {
     const itens: string[] = [];

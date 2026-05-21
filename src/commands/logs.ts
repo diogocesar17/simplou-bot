@@ -1,11 +1,18 @@
-// @ts-nocheck
 import * as sistemaService from '../services/sistemaService';
+import * as usuariosService from '../services/usuariosService';
 import { formatarMensagem } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function logsCommand(sock, userId) {
   try {
-    // Gerar logs de auditoria em CSV
+    const isAdmin = await usuariosService.verificarAdmin(userId);
+    if (!isAdmin) {
+      await sock.sendMessage(userId, {
+        text: ERROR_MESSAGES.SEM_PERMISSAO('Ver logs', 'Apenas administradores podem executar este comando')
+      });
+      return;
+    }
+
     const resultado = await sistemaService.gerarLogAuditoria(userId, 'recentes');
     
     if (resultado && resultado.sucesso) {

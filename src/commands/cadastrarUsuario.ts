@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Comando para cadastrar usuário (apenas para admins)
 import * as usuariosService from '../services/usuariosService';
 
@@ -14,16 +13,9 @@ async function cadastrarUsuarioCommand(sock, userId, texto) {
     }
 
     // Processar comando de cadastro
-    const resultado = await usuariosService.processarComandoCadastrar(texto, userId);
-    
-    // Enviar resposta
-    await sock.sendMessage(userId, { text: resultado.message });
-    
-    // Se cadastrado com sucesso, enviar mensagem de boas-vindas para o novo usuário
-    if (resultado.success && resultado.usuario) {
-      const mensagemBoasVindas = usuariosService.gerarMensagemBoasVindas(resultado.usuario);
-      await sock.sendMessage(resultado.usuario.user_id, { text: mensagemBoasVindas });
-    }
+    await sock.sendMessage(userId, {
+      text: 'Funcionalidade não disponível nesta versão.'
+    });
     
   } catch (error) {
   logger.error({ err: (error as any)?.message || error }, 'Erro no comando cadastrarUsuario');
