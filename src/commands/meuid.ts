@@ -1,7 +1,17 @@
+import * as usuariosService from '../services/usuariosService';
 import { formatarMensagem } from '../utils/formatMessages';
+import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 async function meuidCommand(sock, userId) {
-  await sock.sendMessage(userId, { 
+  const isAdmin = await usuariosService.verificarAdmin(userId);
+  if (!isAdmin) {
+    await sock.sendMessage(userId, {
+      text: ERROR_MESSAGES.SEM_PERMISSAO('Ver ID', 'Apenas administradores podem executar este comando')
+    });
+    return;
+  }
+
+  await sock.sendMessage(userId, {
     text: formatarMensagem({
       titulo: 'Seu ID do WhatsApp',
       emojiTitulo: '🆔',

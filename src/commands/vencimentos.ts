@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { formatarValor } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem } from '../utils/formatMessages';
@@ -37,7 +36,7 @@ async function vencimentosCommand(sock, userId, texto) {
     return;
   }
 
-  const secoes = [];
+  const secoes: any[] = [];
   
   // Cartões
   if (vencimentos.cartoes && vencimentos.cartoes.length > 0) {

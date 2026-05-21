@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Comando para listar usuários (apenas para admins)
 import * as usuariosService from '../services/usuariosService';
 import { formatarMensagem } from '../utils/formatMessages';

@@ -1749,20 +1749,14 @@ async function getResumoReal(userId, mes = null, ano = null) {
 
 // Buscar cartões com vencimento próximo (3 dias antes e no dia)
 async function buscarCartoesVencimentoProximo(userId) {
-  const hoje = new Date();
-  const tresDias = new Date(hoje);
-  tresDias.setDate(hoje.getDate() + 3);
-  
   const query = `
     SELECT DISTINCT nome_cartao, dia_vencimento
-    FROM cartoes_config 
+    FROM cartoes_config
     WHERE user_id = $1
-      AND (
-        dia_vencimento = EXTRACT(DAY FROM CURRENT_DATE) OR
-        dia_vencimento = EXTRACT(DAY FROM CURRENT_DATE + INTERVAL '3 days')
-      )
+      AND dia_vencimento >= EXTRACT(DAY FROM CURRENT_DATE)::integer
+      AND dia_vencimento <= EXTRACT(DAY FROM (CURRENT_DATE + INTERVAL '3 days'))::integer
   `;
-  
+
   const result = await pool.query(query, [userId]);
   return result.rows;
 }
@@ -2509,12 +2503,12 @@ async function buscarGastosPorCategoria(userId, categoria, limite = 20, mes = nu
     let query = `
       SELECT l.*
       FROM lancamentos l
-      WHERE l.user_id = $1 
-        AND LOWER(l.categoria) = LOWER($2)
+      WHERE l.user_id = $1
+        AND l.categoria ILIKE $2
         AND l.tipo = 'gasto'
     `;
-    
-    const params = [userId, categoria];
+
+    const params = [userId, `%${categoria}%`];
     let paramIndex = 3;
     
     if (mes && ano) {

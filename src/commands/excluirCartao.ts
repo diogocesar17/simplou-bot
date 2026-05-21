@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as cartoesService from '../services/cartoesService';
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import { formatarMensagem, formatarConfirmacao, gerarDicasContextuais, formatarCancelamento } from '../utils/formatMessages';
@@ -28,7 +27,7 @@ async function excluirCartaoCommand(sock, userId, texto) {
       return;
     }
     const idx = parseInt(escolha);
-    const cartoes = estado.dadosParciais.cartoes;
+    const cartoes = (estado.dadosParciais as any).cartoes;
     
     if (isNaN(idx) || idx < 1 || idx > cartoes.length) {
       await sock.sendMessage(userId, { 
@@ -84,8 +83,8 @@ async function excluirCartaoCommand(sock, userId, texto) {
       });
       return;
     }
-    const cartao = estado.dadosParciais.cartaoEscolhido;
-    const totalLancamentos = estado.dadosParciais.totalLancamentos;
+    const cartao = (estado.dadosParciais as any).cartaoEscolhido;
+    const totalLancamentos = (estado.dadosParciais as any).totalLancamentos;
     await cartoesService.excluirCartaoConfigurado(userId, cartao.nome_cartao);
     await limparEstado(userId);
     

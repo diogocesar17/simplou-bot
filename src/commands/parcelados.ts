@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { formatarValor } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem } from '../utils/formatMessages';
@@ -23,7 +22,7 @@ async function parceladosCommand(sock, userId) {
   const itensParcelados = parcelados.map((parcelamento, idx) => {
     const parcelasPagas = parcelamento.parcelas.filter(p => p.status === 'paga').length;
     const parcelasPendentes = parcelamento.total_parcelas - parcelasPagas;
-    return `${idx + 1}. *${parcelamento.descricao}*\n   💰 Total: R$ ${formatarValor(parcelamento.valor_total)}\n   📦 ${parcelamento.total_parcelas}x de R$ ${formatarValor(parcelamento.valor_parcela)}\n   ✅ Pagas: ${parcelasPagas} | ⏳ Pendentes: ${parcelasPendentes}\n   📂 ${parcelamento.categoria} | 💳 ${parcelamento.pagamento}\n   📅 ${parcelamento.primeira_parcela} a ${parcelamento.ultima_parcela}`;
+    return `${idx + 1}. *${parcelamento.descricao}*\n   💰 Total: R$ ${formatarValor(parcelamento.valor_total)}\n   📦 ${parcelamento.total_parcelas}x de R$ ${formatarValor(parcelamento.valor_parcela)}\n   📊 ${parcelasPagas}/${parcelamento.total_parcelas} parcelas pagas, ${parcelasPendentes} pendentes\n   📂 ${parcelamento.categoria} | 💳 ${parcelamento.pagamento}\n   📅 ${parcelamento.primeira_parcela} a ${parcelamento.ultima_parcela}`;
   });
 
   await sock.sendMessage(userId, { 

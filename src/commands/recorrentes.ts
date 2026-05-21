@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { formatarValor } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem } from '../utils/formatMessages';

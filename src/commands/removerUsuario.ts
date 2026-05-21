@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Comando para remover usuário (apenas para admins)
 import * as usuariosService from '../services/usuariosService';
 

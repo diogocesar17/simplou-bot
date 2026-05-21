@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarValor } from '../utils/formatUtils';
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
@@ -11,7 +10,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
 
   // Se está aguardando edição de um campo específico
   if (estado?.etapa === 'aguardando_campo_edicao_lancamento') {
-    const contexto = estado.dadosParciais;
+    const contexto = estado.dadosParciais as any;
     const textoLower = texto.toLowerCase().trim();
 
     // Permitir cancelar nesta etapa
@@ -28,7 +27,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
     }
 
     const escolha = parseInt(texto);
-    let campo = null;
+    let campo: string | null = null;
     let instrucao = '';
     
     switch (escolha) {
@@ -140,7 +139,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
 
   // Se está aguardando escolha de como editar parcelas (apenas atual vs futuras também)
   if (estado?.etapa === 'aguardando_escolha_parcelado_edicao') {
-    const { lancamentoId, lancamento, campo, instrucao } = estado.dadosParciais;
+    const { lancamentoId, lancamento, campo, instrucao } = estado.dadosParciais as any;
     const textoLower = texto.toLowerCase().trim();
     if (textoLower === 'cancelar' || texto === '0') {
       await limparEstado(userId);
@@ -189,7 +188,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
 
   // Se está aguardando escolha de como editar recorrente (apenas atual vs futuras também)
   if (estado?.etapa === 'aguardando_escolha_recorrente_edicao') {
-    const { lancamentoId, lancamento, campo, instrucao } = estado.dadosParciais;
+    const { lancamentoId, lancamento, campo, instrucao } = estado.dadosParciais as any;
     const textoLower = texto.toLowerCase().trim();
     if (textoLower === 'cancelar' || texto === '0') {
       await limparEstado(userId);
@@ -238,7 +237,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
 
   // Se está aguardando o novo valor para um campo
   if (estado?.etapa === 'aguardando_valor_edicao_lancamento') {
-    const { lancamentoId, lancamento, campo, aplicarEmLote } = estado.dadosParciais;
+    const { lancamentoId, lancamento, campo, aplicarEmLote } = estado.dadosParciais as any;
     
     if (texto.toLowerCase() === 'cancelar' || texto === '0') {
       await limparEstado(userId);
@@ -385,11 +384,11 @@ async function editarLancamentoCommand(sock, userId, texto) {
   const idx = parseInt(match[1]) - 1;
   // Priorizar a lista exibida no histórico, se disponível e ainda válida
   let lista;
-  if (estado?.etapa === 'historico_exibido' && estado?.dadosParciais?.lista) {
+  if (estado?.etapa === 'historico_exibido' && (estado?.dadosParciais as any)?.lista) {
     const agora = Date.now();
     const tempoExpiracao = 10 * 60 * 1000; // 10 minutos
-    if (agora - (estado.dadosParciais.timestamp || 0) <= tempoExpiracao) {
-      lista = estado.dadosParciais.lista;
+    if (agora - ((estado.dadosParciais as any).timestamp || 0) <= tempoExpiracao) {
+      lista = (estado.dadosParciais as any).lista;
     }
   }
 

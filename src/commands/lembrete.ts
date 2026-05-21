@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { formatarValor } from '../utils/formatUtils';
 import * as lembretesService from '../services/lembretesService';
 import { formatarMensagem } from '../utils/formatMessages';
@@ -253,31 +252,31 @@ async function lembreteCommand(sock, userId, texto) {
     const diasTexto = texto.trim();
     
     // Verificar se o usuário quer cancelar
-    if (diasTexto.toLowerCase() === 'cancelar' || diasTexto === '0') {
+    if (diasTexto.toLowerCase() === 'cancelar') {
       await limparEstado(userId);
       await sock.sendMessage(userId, {
         text: '❌ Criação de lembrete cancelada.'
       });
       return;
     }
-    
+
     let dias = 3; // padrão
-    
+
     if (diasTexto && diasTexto !== '') {
       dias = parseInt(diasTexto);
       if (isNaN(dias) || dias < 0 || dias > 30) {
         await sock.sendMessage(userId, {
-          text: '❌ Número inválido. Digite um número de 0 a 30:\n💡 Digite `0` ou `cancelar` para cancelar'
+          text: '❌ Número inválido. Digite um número de 0 a 30 (0 = notificar no dia):\n💡 Digite `cancelar` para cancelar'
         });
         return;
       }
     }
     
-    estado.dadosParciais.dias_antecedencia = dias;
+    (estado.dadosParciais as any).dias_antecedencia = dias;
     
     // Criar o lembrete
     try {
-      const lembrete = await lembretesService.criarLembrete(userId, estado.dadosParciais);
+      const lembrete = await lembretesService.criarLembrete(userId, estado.dadosParciais as any);
       await limparEstado(userId);
       
       const dataFormatada = lembrete.data_vencimento.toLocaleDateString('pt-BR');
@@ -321,7 +320,7 @@ async function lembreteCommand(sock, userId, texto) {
           secoes: [
             {
               titulo: 'Detalhes do Erro',
-              itens: [error.message || 'Erro desconhecido'],
+              itens: [(error as any)?.message || 'Erro desconhecido'],
               emoji: '🚨'
             }
           ],
@@ -348,37 +347,8 @@ async function lembreteCommand(sock, userId, texto) {
   if (textoLimpo === '' || textoLimpo === 'novo' || textoLimpo === 'criar') {
     // Iniciar fluxo de criação de lembrete
     try {
-      // Verificar limite de lembretes
-      const { permitido, atual, limite } = await lembretesService.verificarLimiteLembretes(userId);
-      
-      if (!permitido) {
-        await sock.sendMessage(userId, {
-          text: formatarMensagem({
-            titulo: 'Limite de lembretes atingido',
-            emojiTitulo: '⚠️',
-            secoes: [
-              {
-                titulo: 'Limite Atual',
-                itens: [
-                  `Lembretes ativos: ${atual}/${limite}`,
-                  'Considere fazer upgrade para premium para lembretes ilimitados'
-                ],
-                emoji: '📊'
-              }
-            ],
-            dicas: [
-              { texto: 'Ver meus lembretes', comando: 'meuslembretes' },
-              { texto: 'Desativar um lembrete', comando: 'meuslembretes' },
-              { texto: 'Ver ajuda', comando: 'ajuda' }
-            ]
-          })
-        });
-        return;
-      }
-      
-      // Iniciar fluxo
       await definirEstado(userId, 'aguardando_titulo_lembrete', {});
-      
+
       await sock.sendMessage(userId, {
         text: formatarMensagem({
           titulo: 'Criar Novo Lembrete',
@@ -387,7 +357,6 @@ async function lembreteCommand(sock, userId, texto) {
             {
               titulo: 'Informações',
               itens: [
-                `Lembretes ativos: ${atual}/${limite}`,
                 'Vamos criar seu lembrete passo a passo'
               ],
               emoji: '📊'
@@ -398,9 +367,9 @@ async function lembreteCommand(sock, userId, texto) {
           ]
         }) + '\n\n📌 Digite o título do lembrete:'
       });
-      
+
     } catch (error) {
-  logger.error({ err: (error as any)?.message || error }, '[LEMBRETE] Erro ao verificar limite');
+      logger.error({ err: (error as any)?.message || error }, '[LEMBRETE] Erro ao iniciar criação');
       await sock.sendMessage(userId, {
         text: '❌ Erro interno. Tente novamente mais tarde.'
       });

@@ -100,12 +100,6 @@ function calcularProximoEnvio(dataVencimento: Date, diasAntecedencia: number): D
 // Função para criar um novo lembrete
 export async function criarLembrete(userId: string, dados: CriarLembreteData): Promise<Lembrete> {
   try {
-    // Verificar limite de lembretes
-    const { permitido, atual, limite } = await verificarLimiteLembretes(userId);
-    if (!permitido) {
-      throw new Error(`Limite de lembretes atingido (${atual}/${limite}). Considere fazer upgrade para premium.`);
-    }
-
     // Validações básicas
     if (!dados.titulo || dados.titulo.trim().length === 0) {
       throw new Error('Título é obrigatório');
@@ -319,8 +313,8 @@ export async function atualizarLembrete(userId: string, lembreteId: string, dado
 
     // Recalcular próximo envio se necessário
     if (dados.data_vencimento !== undefined || dados.dias_antecedencia !== undefined) {
-      const novaDataVencimento = dados.data_vencimento || lembreteExistente.data_vencimento;
-      const novosDiasAntecedencia = dados.dias_antecedencia || lembreteExistente.dias_antecedencia;
+      const novaDataVencimento = dados.data_vencimento ?? lembreteExistente.data_vencimento;
+      const novosDiasAntecedencia = dados.dias_antecedencia ?? lembreteExistente.dias_antecedencia;
       const novoProximoEnvio = calcularProximoEnvio(novaDataVencimento, novosDiasAntecedencia);
       
       campos.push(`proximo_envio = $${contador}`);
@@ -518,10 +512,13 @@ export async function marcarLembreteEnviado(lembreteId: string): Promise<void> {
           novaDataVencimento = new Date(dataVencimento);
           novaDataVencimento.setDate(novaDataVencimento.getDate() + 7);
           break;
-        case 'mensal':
-          novaDataVencimento = new Date(dataVencimento);
-          novaDataVencimento.setMonth(novaDataVencimento.getMonth() + 1);
+        case 'mensal': {
+          const diaOriginal = dataVencimento.getDate();
+          novaDataVencimento = new Date(dataVencimento.getFullYear(), dataVencimento.getMonth() + 1, 1);
+          const ultimoDia = new Date(novaDataVencimento.getFullYear(), novaDataVencimento.getMonth() + 1, 0).getDate();
+          novaDataVencimento.setDate(Math.min(diaOriginal, ultimoDia));
           break;
+        }
         case 'anual':
           novaDataVencimento = new Date(dataVencimento);
           novaDataVencimento.setFullYear(novaDataVencimento.getFullYear() + 1);

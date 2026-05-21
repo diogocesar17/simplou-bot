@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as cartoesService from '../services/cartoesService';
 import { formatarMensagem, formatarLista, gerarDicasContextuais } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';

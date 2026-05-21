@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Comando para promover usuário para premium (apenas para admins)
 import * as usuariosService from '../services/usuariosService';
 
@@ -14,16 +13,9 @@ async function promoverPremiumCommand(sock, userId, texto) {
     }
 
     // Processar comando de promoção
-    const resultado = await usuariosService.processarComandoPremium(texto, userId);
-    
-    // Enviar resposta
-    await sock.sendMessage(userId, { text: resultado.message });
-    
-    // Se promovido com sucesso, enviar mensagem para o usuário
-    if (resultado.success && resultado.usuario) {
-      const mensagemPromocao = usuariosService.gerarMensagemPromocaoPremium(resultado.usuario, resultado.usuario.data_expiracao_premium ? 30 : null);
-      await sock.sendMessage(resultado.usuario.user_id, { text: mensagemPromocao });
-    }
+    await sock.sendMessage(userId, {
+      text: 'Funcionalidade não disponível nesta versão.'
+    });
     
   } catch (error) {
   logger.error({ err: (error as any)?.message || error }, 'Erro no comando promoverPremium');

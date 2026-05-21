@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { formatarValor } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
@@ -10,7 +9,7 @@ async function historicoCommand(sock, userId, texto) {
   const textoLower = texto.toLowerCase().trim();
   // Extrai o possível período após o comando
   const partes = texto.trim().split(/\s+/);
-  let mesAno = null;
+  let mesAno: { mes: number; ano: number } | null = null;
   let limite = 10; // padrão
   
   if (partes.length > 1) {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import excluirLancamentoCommand from './excluirLancamento';
 import excluirCartaoCommand from './excluirCartao';
@@ -82,19 +81,19 @@ async function excluirComMenuCommand(sock, userId, texto) {
     // Se há contexto recente de cartões listados, tratar como exclusão de cartão
     const estadoAtual = await obterEstado(userId);
     const idxMatch = textoLower.match(/^excluir\s+(\d+)$/i);
-    if (estadoAtual?.etapa === 'cartoes_listados' && estadoAtual?.dadosParciais?.cartoes?.length) {
+    if (estadoAtual?.etapa === 'cartoes_listados' && (estadoAtual?.dadosParciais as any)?.cartoes?.length) {
       // Promove o estado para aguardando escolha de exclusão de cartão e repassa o índice
-      await definirEstado(userId, 'aguardando_escolha_exclusao_cartao', { cartoes: estadoAtual.dadosParciais.cartoes });
+      await definirEstado(userId, 'aguardando_escolha_exclusao_cartao', { cartoes: (estadoAtual.dadosParciais as any).cartoes });
       await excluirCartaoCommand(sock, userId, idxMatch![1]);
       return;
     }
 
     // Se há contexto de recorrentes listados, iniciar fluxo de exclusão de recorrente
-    if (estadoAtual?.etapa === 'recorrentes_listados' && estadoAtual?.dadosParciais?.recorrentes?.length) {
+    if (estadoAtual?.etapa === 'recorrentes_listados' && (estadoAtual?.dadosParciais as any)?.recorrentes?.length) {
       const idx = parseInt(idxMatch![1], 10) - 1;
-      const grupos = estadoAtual.dadosParciais.recorrentes;
+      const grupos = (estadoAtual.dadosParciais as any).recorrentes as any[];
       if (!grupos[idx]) {
-        await sock.sendMessage(userId, { 
+        await sock.sendMessage(userId, {
           text: '❌ Número inválido. Escolha um dos itens listados.'
         });
         return;

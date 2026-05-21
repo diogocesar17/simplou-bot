@@ -1,4 +1,3 @@
-// @ts-nocheck
 import * as lancamentosService from '../services/lancamentosService';
 import { obterEstado, limparEstado, definirEstado } from '../configs/stateManager';
 import { formatarMensagem, formatarConfirmacao, gerarDicasContextuais } from '../utils/formatMessages';
@@ -41,12 +40,12 @@ async function excluirLancamentoCommand(sock, userId, texto) {
     
     if (confirmacao === '1' || confirmacao === 'sim' || confirmacao === 'confirmar') {
       try {
-        const { lancamento, escopoExclusao } = estado.dadosParciais;
+        const { lancamento, escopoExclusao } = estado.dadosParciais as any;
         let lancamentosExcluidos = 0;
 
         if (lancamento.parcelamento_id && escopoExclusao) {
           if (escopoExclusao === 'apenas_atual') {
-            lancamentosExcluidos = await lancamentosService.excluirLancamentoPorId(userId, lancamento.id);
+            lancamentosExcluidos = await lancamentosService.excluirLancamentoPorId(userId, lancamento.id) as number;
           } else if (escopoExclusao === 'atual_e_futuras') {
             lancamentosExcluidos = await (lancamentosService as any).excluirParcelasFuturasApartir(
               userId,
@@ -59,7 +58,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
           }
         } else if (lancamento.recorrente_id && escopoExclusao) {
           if (escopoExclusao === 'apenas_atual') {
-            lancamentosExcluidos = await lancamentosService.excluirLancamentoPorId(userId, lancamento.id);
+            lancamentosExcluidos = await lancamentosService.excluirLancamentoPorId(userId, lancamento.id) as number;
           } else if (escopoExclusao === 'atual_e_futuras') {
             const dataSelecionada = (lancamento.data instanceof Date)
               ? lancamento.data.toLocaleDateString('pt-BR')
@@ -71,7 +70,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
             );
           }
         } else {
-          lancamentosExcluidos = await lancamentosService.excluirLancamentoPorId(userId, lancamento.id);
+          lancamentosExcluidos = await lancamentosService.excluirLancamentoPorId(userId, lancamento.id) as number;
         }
         
         // Limpar estado após exclusão bem-sucedida
@@ -173,7 +172,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
 
   // Se está aguardando escolha de escopo para exclusão de parcelado
   if (estado?.etapa === 'aguardando_escolha_exclusao_parcelado') {
-    const { lancamento } = estado.dadosParciais;
+    const { lancamento } = estado.dadosParciais as any;
     const escolha = texto.trim();
     const escolhaLower = escolha.toLowerCase();
     if (escolha === '0' || escolhaLower === 'cancelar') {
@@ -255,7 +254,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
 
   // Se está aguardando escolha de escopo para exclusão de recorrente
   if (estado?.etapa === 'aguardando_escolha_exclusao_recorrente') {
-    const { lancamento } = estado.dadosParciais;
+    const { lancamento } = estado.dadosParciais as any;
     const escolha = texto.trim();
     const escolhaLower = escolha.toLowerCase();
     if (escolha === '0' || escolhaLower === 'cancelar') {
@@ -347,19 +346,19 @@ async function excluirLancamentoCommand(sock, userId, texto) {
   // Verificar se o estado não expirou (mais de 10 minutos)
   const agora = Date.now();
   const tempoExpiracao = 10 * 60 * 1000; // 10 minutos
-  if (agora - estado.dadosParciais.timestamp > tempoExpiracao) {
+  if (agora - (estado.dadosParciais as any).timestamp > tempoExpiracao) {
     await limparEstado(userId);
-    await sock.sendMessage(userId, { 
+    await sock.sendMessage(userId, {
       text: ERROR_MESSAGES.ESTADO_INVALIDO('excluir lançamento')
     });
     return;
   }
-  
-  const lista = estado.dadosParciais.lista;
+
+  const lista = (estado.dadosParciais as any).lista;
   
   if (!lista || !lista[idx]) {
     await sock.sendMessage(userId, { 
-      text: ERROR_MESSAGES.LANCAMENTO_NAO_ENCONTRADO(idx + 1)
+      text: ERROR_MESSAGES.LANCAMENTO_NAO_ENCONTRADO(String(idx + 1))
     });
     return;
   }

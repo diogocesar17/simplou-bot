@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { formatarValor } from '../utils/formatUtils';
 import * as lembretesService from '../services/lembretesService';
 import { formatarMensagem } from '../utils/formatMessages';
@@ -10,19 +9,185 @@ async function meusLembretesCommand(sock, userId, texto) {
   // Verificar se há estado pendente
   const estado = await obterEstado(userId);
   
+  // Fluxo de edição — seleção de campo
+  if (estado?.etapa === 'edicao_lembrete_campo') {
+    const opcao = texto.trim();
+    const lembreteId = estado.dadosParciais.lembreteId as string;
+
+    if (opcao === 'cancelar' || opcao === '5') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '↩️ Edição cancelada.' });
+      return;
+    }
+
+    switch (opcao) {
+      case '1':
+        await definirEstado(userId, 'edicao_lembrete_titulo', { lembreteId });
+        await sock.sendMessage(userId, { text: '✏️ Digite o novo título:\n\n💡 Digite `cancelar` para cancelar' });
+        break;
+      case '2':
+        await definirEstado(userId, 'edicao_lembrete_data', { lembreteId });
+        await sock.sendMessage(userId, { text: '📅 Digite a nova data de vencimento (dd/mm/aaaa):\n\n💡 Digite `cancelar` para cancelar' });
+        break;
+      case '3':
+        await definirEstado(userId, 'edicao_lembrete_valor', { lembreteId });
+        await sock.sendMessage(userId, { text: '💰 Digite o novo valor:\n\n💡 Exemplo: 150.50\n💡 Digite `cancelar` para cancelar' });
+        break;
+      case '4':
+        await definirEstado(userId, 'edicao_lembrete_antecedencia', { lembreteId });
+        await sock.sendMessage(userId, { text: '⏰ Quantos dias antes deseja ser lembrado? (0–30):\n\n💡 Digite `cancelar` para cancelar' });
+        break;
+      default:
+        await sock.sendMessage(userId, { text: '❌ Opção inválida. Digite 1, 2, 3, 4 ou 5 (cancelar):' });
+    }
+    return;
+  }
+
+  // Fluxo de edição — novo título
+  if (estado?.etapa === 'edicao_lembrete_titulo') {
+    const novoTitulo = texto.trim();
+    const lembreteId = estado.dadosParciais.lembreteId as string;
+
+    if (novoTitulo.toLowerCase() === 'cancelar') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '↩️ Edição cancelada.' });
+      return;
+    }
+
+    if (!novoTitulo) {
+      await sock.sendMessage(userId, { text: '❌ Título não pode ser vazio. Digite o novo título ou `cancelar`:' });
+      return;
+    }
+
+    try {
+      await lembretesService.atualizarLembrete(userId, lembreteId, { titulo: novoTitulo });
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: `✅ Título atualizado para "${novoTitulo}".` });
+    } catch (error) {
+      logger.error({ err: (error as any)?.message || error }, '[MEUS_LEMBRETES] Erro ao atualizar título');
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '❌ Erro ao atualizar lembrete. Tente novamente.' });
+    }
+    return;
+  }
+
+  // Fluxo de edição — nova data
+  if (estado?.etapa === 'edicao_lembrete_data') {
+    const dataTexto = texto.trim();
+    const lembreteId = estado.dadosParciais.lembreteId as string;
+
+    if (dataTexto.toLowerCase() === 'cancelar') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '↩️ Edição cancelada.' });
+      return;
+    }
+
+    const regexData = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+    const match = dataTexto.match(regexData);
+
+    if (!match) {
+      await sock.sendMessage(userId, { text: '❌ Data inválida. Use o formato dd/mm/aaaa (ex: 25/12/2025) ou `cancelar`:' });
+      return;
+    }
+
+    const [, dia, mes, ano] = match;
+    const novaData = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+
+    if (isNaN(novaData.getTime())) {
+      await sock.sendMessage(userId, { text: '❌ Data inválida. Verifique se a data existe.' });
+      return;
+    }
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    if (novaData < hoje) {
+      await sock.sendMessage(userId, { text: '❌ A data não pode ser no passado. Digite uma data futura:' });
+      return;
+    }
+
+    try {
+      await lembretesService.atualizarLembrete(userId, lembreteId, { data_vencimento: novaData });
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: `✅ Data de vencimento atualizada para ${novaData.toLocaleDateString('pt-BR')}.` });
+    } catch (error) {
+      logger.error({ err: (error as any)?.message || error }, '[MEUS_LEMBRETES] Erro ao atualizar data');
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '❌ Erro ao atualizar lembrete. Tente novamente.' });
+    }
+    return;
+  }
+
+  // Fluxo de edição — novo valor
+  if (estado?.etapa === 'edicao_lembrete_valor') {
+    const valorTexto = texto.trim().toLowerCase();
+    const lembreteId = estado.dadosParciais.lembreteId as string;
+
+    if (valorTexto === 'cancelar') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '↩️ Edição cancelada.' });
+      return;
+    }
+
+    const novoValor = parseFloat(valorTexto.replace(',', '.'));
+    if (isNaN(novoValor) || novoValor <= 0) {
+      await sock.sendMessage(userId, { text: '❌ Valor inválido. Digite um número positivo (ex: 150.50) ou `cancelar`:' });
+      return;
+    }
+
+    try {
+      await lembretesService.atualizarLembrete(userId, lembreteId, { valor: novoValor });
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: `✅ Valor atualizado para R$ ${formatarValor(novoValor)}.` });
+    } catch (error) {
+      logger.error({ err: (error as any)?.message || error }, '[MEUS_LEMBRETES] Erro ao atualizar valor');
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '❌ Erro ao atualizar lembrete. Tente novamente.' });
+    }
+    return;
+  }
+
+  // Fluxo de edição — nova antecedência
+  if (estado?.etapa === 'edicao_lembrete_antecedencia') {
+    const diasTexto = texto.trim();
+    const lembreteId = estado.dadosParciais.lembreteId as string;
+
+    if (diasTexto.toLowerCase() === 'cancelar') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '↩️ Edição cancelada.' });
+      return;
+    }
+
+    const dias = parseInt(diasTexto);
+    if (isNaN(dias) || dias < 0 || dias > 30) {
+      await sock.sendMessage(userId, { text: '❌ Número inválido. Digite um número de 0 a 30 (0 = notificar no dia) ou `cancelar`:' });
+      return;
+    }
+
+    try {
+      await lembretesService.atualizarLembrete(userId, lembreteId, { dias_antecedencia: dias });
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: `✅ Antecedência atualizada para ${dias} dia(s).` });
+    } catch (error) {
+      logger.error({ err: (error as any)?.message || error }, '[MEUS_LEMBRETES] Erro ao atualizar antecedência');
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '❌ Erro ao atualizar lembrete. Tente novamente.' });
+    }
+    return;
+  }
+
   // Fluxo aguardando ação sobre lembrete específico
   if (estado?.etapa === 'aguardando_acao_lembrete') {
     const acao = texto.trim().toLowerCase();
-    const lembreteId = estado.dadosParciais.lembreteId;
-    
+    const lembreteId = (estado.dadosParciais as any).lembreteId as string;
+
     try {
       switch (acao) {
         case '1':
         case 'editar':
+          await definirEstado(userId, 'edicao_lembrete_campo', { lembreteId });
           await sock.sendMessage(userId, {
-            text: '🚧 Funcionalidade de edição em desenvolvimento.\n\n💡 Por enquanto, você pode desativar e criar um novo lembrete.'
+            text: '✏️ O que deseja editar?\n\n1. Título\n2. Data de vencimento\n3. Valor\n4. Dias de antecedência\n5. Cancelar'
           });
-          await limparEstado(userId);
           break;
           
         case '2':
@@ -87,7 +252,7 @@ async function meusLembretesCommand(sock, userId, texto) {
   // Fluxo confirmando exclusão
   if (estado?.etapa === 'confirmando_exclusao_lembrete') {
     const confirmacao = texto.trim().toLowerCase();
-    const lembreteId = estado.dadosParciais.lembreteId;
+    const lembreteId = (estado.dadosParciais as any).lembreteId as string;
     
     if (confirmacao === '1' || confirmacao === 'sim') {
       try {
@@ -130,7 +295,7 @@ async function meusLembretesCommand(sock, userId, texto) {
   // Fluxo aguardando seleção de lembrete
   if (estado?.etapa === 'aguardando_selecao_lembrete') {
     const selecao = texto.trim();
-    const lembretes = estado.dadosParciais.lembretes;
+    const lembretes = (estado.dadosParciais as any).lembretes as any[];
     
     if (selecao.toLowerCase() === 'voltar' || selecao.toLowerCase() === 'cancelar') {
       await limparEstado(userId);
@@ -179,7 +344,7 @@ async function meusLembretesCommand(sock, userId, texto) {
           {
             titulo: 'Ações Disponíveis',
             itens: [
-              '1. ✏️ Editar (em breve)',
+              '1. ✏️ Editar',
               `2. ${lembreteSelecionado.ativo ? '⏸️ Pausar' : '▶️ Ativar'}`,
               '3. 🗑️ Excluir',
               '4. ↩️ Voltar'
@@ -200,14 +365,14 @@ async function meusLembretesCommand(sock, userId, texto) {
   
   try {
     // Determinar filtro
-    let apenasAtivos = null;
+    let apenasAtivos: boolean | null = null;
     if (textoLimpo === 'ativos') {
       apenasAtivos = true;
     } else if (textoLimpo === 'pausados' || textoLimpo === 'inativos') {
       apenasAtivos = false;
     }
     
-    const lembretes = await lembretesService.listarLembretes(userId, apenasAtivos);
+    const lembretes = await lembretesService.listarLembretes(userId, apenasAtivos ?? undefined);
     
     if (lembretes.length === 0) {
       const mensagemVazia = apenasAtivos === true ? 'Você não tem lembretes ativos.' :
@@ -313,7 +478,7 @@ async function meusLembretesCommand(sock, userId, texto) {
         secoes: [
           {
             titulo: 'Detalhes do Erro',
-            itens: [error.message || 'Erro desconhecido'],
+            itens: [(error as any)?.message || 'Erro desconhecido'],
             emoji: '🚨'
           }
         ],
