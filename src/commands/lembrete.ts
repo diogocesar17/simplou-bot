@@ -120,139 +120,20 @@ async function lembreteCommand(sock, userId, texto) {
       estado.dadosParciais.valor = valor;
     }
     
-    await definirEstado(userId, 'aguardando_categoria_lembrete', estado.dadosParciais);
-    
-    const categorias = [
-      'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia',
-      'Lazer', 'Vestuário', 'Serviços', 'Casa', 'Trabalho', 'Outros'
-    ];
-    
+    await definirEstado(userId, 'aguardando_antecedencia_lembrete', estado.dadosParciais);
+
     await sock.sendMessage(userId, {
-      text: `📂 Escolha uma categoria (opcional):\n\n${categorias.map((cat, idx) => `${idx + 1}. ${cat}`).join('\n')}\n\n💡 Digite o número da categoria ou "pular" para continuar`
+      text: '⏰ Quantos dias antes você quer ser lembrado?\n\n💡 Digite um número de 0 a 30 ou "pular" para usar o padrão (1 dia)'
     });
     return;
   }
   
-  // Fluxo aguardando categoria
-  if (estado?.etapa === 'aguardando_categoria_lembrete') {
-    const categoriaTexto = texto.trim().toLowerCase();
-    
+  // Fluxo aguardando antecedência (etapa 4)
+  if (estado?.etapa === 'aguardando_antecedencia_lembrete') {
+    const diasTexto = texto.trim().toLowerCase();
+
     // Verificar se o usuário quer cancelar
-    if (categoriaTexto === 'cancelar' || categoriaTexto === '0') {
-      await limparEstado(userId);
-      await sock.sendMessage(userId, {
-        text: '❌ Criação de lembrete cancelada.'
-      });
-      return;
-    }
-    
-    if (categoriaTexto === 'pular' || categoriaTexto === 'skip') {
-      estado.dadosParciais.categoria = null;
-    } else {
-      const categorias = [
-        'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia',
-        'Lazer', 'Vestuário', 'Serviços', 'Casa', 'Trabalho', 'Outros'
-      ];
-      
-      const indice = parseInt(categoriaTexto) - 1;
-      if (isNaN(indice) || indice < 0 || indice >= categorias.length) {
-        await sock.sendMessage(userId, {
-          text: '❌ Opção inválida. Digite um número de 1 a 11 ou "pular"\n💡 Digite `0` ou `cancelar` para cancelar'
-        });
-        return;
-      }
-      
-      estado.dadosParciais.categoria = categorias[indice];
-    }
-    
-    await definirEstado(userId, 'aguardando_descricao_lembrete', estado.dadosParciais);
-    
-    await sock.sendMessage(userId, {
-      text: '📝 Digite uma descrição (opcional):\n\n💡 Exemplo: "Pagamento da conta de luz" ou "pular" para continuar'
-    });
-    return;
-  }
-  
-  // Fluxo aguardando descrição
-  if (estado?.etapa === 'aguardando_descricao_lembrete') {
-    const descricaoTexto = texto.trim();
-    
-    // Verificar se o usuário quer cancelar
-    if (descricaoTexto.toLowerCase() === 'cancelar' || descricaoTexto === '0') {
-      await limparEstado(userId);
-      await sock.sendMessage(userId, {
-        text: '❌ Criação de lembrete cancelada.'
-      });
-      return;
-    }
-    
-    if (descricaoTexto.toLowerCase() === 'pular' || descricaoTexto.toLowerCase() === 'skip') {
-      estado.dadosParciais.descricao = null;
-    } else {
-      estado.dadosParciais.descricao = descricaoTexto;
-    }
-    
-    await definirEstado(userId, 'aguardando_recorrencia_lembrete', estado.dadosParciais);
-    
-    await sock.sendMessage(userId, {
-      text: '🔄 Este lembrete é recorrente?\n\n1. Não (apenas uma vez)\n2. Semanal\n3. Mensal\n4. Anual\n\n💡 Digite o número da opção:'
-    });
-    return;
-  }
-  
-  // Fluxo aguardando recorrência
-  if (estado?.etapa === 'aguardando_recorrencia_lembrete') {
-    const textoRecorrencia = texto.trim();
-    
-    // Verificar se o usuário quer cancelar
-    if (textoRecorrencia.toLowerCase() === 'cancelar' || textoRecorrencia === '0') {
-      await limparEstado(userId);
-      await sock.sendMessage(userId, {
-        text: '❌ Criação de lembrete cancelada.'
-      });
-      return;
-    }
-    
-    const opcao = parseInt(textoRecorrencia);
-    
-    switch (opcao) {
-      case 1:
-        estado.dadosParciais.recorrente = false;
-        estado.dadosParciais.tipo_recorrencia = null;
-        break;
-      case 2:
-        estado.dadosParciais.recorrente = true;
-        estado.dadosParciais.tipo_recorrencia = 'semanal';
-        break;
-      case 3:
-        estado.dadosParciais.recorrente = true;
-        estado.dadosParciais.tipo_recorrencia = 'mensal';
-        break;
-      case 4:
-        estado.dadosParciais.recorrente = true;
-        estado.dadosParciais.tipo_recorrencia = 'anual';
-        break;
-      default:
-        await sock.sendMessage(userId, {
-          text: '❌ Opção inválida. Digite 1, 2, 3 ou 4:\n💡 Digite `0` ou `cancelar` para cancelar'
-        });
-        return;
-    }
-    
-    await definirEstado(userId, 'aguardando_dias_antecedencia_lembrete', estado.dadosParciais);
-    
-    await sock.sendMessage(userId, {
-      text: '⏰ Quantos dias antes você quer ser lembrado?\n\n💡 Digite um número de 0 a 30 (padrão: 3 dias)'
-    });
-    return;
-  }
-  
-  // Fluxo aguardando dias de antecedência
-  if (estado?.etapa === 'aguardando_dias_antecedencia_lembrete') {
-    const diasTexto = texto.trim();
-    
-    // Verificar se o usuário quer cancelar
-    if (diasTexto.toLowerCase() === 'cancelar') {
+    if (diasTexto === 'cancelar' || diasTexto === '0') {
       await limparEstado(userId);
       await sock.sendMessage(userId, {
         text: '❌ Criação de lembrete cancelada.'
@@ -260,19 +141,24 @@ async function lembreteCommand(sock, userId, texto) {
       return;
     }
 
-    let dias = 3; // padrão
+    let dias = 1; // padrão
 
-    if (diasTexto && diasTexto !== '') {
+    if (diasTexto !== 'pular' && diasTexto !== 'skip' && diasTexto !== '') {
       dias = parseInt(diasTexto);
       if (isNaN(dias) || dias < 0 || dias > 30) {
         await sock.sendMessage(userId, {
-          text: '❌ Número inválido. Digite um número de 0 a 30 (0 = notificar no dia):\n💡 Digite `cancelar` para cancelar'
+          text: '❌ Número inválido. Digite um número de 0 a 30 ou "pular" para usar o padrão (1 dia):\n💡 Digite `cancelar` para cancelar'
         });
         return;
       }
     }
-    
+
     (estado.dadosParciais as any).dias_antecedencia = dias;
+    // Definir valores padrão para campos removidos do wizard
+    (estado.dadosParciais as any).categoria = null;
+    (estado.dadosParciais as any).descricao = null;
+    (estado.dadosParciais as any).recorrente = true;
+    (estado.dadosParciais as any).tipo_recorrencia = 'mensal';
     
     // Criar o lembrete
     try {
