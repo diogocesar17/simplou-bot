@@ -1,7 +1,13 @@
 import * as geminiService from '../services/geminiService';
 import * as lancamentosService from '../services/lancamentosService';
+import { isPremium, MSG_UPGRADE } from '../services/planoService';
 
 async function analisarCommand(sock, userId) {
+  const premium = await isPremium(userId);
+  if (!premium) {
+    await sock.sendMessage(userId, { text: MSG_UPGRADE });
+    return;
+  }
   // Buscar dados dos últimos 3 meses (como no fluxo original)
   const dados = await lancamentosService.buscarDadosParaAnalise(userId, 3);
   if (!dados || dados.length === 0) {

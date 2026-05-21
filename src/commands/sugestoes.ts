@@ -1,8 +1,14 @@
 import * as geminiService from '../services/geminiService';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
+import { isPremium, MSG_UPGRADE } from '../services/planoService';
 
 async function sugestoesCommand(sock, userId) {
+  const premium = await isPremium(userId);
+  if (!premium) {
+    await sock.sendMessage(userId, { text: MSG_UPGRADE });
+    return;
+  }
   // Buscar dados dos últimos 2 meses (como no fluxo original)
   const dados = await lancamentosService.buscarDadosParaSugestoes(userId, 2);
   if (!dados || dados.length === 0) {
