@@ -23,8 +23,7 @@ import statusCommand from './commands/status';
 import limparCommand from './commands/limpar';
 import backupCommand from './commands/backup';
 import logsCommand from './commands/logs';
-import meuidCommand from './commands/meuid';
-import quemsouCommand from './commands/quemsou';
+import perfilCommand from './commands/perfil';
 import analisarCommand from './commands/analisar';
 import sugestoesCommand from './commands/sugestoes';
 import previsaoCommand from './commands/previsao';
@@ -368,12 +367,8 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     await logsCommand(sock, userId);
     return;
   }
-  if (textoLower === 'meuid') {
-    await meuidCommand(sock, userId);
-    return;
-  }
-  if (textoLower === 'quemsou') {
-    await quemsouCommand(sock, userId);
+  if (["perfil", "minha conta", "meuid", "quemsou"].includes(textoLower)) {
+    await perfilCommand(sock, userId);
     return;
   }
 
