@@ -48,12 +48,33 @@ import * as geminiService from './services/geminiService';
 import { initializeDatabase } from './infrastructure/databaseService';
 import * as lancamentosService from './services/lancamentosService';
 import { routeIntent } from './intents/intentRouter';
+import { buscarUsuario, cadastrarUsuario } from './services/usuariosService';
 
 // Exemplo de função de roteamento (simples)
 async function handleMessage(sock: any, userId: string, texto: string): Promise<void> {
   const textoLower = texto.toLowerCase().trim();
 
   const estado = await obterEstado(userId);
+
+  // Onboarding: cadastrar e dar boas-vindas a novos usuários
+  const usuario = await buscarUsuario(userId);
+  if (!usuario) {
+    await cadastrarUsuario(userId, { nome: 'Usuário' });
+    await sock.sendMessage(userId, {
+      text:
+        '👋 *Olá! Bem-vindo ao Simplou!*\n\n' +
+        '💰 Sou seu assistente financeiro pessoal. Vou te ajudar a organizar suas finanças de forma simples e rápida pelo WhatsApp!\n\n' +
+        '📋 *Comandos básicos:*\n' +
+        '• *gastei 50 no mercado* — registrar um gasto\n' +
+        '• *recebi 1000 salário* — registrar uma receita\n' +
+        '• *resumo* — ver o resumo do mês\n' +
+        '• *historico* — ver seus últimos lançamentos\n' +
+        '• *lembrete* — criar um lembrete de conta\n' +
+        '• *ajuda* — ver todos os comandos disponíveis\n\n' +
+        'Para começar, tente registrar seu primeiro gasto! Ex: *gastei 30 no almoço*'
+    });
+    return;
+  }
 
   logger.info(`Estado: ${estado?.etapa}`);
   // Tratar qualquer etapa de fluxo (aguardando_*, confirmando_*, etc.)
