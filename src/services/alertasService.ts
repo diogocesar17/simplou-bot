@@ -2,7 +2,8 @@ import {
   buscarAlertasDoDia,
   gerarMensagemAlertas,
   buscarUsuariosPremiumExpiracao,
-  listarUsuarios
+  listarUsuarios,
+  queryDatabase
 } from '../infrastructure/databaseService';
 import { logger } from '../infrastructure/logger';
 import * as lembretesService from './lembretesService';
@@ -396,6 +397,59 @@ async function temAlertas(userId: string): Promise<boolean> {
 }
 
 /**
+ * Formata valor monetário para exibição
+ */
+function formatarValorAlerta(valor: number): string {
+  return valor.toFixed(2).replace('.', ',');
+}
+
+/**
+ * Calcula o número da semana do ano para uma data
+ */
+function getNumeroSemana(data: Date): number {
+  const d = new Date(Date.UTC(data.getFullYear(), data.getMonth(), data.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+/**
+ * Envia resumo semanal de gastos para um usuário
+ */
+async function enviarResumoSemanal(sock: WASocket, userId: string): Promise<void> {
+  try {
+    const agora = new Date();
+    const semana = `${agora.getFullYear()}-W${String(getNumeroSemana(agora)).padStart(2, '0')}`;
+    const chaveDedup = `alerta:${userId}_resumo_semanal_${semana}`;
+
+    const jaEnviado = await redisDedup.get(chaveDedup);
+    if (jaEnviado) return;
+
+    const resultado = await queryDatabase(
+      `SELECT COALESCE(SUM(valor), 0) as total
+       FROM lancamentos
+       WHERE user_id = $1
+         AND tipo = 'gasto'
+         AND data >= CURRENT_DATE - INTERVAL '7 days'`,
+      [userId]
+    );
+
+    const total = parseFloat(resultado.rows[0]?.total || '0');
+
+    await redisDedup.set(chaveDedup, '1', 'EX', 7 * 24 * 60 * 60); // TTL: 7 dias
+
+    await sock.sendMessage(userId, {
+      text: `📊 *Resumo da semana* — você gastou R$ ${formatarValorAlerta(total)} nos últimos 7 dias.`
+    });
+
+    logger.info({ userId, semana, total }, '[ALERTAS] Resumo semanal enviado');
+  } catch (error) {
+    logger.error({ userId, err: (error as any)?.message || error }, '[ALERTAS] Erro ao enviar resumo semanal');
+  }
+}
+
+/**
  * Verifica e envia alertas automaticamente para todos os usuários
  * @param sock - Socket do WhatsApp
  * @param eLembreteFinal - Se é o lembrete final (11h)
@@ -418,6 +472,12 @@ async function verificarEEnviarAlertasAutomaticos(sock: WASocket, eLembreteFinal
           enviados++;
           logger.info({ userId: usuario.user_id, lembreteFinal: eLembreteFinal }, '[ALERTAS] Alerta enviado');
           await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Só envia na segunda-feira
+        const diaSemana = new Date().getDay(); // 0=dom, 1=seg
+        if (diaSemana === 1) {
+          await enviarResumoSemanal(sock, usuario.user_id);
         }
       } catch (error) {
         erros++;

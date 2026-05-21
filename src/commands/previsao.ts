@@ -1,7 +1,13 @@
 import * as geminiService from '../services/geminiService';
 import * as lancamentosService from '../services/lancamentosService';
+import { isPremium, MSG_UPGRADE } from '../services/planoService';
 
 async function previsaoCommand(sock, userId) {
+  const premium = await isPremium(userId);
+  if (!premium) {
+    await sock.sendMessage(userId, { text: MSG_UPGRADE });
+    return;
+  }
   // Buscar dados dos últimos 6 meses (como no fluxo original)
   const dados = await lancamentosService.buscarDadosParaPrevisao(userId, 6);
   if (!dados || dados.length === 0) {

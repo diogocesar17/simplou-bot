@@ -38,6 +38,7 @@ import alertasCommand from './commands/alertas';
 import relatorioCommand from './commands/relatorio';
 import lembreteCommand from './commands/lembrete';
 import meusLembretesCommand from './commands/meuslembretes';
+import assinarCommand from './commands/assinar';
 
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
@@ -90,7 +91,7 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   if (estado?.etapa) {
     // Salvaguarda global de cancelamento em estados ativos
     // Exceção: "0" é válido como dias_antecedencia no wizard de lembrete (G-03)
-    const isAntecedenciaStep = estado.etapa === 'aguardando_dias_antecedencia_lembrete';
+    const isAntecedenciaStep = estado.etapa === 'aguardando_antecedencia_lembrete';
     if ((textoLower === '0' && !isAntecedenciaStep) || textoLower === 'cancelar') {
       await limparEstado(userId);
       await sock.sendMessage(userId, {
@@ -410,6 +411,12 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   }
   if (["ajuda inteligente", "ajuda financeira", "consulta", "pergunta"].includes(textoLower)) {
     await ajudaInteligenteCommand(sock, userId);
+    return;
+  }
+
+  // Roteamento para o fluxo de assinatura premium
+  if (["assinar", "premium", "planos", "assine"].includes(textoLower)) {
+    await assinarCommand(sock, userId);
     return;
   }
 

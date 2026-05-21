@@ -24,6 +24,7 @@ import {
   ePrimeiraVerificacaoDoDia,
   eVerificacaoFinalDoDia,
 } from './services/alertasService'
+import { isPremium, MSG_UPGRADE } from './services/planoService'
 
 let sock: WASocket | null = null
 let reconnecting = false
@@ -200,6 +201,11 @@ async function createSocket(): Promise<void> {
 
     const hasAudio = Boolean((raw as any)?.audioMessage)
     if (hasAudio) {
+      const premiumAudio = await isPremium(userId)
+      if (!premiumAudio) {
+        await sock!.sendMessage(userId, { text: MSG_UPGRADE })
+        return
+      }
       try {
         await sock!.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
         const audioMessage = (raw as any)?.audioMessage
@@ -246,6 +252,11 @@ async function createSocket(): Promise<void> {
 
     const hasVoucherMedia = Boolean((raw as any)?.imageMessage || (raw as any)?.documentMessage)
     if (hasVoucherMedia) {
+      const premiumVoucher = await isPremium(userId)
+      if (!premiumVoucher) {
+        await sock!.sendMessage(userId, { text: MSG_UPGRADE })
+        return
+      }
       try {
         await sock!.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
         const isImage = Boolean((raw as any)?.imageMessage)

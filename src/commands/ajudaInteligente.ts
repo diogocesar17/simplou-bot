@@ -1,6 +1,12 @@
 import { definirEstado } from '../configs/stateManager';
+import { isPremium, MSG_UPGRADE } from '../services/planoService';
 
 async function ajudaInteligenteCommand(sock, userId) {
+  const premium = await isPremium(userId);
+  if (!premium) {
+    await sock.sendMessage(userId, { text: MSG_UPGRADE });
+    return;
+  }
   // Definir etapa no Redis para aguardar pergunta inteligente (TTL padrão 10min)
   await definirEstado(userId, 'pergunta_inteligente', {});
   
