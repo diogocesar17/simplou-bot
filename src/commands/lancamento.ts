@@ -784,8 +784,11 @@ async function lancamentoCommand(sock, userId, texto) {
   logger.info('[LANCAMENTO] ✅ IA fallback retornou um parsed válido.');
       
       // Confirmar com o usuário se a IA entendeu corretamente
+      const avisoConfianca = (parsedIA as any).confianca < 0.6
+        ? '\n\n⚠️ _Não tenho certeza sobre este lançamento — revise os dados antes de confirmar._'
+        : '';
       await sock.sendMessage(userId, {
-        text: `🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsedIA.valor)}\n📝 Descrição: ${parsedIA.descricao}\n📂 Categoria: ${parsedIA.categoria}\n💳 Pagamento: ${parsedIA.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsedIA.pagamento}\n📅 Data: ${parsedIA.data}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+        text: `🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsedIA.valor)}\n📝 Descrição: ${parsedIA.descricao}\n📂 Categoria: ${parsedIA.categoria}\n💳 Pagamento: ${parsedIA.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsedIA.pagamento}\n📅 Data: ${parsedIA.data}${avisoConfianca}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
       });
       
       // Aguardar confirmação
