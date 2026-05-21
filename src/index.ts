@@ -186,6 +186,12 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
       return;
     }
 
+    // Confirmação do comando limpar
+    if (estado.etapa === 'aguardando_confirmacao_limpar') {
+      await limparCommand(sock, userId, texto);
+      return;
+    }
+
     // Roteamento para estados de meus lembretes (mais específicos) primeiro
     if (
       estado.etapa.includes('selecao_lembrete') ||
@@ -347,7 +353,7 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     return;
   }
   if (textoLower === 'limpar') {
-    await limparCommand(sock, userId);
+    await limparCommand(sock, userId, texto);
     return;
   }
   if (textoLower.startsWith('relatorio') || textoLower.startsWith('relatório')) {
