@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import { logger } from '../infrastructure/logger';
 
 // Tipagem genérica e simples para dados do estado
 export interface UserState<T extends Record<string, unknown> = Record<string, unknown>> {
@@ -21,6 +22,7 @@ const prefixo = 'estado:'; // prefixo usado nas chaves do Redis
 async function definirEstado<T extends Record<string, unknown>>(userId: string, etapa: string, dadosParciais: T = {} as T, ttlSegundos: number = 600): Promise<void> {
   const valor: UserState<T> = { etapa, dadosParciais };
   await redis.set(`${prefixo}${userId}`, JSON.stringify(valor), 'EX', ttlSegundos);
+  logger.debug({ userId, etapa, ttl: ttlSegundos }, '[STATE] definirEstado');
 }
 
 /**
@@ -39,6 +41,7 @@ async function obterEstado<T extends Record<string, unknown>>(userId: string): P
  */
 async function limparEstado(userId: string): Promise<void> {
   await redis.del(`${prefixo}${userId}`);
+  logger.debug({ userId }, '[STATE] limparEstado');
 }
 
 export {

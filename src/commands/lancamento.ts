@@ -850,12 +850,13 @@ async function processarLancamento(sock, userId, parsed) {
       };
       
       await lancamentosService.salvarLancamento(userId, dados);
+      logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'sem_cartao' }, '[LANCAMENTO] Salvo');
       await sock.sendMessage(userId, {
         text: await gerarMensagemSucesso(parsed) + `\n\n💡 *Dica:* Para controlar faturas, use "configurar cartao"!`
       });
       return;
     }
-    
+
     if (cartoes.length === 1) {
       // Apenas um cartão, usar automaticamente
       const cartao = cartoes[0];
@@ -863,6 +864,7 @@ async function processarLancamento(sock, userId, parsed) {
       // Parcelamento
       if (parsed.parcelamento && parsed.numParcelas > 1) {
         const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed, cartao);
+        logger.info({ userId, tipo: 'gasto', valor: parsed.valor, categoria: parsed.categoria, cartao: cartao.nome_cartao, parcelas: parsed.numParcelas, origem: 'parcelamento_cartao' }, '[LANCAMENTO] Salvo');
         let msg = `✅ Parcelamento registrado no cartão ${cartao.nome_cartao}!\n\n`;
         msg += `💰 Valor total: R$ ${formatarValor(parsed.valor)}\n`;
         msg += `📦 ${parsed.numParcelas}x de R$ ${formatarValor(parsed.valor / parsed.numParcelas)}\n`;
@@ -871,10 +873,11 @@ async function processarLancamento(sock, userId, parsed) {
         await sock.sendMessage(userId, { text: msg });
         return;
       }
-      
+
       // Recorrente
       if (parsed.recorrente && parsed.recorrenteMeses > 1) {
         const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed, cartao);
+        logger.info({ userId, tipo: 'gasto', valor: parsed.valor, categoria: parsed.categoria, cartao: cartao.nome_cartao, meses: parsed.recorrenteMeses, origem: 'recorrente_cartao' }, '[LANCAMENTO] Salvo');
         let msg = `✅ Lançamento recorrente registrado no cartão ${cartao.nome_cartao}!\n\n`;
         msg += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
         msg += `📅 ${parsed.recorrenteMeses} meses\n`;
@@ -883,10 +886,10 @@ async function processarLancamento(sock, userId, parsed) {
         await sock.sendMessage(userId, { text: msg });
         return;
       }
-      
+
       // Gasto simples no cartão
       const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartao.dia_vencimento, cartao.dia_fechamento);
-      
+
       const dados = {
         data: parsed.data.split('/').reverse().join('-'),
         tipo: parsed.tipo.toLowerCase(),
@@ -903,8 +906,9 @@ async function processarLancamento(sock, userId, parsed) {
         status_fatura: 'pendente',
         data_vencimento: converterDataParaISO(parsed.dataVencimento)
       };
-      
+
       await lancamentosService.salvarLancamento(userId, dados);
+      logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, cartao: cartao.nome_cartao, origem: 'simples_cartao' }, '[LANCAMENTO] Salvo');
       await sock.sendMessage(userId, { text: await gerarMensagemSucesso(parsed, cartao) });
       return;
     }
@@ -935,6 +939,7 @@ async function processarLancamento(sock, userId, parsed) {
   // Parcelamento sem cartão
   if (parsed.parcelamento && parsed.numParcelas > 1) {
     const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed);
+    logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, parcelas: parsed.numParcelas, origem: 'parcelamento' }, '[LANCAMENTO] Salvo');
     let msg = `✅ Parcelamento registrado!\n\n`;
     msg += `💰 Valor total: R$ ${formatarValor(parsed.valor)}\n`;
     msg += `📦 ${parsed.numParcelas}x de R$ ${formatarValor(parsed.valor / parsed.numParcelas)}\n`;
@@ -943,10 +948,11 @@ async function processarLancamento(sock, userId, parsed) {
     await sock.sendMessage(userId, { text: msg });
     return;
   }
-  
+
   // Recorrente sem cartão
   if (parsed.recorrente && parsed.recorrenteMeses > 1) {
     const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed);
+    logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, meses: parsed.recorrenteMeses, origem: 'recorrente' }, '[LANCAMENTO] Salvo');
     let msg = `✅ Lançamento recorrente registrado!\n\n`;
     msg += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
     msg += `📅 ${parsed.recorrenteMeses} meses\n`;
@@ -955,7 +961,7 @@ async function processarLancamento(sock, userId, parsed) {
     await sock.sendMessage(userId, { text: msg });
     return;
   }
-  
+
   // Lançamento simples
   const dados = {
     data: parsed.data.split('/').reverse().join('-'),
@@ -966,8 +972,9 @@ async function processarLancamento(sock, userId, parsed) {
     pagamento: parsed.pagamento,
     data_vencimento: converterDataParaISO(parsed.dataVencimento)
   };
-  
+
   await lancamentosService.salvarLancamento(userId, dados);
+  logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'simples' }, '[LANCAMENTO] Salvo');
   await sock.sendMessage(userId, { text: await gerarMensagemSucesso(parsed) });
 }
 
