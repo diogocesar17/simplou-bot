@@ -27,6 +27,34 @@ pool.on('error', (err, client) => {
   fileLogger.error('❌ Erro no pool PostgreSQL:', err.message);
 });
 
+export function getPoolStats() {
+  return {
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount,
+  };
+}
+
+const SLOW_QUERY_THRESHOLD_MS = 500;
+
+async function queryDatabase(text: string, params?: unknown[]): Promise<any> {
+  const t0 = Date.now();
+  try {
+    const result = await pool.query(text, params);
+    const durationMs = Date.now() - t0;
+    if (durationMs > SLOW_QUERY_THRESHOLD_MS) {
+      logger.warn({ durationMs, query: text.slice(0, 100) }, '[DB] Query lenta');
+    } else {
+      logger.debug({ durationMs }, '[DB] Query');
+    }
+    return result;
+  } catch (err) {
+    const durationMs = Date.now() - t0;
+    logger.error({ durationMs, err: (err as any)?.message, query: text.slice(0, 100) }, '[DB] Query erro');
+    throw err;
+  }
+}
+
 // Inicializar tabelas se não existirem
 async function initializeDatabase() {
   try {
@@ -474,7 +502,7 @@ async function salvarConfiguracaoCartao(userId: string, nomeCartao: string, diaV
       RETURNING id
     `;
     
-    const result = await pool.query(query, [userId, nomeCartao, diaVencimento, diaFechamento]);
+    const result = await queryDatabase(query, [userId, nomeCartao, diaVencimento, diaFechamento]);
     
     // Registrar log de auditoria
     const detalhes = `Cartão: ${nomeCartao}, Vencimento: dia ${diaVencimento}, Fechamento: dia ${diaFechamento || 'N/A'}`;
@@ -496,7 +524,7 @@ async function atualizarCartaoConfigurado(userId: string, nomeCartao: string, di
       RETURNING id
     `;
     
-    const result = await pool.query(query, [userId, nomeCartao, diaVencimento, diaFechamento]);
+    const result = await queryDatabase(query, [userId, nomeCartao, diaVencimento, diaFechamento]);
     
     // Registrar log de auditoria
     const detalhes = `Cartão: ${nomeCartao}, Vencimento: dia ${diaVencimento}, Fechamento: dia ${diaFechamento || 'N/A'}`;
@@ -515,7 +543,7 @@ async function buscarConfiguracaoCartao(userId, nomeCartao) {
     FROM cartoes_config
     WHERE user_id = $1 AND nome_cartao ILIKE $2
   `;
-  const result = await pool.query(query, [userId, nomeCartao]);
+  const result = await queryDatabase(query, [userId, nomeCartao]);
   return result.rows[0];
 }
 
@@ -526,7 +554,7 @@ async function listarCartoesConfigurados(userId) {
     WHERE user_id = $1
     ORDER BY nome_cartao ASC
   `;
-  const result = await pool.query(query, [userId]);
+  const result = await queryDatabase(query, [userId]);
   return result.rows;
 }
 
@@ -537,7 +565,7 @@ async function contarLancamentosAssociadosCartao(userId, nomeCartao) {
       FROM lancamentos
       WHERE user_id = $1 AND cartao_nome ILIKE $2
     `;
-    const result = await pool.query(query, [userId, nomeCartao]);
+    const result = await queryDatabase(query, [userId, nomeCartao]);
     return parseInt(result.rows[0].total);
  } catch (error: any) {
     fileLogger.error('❌ Erro ao contar lançamentos associados ao cartão:', error);
@@ -555,7 +583,7 @@ async function excluirCartaoConfigurado(userId, nomeCartao) {
       DELETE FROM cartoes_config
       WHERE user_id = $1 AND nome_cartao ILIKE $2
     `;
-    const result = await pool.query(deleteQuery, [userId, nomeCartao]);
+    const result = await queryDatabase(deleteQuery, [userId, nomeCartao]);
 
     if (result.rowCount === 0) {
       throw new Error('Cartão não encontrado');
@@ -651,7 +679,7 @@ async function appendRowToDatabase(userId, values) {
       RETURNING id
     `;
     
-    const result = await pool.query(query, [userId, ...values]);
+    const result = await queryDatabase(query, [userId, ...values]);
     const lancamentoId = result.rows[0].id;
     
     // Registrar log de auditoria
@@ -699,7 +727,7 @@ async function getDatabaseData(userId) {
     ORDER BY data DESC, criado_em DESC
   `;
   
-  const result = await pool.query(query, [userId]);
+  const result = await queryDatabase(query, [userId]);
   return result.rows.map(row => [
     row.id,
     row.data,
@@ -724,7 +752,7 @@ async function getResumoDoMesAtual(userId) {
     GROUP BY tipo
   `;
   
-  const result = await pool.query(query, [userId]);
+  const result = await queryDatabase(query, [userId]);
   
   let totalReceitas = 0;
   let totalDespesas = 0;
@@ -762,7 +790,7 @@ async function getResumoDoDia(userId) {
     GROUP BY tipo
   `;
   
-  const result = await pool.query(query, [userId]);
+  const result = await queryDatabase(query, [userId]);
   
   let totalReceitas = 0;
   let totalDespesas = 0;
@@ -809,7 +837,7 @@ async function getResumoPorMes(userId, mes, ano) {
   logger.debug('[DEBUG] Query params:', params);
   logger.debug('[DEBUG] Query SQL:', query);
   
-  const result = await pool.query(query, params);
+  const result = await queryDatabase(query, params);
   logger.debug('[DEBUG] Resultado da query:', result.rows);
   
   let totalReceitas = 0;
@@ -861,7 +889,7 @@ async function getGastosPorCategoria(userId, mes = null, ano = null) {
   
   query += ` GROUP BY categoria ORDER BY total DESC`;
   
-  const result = await pool.query(query, params);
+  const result = await queryDatabase(query, params);
   
   const categorias = result.rows.map(row => ({
     nome: row.categoria,
@@ -911,7 +939,7 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
     params.push(limite * 5);
   }
   
-  const result = await pool.query(query, params);
+  const result = await queryDatabase(query, params);
   const lancamentos = result.rows;
   
   // Agrupa parcelamentos e recorrentes
@@ -1004,7 +1032,7 @@ async function getUltimosLancamentos(userId, n = 5) {
     LIMIT $2
   `;
   
-  const result = await pool.query(query, [userId, n * 5]); // Busca mais para garantir agrupamento
+  const result = await queryDatabase(query, [userId, n * 5]); // Busca mais para garantir agrupamento
   return result.rows;
 }
 
@@ -1015,7 +1043,7 @@ async function getLancamentoPorId(userId, id) {
     WHERE user_id = $1 AND id = $2
   `;
   
-  const result = await pool.query(query, [userId, id]);
+  const result = await queryDatabase(query, [userId, id]);
   return result.rows[0];
 }
 
@@ -1079,7 +1107,7 @@ async function atualizarLancamentoPorId(userId, id, novosDados) {
     logger.debug('[DEBUG] Query de atualização:', query);
     logger.debug('[DEBUG] Valores:', valores);
     
-    const result = await pool.query(query, valores);
+    const result = await queryDatabase(query, valores);
     
     // Registrar log de auditoria
     if (lancamentoAntes) {
@@ -1127,7 +1155,7 @@ async function excluirLancamentoPorId(userId, id) {
     
     // Excluir apenas o lançamento selecionado (não excluir em massa por padrão)
     const query = `DELETE FROM lancamentos WHERE user_id = $1 AND id = $2`;
-    const deleteResult = await pool.query(query, [userId, id]);
+    const deleteResult = await queryDatabase(query, [userId, id]);
     
     // Registrar log de auditoria
     const detalhes = `ID: ${id}, Tipo: ${lancamento.tipo}, Valor: R$ ${lancamento.valor}, Categoria: ${lancamento.categoria}, Descrição: ${lancamento.descricao}`;
@@ -1167,7 +1195,7 @@ async function excluirParcelasFuturasApartir(
       WHERE ${where.join(' AND ')}
       RETURNING id
     `;
-    const result = await pool.query(deleteQuery, params);
+    const result = await queryDatabase(deleteQuery, params);
 
     const detalhes = `Parcelamento ID: ${parcelamentoId}, A partir de: ${parcelaAtualSelecionada ?? dataSelecionada}, Parcelas excluídas: ${result.rowCount}`;
     await registrarLog(userId, 'EXCLUIR_PARCELAS_FUTURAS', detalhes);
@@ -1201,7 +1229,7 @@ async function excluirRecorrenciasFuturasApartir(
       WHERE ${where.join(' AND ')}
       RETURNING id
     `;
-    const result = await pool.query(deleteQuery, params);
+    const result = await queryDatabase(deleteQuery, params);
 
     const detalhes = `Recorrente ID: ${recorrenteId}, A partir de: ${dataSelecionada}, Recorrências excluídas: ${result.rowCount}`;
     await registrarLog(userId, 'EXCLUIR_RECORRENCIAS_FUTURAS', detalhes);
@@ -1285,7 +1313,7 @@ async function atualizarRecorrenciasApartir(
       WHERE ${whereParts.join(' AND ')}
       RETURNING id
     `;
-    const result = await pool.query(updateQuery, [...valores, ...whereParams]);
+    const result = await queryDatabase(updateQuery, [...valores, ...whereParams]);
 
     const detalhes = `Recorrente ID: ${recorrenteId}, A partir de: ${dataSelecionada}, Recorrências atualizadas: ${result.rowCount}`;
     await registrarLog(userId, 'ATUALIZAR_RECORRENTES_FUTUROS', detalhes);
@@ -1373,7 +1401,7 @@ async function atualizarLancamentosParceladosApartir(
     logger.debug('[DEBUG] Query de atualização (lote):', query);
     logger.debug('[DEBUG] Valores (lote):', [...valores, ...whereParams]);
 
-    const result = await pool.query(query, [...valores, ...whereParams]);
+    const result = await queryDatabase(query, [...valores, ...whereParams]);
 
     const detalhes = `Parcelamento ID: ${parcelamentoId}, A partir da parcela: ${parcelaAtualSelecionada}, Campos atualizados: ${campos.length}, Registros afetados: ${result.rowCount}`;
     await registrarLog(userId, 'EDITAR_LANCAMENTO_EM_LOTE', detalhes);
@@ -1403,7 +1431,7 @@ async function getTotalGastosPorPagamento(userId, pagamento, mes = null, ano = n
     query += ` AND EXTRACT(MONTH FROM data) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM data) = EXTRACT(YEAR FROM CURRENT_DATE)`;
   }
   
-  const result = await pool.query(query, params);
+  const result = await queryDatabase(query, params);
   return result.rows[0].total ? parseFloat(result.rows[0].total) : 0;
 }
 
@@ -1417,7 +1445,7 @@ async function excluirParcelamentoPorId(userId, parcelamentoId) {
       FROM lancamentos 
       WHERE user_id = $1 AND parcelamento_id = $2
     `;
-    const result = await pool.query(query, [userId, parcelamentoId]);
+    const result = await queryDatabase(query, [userId, parcelamentoId]);
     const info = result.rows[0];
     
     if (!info || info.total_parcelas == 0) {
@@ -1429,7 +1457,7 @@ async function excluirParcelamentoPorId(userId, parcelamentoId) {
       WHERE user_id = $1 AND parcelamento_id = $2
       RETURNING id
     `;
-    const deleteResult = await pool.query(deleteQuery, [userId, parcelamentoId]);
+    const deleteResult = await queryDatabase(deleteQuery, [userId, parcelamentoId]);
     
     // Registrar log de auditoria
     const detalhes = `Parcelamento ID: ${parcelamentoId}, Parcelas: ${info.total_parcelas}, Valor Total: R$ ${info.valor_total}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
@@ -1451,7 +1479,7 @@ async function excluirRecorrentePorId(userId, recorrenteId) {
       FROM lancamentos 
       WHERE user_id = $1 AND recorrente_id = $2
     `;
-    const result = await pool.query(query, [userId, recorrenteId]);
+    const result = await queryDatabase(query, [userId, recorrenteId]);
     const info = result.rows[0];
     
     if (!info || info.total_recorrencias == 0) {
@@ -1463,7 +1491,7 @@ async function excluirRecorrentePorId(userId, recorrenteId) {
       WHERE user_id = $1 AND recorrente_id = $2 AND data >= CURRENT_DATE
       RETURNING id
     `;
-    const deleteResult = await pool.query(deleteQuery, [userId, recorrenteId]);
+    const deleteResult = await queryDatabase(deleteQuery, [userId, recorrenteId]);
     
     // Registrar log de auditoria
     const detalhes = `Recorrente ID: ${recorrenteId}, Recorrências: ${info.total_recorrencias}, Valor: R$ ${info.valor}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
@@ -1488,7 +1516,7 @@ async function buscarLancamentosParaExclusao(userId, limite = 20) {
     LIMIT $2
   `;
   
-  const result = await pool.query(query, [userId, limite * 3]); // Busca mais para garantir agrupamento
+  const result = await queryDatabase(query, [userId, limite * 3]); // Busca mais para garantir agrupamento
   const lancamentos = result.rows;
   
   // Agrupa parcelamentos e recorrentes
@@ -1566,7 +1594,7 @@ async function buscarFaturaCartao(userId, nomeCartao, mes, ano) {
     WHERE user_id = $1
   `;
   
-  const cartoesResult = await pool.query(cartoesQuery, [userId]);
+  const cartoesResult = await queryDatabase(cartoesQuery, [userId]);
   const cartoes = cartoesResult.rows;
   
   // Encontrar o nome exato do cartão que corresponde ao input normalizado
@@ -1593,7 +1621,7 @@ async function buscarFaturaCartao(userId, nomeCartao, mes, ano) {
     ORDER BY data_lancamento ASC
   `;
   
-  const result = await pool.query(query, [userId, `%${nomeCartaoExato}%`, mes, ano]);
+  const result = await queryDatabase(query, [userId, `%${nomeCartaoExato}%`, mes, ano]);
   return result.rows;
 }
 
@@ -1606,7 +1634,7 @@ async function buscarResumoFaturaCartao(userId, nomeCartao, mes, ano) {
     WHERE user_id = $1
   `;
 
-  const cartoesResult = await pool.query(cartoesQuery, [userId]);
+  const cartoesResult = await queryDatabase(cartoesQuery, [userId]);
   const cartoes = cartoesResult.rows;
 
   let nomeCartaoExato = null;
@@ -1633,7 +1661,7 @@ async function buscarResumoFaturaCartao(userId, nomeCartao, mes, ano) {
       AND ano_fatura = $4
   `;
 
-  const result = await pool.query(query, [userId, `%${nomeCartaoExato}%`, mes, ano]);
+  const result = await queryDatabase(query, [userId, `%${nomeCartaoExato}%`, mes, ano]);
   const row = result.rows[0] || {};
   return {
     total: parseFloat(row.total || 0),
@@ -1666,7 +1694,7 @@ async function buscarTotaisFaturasFuturas(userId, meses = 6) {
     ORDER BY ano_fatura ASC, mes_fatura ASC, cartao_nome ASC
   `;
 
-  const result = await pool.query(query, [userId, meses]);
+  const result = await queryDatabase(query, [userId, meses]);
   return result.rows;
 }
 
@@ -1697,7 +1725,7 @@ async function getResumoReal(userId, mes = null, ano = null) {
   
   query += ` GROUP BY tipo`;
   
-  const result = await pool.query(query, params);
+  const result = await queryDatabase(query, params);
   
   let totalReceitas = 0;
   let totalDespesas = 0;
@@ -1731,7 +1759,7 @@ async function getResumoReal(userId, mes = null, ano = null) {
     queryPendentes += ` AND EXTRACT(MONTH FROM data_lancamento) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM data_lancamento) = EXTRACT(YEAR FROM CURRENT_DATE)`;
   }
   
-  const resultPendentes = await pool.query(queryPendentes, paramsPendentes);
+  const resultPendentes = await queryDatabase(queryPendentes, paramsPendentes);
   const totalPendente = resultPendentes.rows[0]?.total_pendente ? parseFloat(resultPendentes.rows[0].total_pendente) : 0;
   const qtdPendente = resultPendentes.rows[0]?.qtd_pendente ? parseInt(resultPendentes.rows[0].qtd_pendente) : 0;
   
@@ -1757,7 +1785,7 @@ async function buscarCartoesVencimentoProximo(userId) {
       AND dia_vencimento <= EXTRACT(DAY FROM (CURRENT_DATE + INTERVAL '3 days'))::integer
   `;
 
-  const result = await pool.query(query, [userId]);
+  const result = await queryDatabase(query, [userId]);
   return result.rows;
 }
 
@@ -1778,7 +1806,7 @@ async function buscarBoletosVencimentoProximo(userId) {
     ORDER BY data_vencimento ASC
   `;
   
-  const result = await pool.query(query, [userId]);
+  const result = await queryDatabase(query, [userId]);
   return result.rows;
 }
 
@@ -1851,17 +1879,6 @@ function gerarMensagemAlertas(alertas) {
   return mensagem;
 }
 
-// Função genérica para executar queries
-async function queryDatabase(query, params = []) {
-  try {
-    const result = await pool.query(query, params);
-    return result.rows;
-  } catch (error) {
-    fileLogger.error('[DATABASE] Erro na query:', error);
-    throw error;
-  }
-}
-
 // ===== FUNÇÕES DE ADMINISTRAÇÃO E AUDITORIA =====
 
 /**
@@ -1873,7 +1890,7 @@ async function registrarLog(userId, acao, detalhes: any = null) {
       INSERT INTO logs_auditoria (user_id, acao, detalhes) 
       VALUES ($1, $2, $3)
     `;
-    await pool.query(query, [userId, acao, detalhes]);
+    await queryDatabase(query, [userId, acao, detalhes]);
   } catch (error: any) {
     fileLogger.error('[LOGS] Erro ao registrar log:', error);
   }
@@ -1890,7 +1907,7 @@ async function buscarLogsRecentes(limite = 10) {
       ORDER BY timestamp DESC 
       LIMIT $1
     `;
-    const result = await pool.query(query, [limite]);
+    const result = await queryDatabase(query, [limite]);
     return result.rows;
   } catch (error) {
     fileLogger.error('[LOGS] Erro ao buscar logs:', error);
@@ -1912,15 +1929,15 @@ async function gerarEstatisticasSistema() {
       FROM lancamentos 
       WHERE criado_em >= $1
     `;
-    const usuariosResult = await pool.query(usuariosAtivosQuery, [dataLimite.toISOString()]);
+    const usuariosResult = await queryDatabase(usuariosAtivosQuery, [dataLimite.toISOString()]);
     
     // Total de lançamentos
     const totalLancamentosQuery = `SELECT COUNT(*) as total FROM lancamentos`;
-    const totalResult = await pool.query(totalLancamentosQuery);
+    const totalResult = await queryDatabase(totalLancamentosQuery);
     
     // Cartões configurados
     const cartoesQuery = `SELECT COUNT(*) as total FROM cartoes_config`;
-    const cartoesResult = await pool.query(cartoesQuery);
+    const cartoesResult = await queryDatabase(cartoesQuery);
     
     // Lançamentos de hoje
     const hojeDate = new Date();
@@ -1930,20 +1947,20 @@ async function gerarEstatisticasSistema() {
       FROM lancamentos 
       WHERE DATE(criado_em) = $1
     `;
-    const lancamentosHojeResult = await pool.query(lancamentosHojeQuery, [hoje]);
+    const lancamentosHojeResult = await queryDatabase(lancamentosHojeQuery, [hoje]);
     
     // Última atividade
     const ultimaAtividadeQuery = `
       SELECT MAX(criado_em) as ultima
       FROM lancamentos
     `;
-    const ultimaResult = await pool.query(ultimaAtividadeQuery);
+    const ultimaResult = await queryDatabase(ultimaAtividadeQuery);
     
     // Tamanho aproximado do banco
     const tamanhoQuery = `
       SELECT pg_size_pretty(pg_total_relation_size('lancamentos')) as tamanho
     `;
-    const tamanhoResult = await pool.query(tamanhoQuery);
+    const tamanhoResult = await queryDatabase(tamanhoQuery);
     
     return {
       usuariosAtivos: usuariosResult.rows[0]?.total || 0,
@@ -1997,7 +2014,7 @@ async function gerarBackupCSV(userId) {
       ORDER BY data DESC, criado_em DESC
     `;
     
-    const result = await pool.query(query, [userId]);
+    const result = await queryDatabase(query, [userId]);
     const lancamentos = result.rows;
     
     // Gerar cabeçalho CSV
@@ -2125,7 +2142,7 @@ async function limparDadosAntigos() {
       WHERE data < $1
     `;
     const dataLimiteStr = `${dataLimite.getFullYear()}-${String(dataLimite.getMonth() + 1).padStart(2, '0')}-${String(dataLimite.getDate()).padStart(2, '0')}`;
-    const countResult = await pool.query(countQuery, [dataLimiteStr]);
+    const countResult = await queryDatabase(countQuery, [dataLimiteStr]);
     const lancamentosParaRemover = countResult.rows[0]?.total || 0;
     
     // Remover lançamentos antigos
@@ -2133,7 +2150,7 @@ async function limparDadosAntigos() {
       DELETE FROM lancamentos 
       WHERE data < $1
     `;
-    await pool.query(deleteQuery, [dataLimiteStr]);
+    await queryDatabase(deleteQuery, [dataLimiteStr]);
     
     // Calcular tempo de processamento
     const tempoProcessamento = Math.round((Date.now() - inicio) / 1000);
@@ -2192,7 +2209,7 @@ async function gerarRelatorioCSV(userId, mes, ano) {
     `;
     
     console.log(`[DATABASE_SERVICE] Executando query com parâmetros:`, [userId, mes, ano]);
-    const result = await pool.query(query, [userId, mes, ano]);
+    const result = await queryDatabase(query, [userId, mes, ano]);
     const lancamentos = result.rows;
     console.log(`[DATABASE_SERVICE] Lançamentos encontrados:`, lancamentos.length);
     
@@ -2295,7 +2312,7 @@ async function gerarLogAuditoria(limite = 100) {
       ORDER BY timestamp DESC
       LIMIT $1
     `;
-    const result = await pool.query(query, [limite]);
+    const result = await queryDatabase(query, [limite]);
     const logs = result.rows;
     const headers = ['User ID', 'Ação', 'Detalhes', 'Timestamp'];
     let csv = headers.join(',') + '\n';
@@ -2330,7 +2347,7 @@ async function buscarParceladosAtivos(userId, limite = 20) {
       LIMIT $2
     `;
     
-    const result = await pool.query(query, [userId, limite]);
+    const result = await queryDatabase(query, [userId, limite]);
     
     // Agrupar por parcelamento_id
     const parcelamentos = {};
@@ -2392,7 +2409,7 @@ async function buscarRecorrentesAtivos(userId, limite = 20) {
       LIMIT $2
     `;
     
-    const result = await pool.query(query, [userId, limite]);
+    const result = await queryDatabase(query, [userId, limite]);
     
     // Agrupar por recorrente_id
     const recorrentes = {};
@@ -2460,7 +2477,7 @@ async function buscarProximosVencimentos(userId, dias = 30) {
       ORDER BY data_vencimento_real
     `;
     
-    const result = await pool.query(query, [userId, dias]);
+    const result = await queryDatabase(query, [userId, dias]);
     
     // Agrupar por tipo e data
     const vencimentos = {
@@ -2520,7 +2537,7 @@ async function buscarGastosPorCategoria(userId, categoria, limite = 20, mes = nu
     query += ` ORDER BY l.data DESC LIMIT $${paramIndex}`;
     params.push(limite);
     
-    const result = await pool.query(query, params);
+    const result = await queryDatabase(query, params);
     
     return result.rows.map(row => ({
       ...row,
@@ -2555,7 +2572,7 @@ async function buscarGastosValorAlto(userId, valorMinimo = 100, limite = 20, mes
     query += ` ORDER BY l.valor DESC, l.data DESC LIMIT $${paramIndex}`;
     params.push(limite);
     
-    const result = await pool.query(query, params);
+    const result = await queryDatabase(query, params);
     
     return result.rows.map(row => ({
       ...row,
@@ -2621,7 +2638,7 @@ async function cadastrarUsuario(userId, dados) {
   try {
     const { nome = 'Usuário', plano = 'gratuito', is_admin = false, criado_por } = dados;
     
-    const result = await pool.query(`
+    const result = await queryDatabase(`
       INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
@@ -2657,7 +2674,7 @@ async function promoverParaPremium(userId, diasExpiracao = null, promovidoPor) {
       dataExpiracao = new Date(agora.getTime() + (diasExpiracao * 24 * 60 * 60 * 1000) + (timezoneOffset * 60 * 1000));
     }
     
-    const result = await pool.query(`
+    const result = await queryDatabase(`
       UPDATE usuarios 
       SET plano = 'premium', 
           data_expiracao_premium = $2,
@@ -2689,7 +2706,7 @@ async function promoverParaPremium(userId, diasExpiracao = null, promovidoPor) {
 async function removerUsuario(userId, removidoPor) {
   try {
     // Verificar se usuário existe
-    const checkResult = await pool.query('SELECT * FROM usuarios WHERE user_id = $1', [userId]);
+    const checkResult = await queryDatabase('SELECT * FROM usuarios WHERE user_id = $1', [userId]);
     if (checkResult.rows.length === 0) {
       throw new Error('Usuário não encontrado');
     }
@@ -2697,7 +2714,7 @@ async function removerUsuario(userId, removidoPor) {
     const usuario = checkResult.rows[0];
     
     // Deletar usuário
-    const result = await pool.query(`
+    const result = await queryDatabase(`
       DELETE FROM usuarios WHERE user_id = $1
     `, [userId]);
     
@@ -2744,7 +2761,7 @@ async function listarUsuarios(filtros: { plano?: string; status?: string; is_adm
     
     query += ' ORDER BY criado_em DESC';
     
-    const result = await pool.query(query, params);
+    const result = await queryDatabase(query, params);
     return result.rows;
   } catch (error) {
     logger.error('❌ Erro ao listar usuários:', error);
@@ -2755,7 +2772,7 @@ async function listarUsuarios(filtros: { plano?: string; status?: string; is_adm
 // Função para buscar usuário específico
 async function buscarUsuario(userId) {
   try {
-    const result = await pool.query('SELECT * FROM usuarios WHERE user_id = $1', [userId]);
+    const result = await queryDatabase('SELECT * FROM usuarios WHERE user_id = $1', [userId]);
     return result.rows[0] || null;
   } catch (error) {
     logger.error('❌ Erro ao buscar usuário:', error);
@@ -2782,7 +2799,7 @@ async function verificarAcessoUsuario(userId) {
       
       if (agora > expiracao) {
         // Atualizar para gratuito
-        await pool.query(`
+        await queryDatabase(`
           UPDATE usuarios 
           SET plano = 'gratuito', 
               data_expiracao_premium = NULL,
@@ -2812,7 +2829,7 @@ async function verificarAcessoUsuario(userId) {
 // Função para registrar acesso do usuário
 async function registrarAcesso(userId) {
   try {
-    await pool.query(`
+    await queryDatabase(`
       UPDATE usuarios 
       SET data_ultimo_acesso = CURRENT_TIMESTAMP
       WHERE user_id = $1
@@ -2830,7 +2847,7 @@ async function buscarUsuariosPremiumExpiracao(diasAntes = 7) {
     const timezoneOffset = -3 * 60; // UTC-3 (horário de Brasília)
     const dataLimite = new Date(agora.getTime() + (diasAntes * 24 * 60 * 60 * 1000) + (timezoneOffset * 60 * 1000));
     
-    const result = await pool.query(`
+    const result = await queryDatabase(`
       SELECT * FROM usuarios 
       WHERE plano = 'premium' 
         AND data_expiracao_premium IS NOT NULL

@@ -42,13 +42,13 @@ async function safeCloseSocket(reason = 'Fechando socket atual'): Promise<void> 
     sock.ev.removeAllListeners('messages.upsert')
     sock.ev.removeAllListeners('creds.update')
   } catch (e) {
-    console.warn('⚠️ Erro ao remover listeners do socket:', (e as any)?.message || e)
+    logger.warn({ err: (e as any)?.message || e }, '[WA] Erro ao remover listeners do socket')
   }
 
   try {
     sock.end(new Error(reason))
   } catch (e) {
-    console.warn('⚠️ Erro ao encerrar socket:', (e as any)?.message || e)
+    logger.warn({ err: (e as any)?.message || e }, '[WA] Erro ao encerrar socket')
   }
 
   sock = null
@@ -74,9 +74,10 @@ async function createSocket(): Promise<void> {
   if (!state.creds?.registered && process.env.WHATSAPP_PAIRING_NUMBER) {
     try {
       const code = await sock.requestPairingCode(process.env.WHATSAPP_PAIRING_NUMBER)
+      logger.info({ code }, '[WA] Código de pareamento gerado')
       console.log(`🔗 Código de pareamento: ${code}\n👉 No celular: WhatsApp > Aparelhos conectados > Conectar com código`)
     } catch (err) {
-      console.error('❌ Erro ao solicitar código de pareamento:', (err as any)?.message || err)
+      logger.error({ err: (err as any)?.message || err }, '[WA] Erro ao solicitar código de pareamento')
     }
   }
 
@@ -89,7 +90,7 @@ async function createSocket(): Promise<void> {
     }
 
     if (connection === 'open') {
-      console.log('✅ Conectado com sucesso ao WhatsApp!')
+      logger.info('[WA] Conectado com sucesso ao WhatsApp')
       retryDelayMs = INITIAL_RETRY_DELAY_MS
       reconnecting = false
       iniciarSistemaAlertas(sock!)
@@ -99,20 +100,17 @@ async function createSocket(): Promise<void> {
     if (connection === 'close') {
       const error = lastDisconnect?.error as Boom | Error | undefined
       const statusCode = (error as Boom | undefined)?.output?.statusCode
+      const errMsg = (error as Error | undefined)?.message
 
-      console.log('⚠️ Conexão encerrada.')
-      console.log('   Mensagem:', (error as Error | undefined)?.message)
-      console.log('   StatusCode:', statusCode)
+      logger.warn({ statusCode, err: errMsg }, '[WA] Conexão encerrada')
 
       if (statusCode === DisconnectReason.badSession || statusCode === 401) {
-        console.error('🛑 Sessão inválida ou expirada (401/badSession).')
-        console.error('   Apague a pasta ./auth e pareie novamente para continuar.')
+        logger.error({ statusCode }, '[WA] Sessão inválida ou expirada — requer novo pareamento')
         return
       }
 
       if (statusCode === DisconnectReason.connectionReplaced || statusCode === 409) {
-        console.warn('🔄 Conexão substituída por outro dispositivo (409/connectionReplaced).')
-        console.warn('   Se este não foi você, desconecte o outro dispositivo ou pareie novamente.')
+        logger.warn({ statusCode }, '[WA] Conexão substituída por outro dispositivo')
         return
       }
 
@@ -125,18 +123,17 @@ async function createSocket(): Promise<void> {
         statusCode === 503 ||
         statusCode === 515
       ) {
-        console.log('♻️ Desconexão temporária. Tentando reconectar com backoff...')
+        logger.warn({ statusCode }, '[WA] Desconexão temporária — iniciando reconexão com backoff')
         await reconnect()
         return
       }
 
       if (statusCode === DisconnectReason.loggedOut) {
-        console.error('🚪 Sessão encerrada pelo WhatsApp (loggedOut).')
-        console.error('   É necessário apagar ./auth e parear novamente.')
+        logger.error({ statusCode }, '[WA] Sessão encerrada pelo WhatsApp (loggedOut) — requer novo pareamento')
         return
       }
 
-      console.warn('⚠️ Desconexão genérica. Tentando reconectar com backoff...')
+      logger.warn({ statusCode }, '[WA] Desconexão genérica — iniciando reconexão com backoff')
       await reconnect()
     }
   })
@@ -312,17 +309,15 @@ async function reconnect(): Promise<void> {
 
   try {
     const waitSeconds = Math.round(retryDelayMs / 1000)
-    console.log(`⏲️ Aguardando ${waitSeconds}s antes de tentar reconectar...`)
+    logger.info({ delayMs: retryDelayMs }, '[WA] Aguardando antes de reconectar')
     await new Promise((res) => setTimeout(res, retryDelayMs))
 
     await createSocket()
-    console.log('🔌 Reconexão bem-sucedida!')
+    logger.info('[WA] Reconexão bem-sucedida')
     retryDelayMs = INITIAL_RETRY_DELAY_MS
   } catch (e) {
-    console.error('❌ Erro ao tentar reconectar:', (e as any)?.message || e)
     retryDelayMs = Math.min(retryDelayMs * 2, MAX_RETRY_DELAY_MS)
-    const nextSeconds = Math.round(retryDelayMs / 1000)
-    console.warn(`⏳ Ajustando backoff: próxima tentativa em ~${nextSeconds}s (máx ${Math.round(MAX_RETRY_DELAY_MS / 1000)}s)`)
+    logger.error({ err: (e as any)?.message || e, proximoDelayMs: retryDelayMs }, '[WA] Erro ao reconectar — backoff ajustado')
   } finally {
     reconnecting = false
   }
@@ -332,40 +327,38 @@ function iniciarSistemaAlertas(sock: WASocket): void {
   sockRef = sock
 
   if (alertasIniciados) {
-    console.log('🔕 Alertas já iniciados anteriormente — ignorando nova configuração de timers.')
+    logger.info('[ALERTAS] Sistema já iniciado — ignorando nova configuração de timers')
     return
   }
 
   alertasIniciados = true
-  console.log('🔔 Sistema de alertas automáticos iniciado')
+  logger.info('[ALERTAS] Sistema de alertas automáticos iniciado (intervalo: 60 min)')
 
   alertasIntervalId = setInterval(async () => {
     if (estaNoHorarioAlertas()) {
-      const agora = new Date()
-      const hora = agora.getHours()
-      console.log(`⏰ Verificando alertas automáticos às ${hora}h...`)
+      const hora = new Date().getHours()
 
       const s = sockRef
       if (!s) {
-        console.warn('⚠️ Socket ausente ao verificar alertas — aguardando reconexão.')
+        logger.warn('[ALERTAS] Socket ausente ao verificar alertas — aguardando reconexão')
         return
       }
 
       if (ePrimeiraVerificacaoDoDia()) {
-        console.log('🌅 Primeira verificação do dia - enviando todos os alertas')
+        logger.info({ hora }, '[ALERTAS] Primeira verificação do dia')
         await verificarEEnviarAlertasAutomaticos(s, false)
       } else if (eVerificacaoFinalDoDia()) {
-        console.log('🌆 Última verificação do dia - enviando lembretes finais')
+        logger.info({ hora }, '[ALERTAS] Verificação final do dia (lembrete)')
         await verificarEEnviarAlertasAutomaticos(s, true)
       } else {
-        console.log('📋 Verificação intermediária - enviando novos alertas')
+        logger.info({ hora }, '[ALERTAS] Verificação intermediária')
         await verificarEEnviarAlertasAutomaticos(s, false)
       }
     }
   }, 60 * 60 * 1000)
 
   if (estaNoHorarioAlertas()) {
-    console.log('🚀 Verificação inicial de alertas...')
+    logger.info('[ALERTAS] Verificação inicial imediata')
     verificarEEnviarAlertasAutomaticos(sockRef!, false)
   }
 }
@@ -377,27 +370,27 @@ export function resetSistemaAlertas(): void {
   }
   alertasIniciados = false
   sockRef = null
-  console.log('🔄 Sistema de alertas resetado — timers limpos e flag reiniciada.')
+  logger.info('[ALERTAS] Sistema resetado — timers limpos')
 }
 
 export async function bootstrap(): Promise<void> {
   try {
     const ok = geminiService.initializeGemini()
     if (!ok) {
-      console.log('[INIT] Gemini não inicializado (verifique GEMINI_API_KEY)')
+      logger.warn('[INIT] Gemini não inicializado — verifique GEMINI_API_KEY')
     }
   } catch (e) {
-    console.error('[INIT] Erro ao inicializar Gemini:', (e as any)?.message || e)
+    logger.error({ err: (e as any)?.message || e }, '[INIT] Erro ao inicializar Gemini')
   }
 
   try {
-    console.log('🔌 Inicializando banco de dados...')
+    logger.info('[INIT] Inicializando banco de dados')
     await initializeDatabase()
-    console.log('✅ Banco de dados inicializado com sucesso!')
+    logger.info('[INIT] Banco de dados inicializado com sucesso')
   } catch (error) {
     const err = error as any
     const stack = err?.stack || (typeof err === 'object' ? JSON.stringify(err) : String(err))
-    console.error('❌ Erro ao inicializar banco de dados:', stack)
+    logger.error({ err: stack }, '[INIT] Falha crítica ao inicializar banco de dados')
     process.exit(1)
   }
 

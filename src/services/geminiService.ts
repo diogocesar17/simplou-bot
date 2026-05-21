@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import { logger } from '../infrastructure/logger';
 
 // Interfaces para tipagem
 interface AnaliseTransacao {
@@ -30,18 +31,17 @@ export function initializeGemini(): boolean {
   const apiKey = rawKey.trim();
 
   if (!apiKey) {
-    console.log('[GEMINI] ❌ API key não configurada ou vazia. Funcionalidades inteligentes desabilitadas.');
+    logger.warn('[GEMINI] API key não configurada — funcionalidades inteligentes desabilitadas');
     return false;
   }
 
   try {
-    console.log('[GEMINI] Tentando inicializar. Tamanho da chave:', apiKey.length);
     gemini = new GoogleGenerativeAI(apiKey);
     isGeminiAvailable = true;
-    console.log('[GEMINI] ✅ Inicializado com sucesso!');
+    logger.info({ model: GEMINI_TEXT_MODEL }, '[GEMINI] Inicializado com sucesso');
     return true;
   } catch (error: any) {
-    console.error('[GEMINI] ❌ Erro ao inicializar:', error?.message || error);
+    logger.error({ err: error?.message || error }, '[GEMINI] Erro ao inicializar');
     isGeminiAvailable = false;
     return false;
   }
@@ -49,10 +49,7 @@ export function initializeGemini(): boolean {
 
 // Função helper para pegar o modelo já tipado
 function getTextModel(): GenerativeModel | null {
-  if (!isGeminiAvailable || !gemini) {
-    console.log('[GEMINI] Não disponível, usando parser padrão');
-    return null;
-  }
+  if (!isGeminiAvailable || !gemini) return null;
   return gemini.getGenerativeModel({ model: GEMINI_TEXT_MODEL });
 }
 
@@ -61,24 +58,23 @@ export async function gerarJSONComGemini(prompt: string): Promise<any | null> {
   if (!model) return null;
 
   try {
+    const t0 = Date.now();
     const result = await model.generateContent(String(prompt || ''));
     const response = await result.response;
     const textResp = response.text();
     const jsonMatch = textResp.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
+    logger.debug({ latencyMs: Date.now() - t0 }, '[GEMINI] gerarJSON');
     return JSON.parse(jsonMatch[0]);
   } catch (error: any) {
-    console.error('[GEMINI][gerarJSONComGemini] Erro:', error?.message || error);
+    logger.error({ err: error?.message || error }, '[GEMINI] gerarJSON erro');
     return null;
   }
 }
 
 // Função helper para pegar o modelo multimodal (imagens/documentos)
 function getVisionModel(): GenerativeModel | null {
-  if (!isGeminiAvailable || !gemini) {
-    console.log('[GEMINI] Não disponível (vision), usando parser padrão');
-    return null;
-  }
+  if (!isGeminiAvailable || !gemini) return null;
   return gemini.getGenerativeModel({ model: GEMINI_VISION_MODEL });
 }
 
@@ -114,21 +110,23 @@ Regras importantes:
 - Retorne APENAS o JSON, sem texto adicional
 `;
 
+    const t0 = Date.now();
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const textResp = response.text();
+    const latencyMs = Date.now() - t0;
 
     const jsonMatch = textResp.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed: AnaliseTransacao = JSON.parse(jsonMatch[0]);
-      console.log('[GEMINI] Análise realizada (resumo) → tipo=%s; valor=%s; cat=%s; fp=%s; conf=%s', parsed.tipo, parsed.valor, parsed.categoria, parsed.formaPagamento, parsed.confianca);
+      logger.info({ userId, latencyMs, tipo: parsed.tipo, categoria: parsed.categoria, confianca: parsed.confianca }, '[GEMINI] analisarTransacao');
       return parsed;
     } else {
-      console.log('[GEMINI] Não conseguiu extrair JSON. respLen=%d; prefix=%s', (textResp || '').length, (textResp || '').slice(0, 80));
+      logger.warn({ userId, latencyMs, respLen: (textResp || '').length }, '[GEMINI] analisarTransacao sem JSON na resposta');
       return null;
     }
   } catch (error: any) {
-    console.error('[GEMINI] Erro na análise (resumido):', error?.message || String(error));
+    logger.error({ userId, err: error?.message || String(error) }, '[GEMINI] analisarTransacao erro');
     return null;
   }
 }
@@ -158,11 +156,13 @@ Forneça uma análise em português brasileiro com:
 Formato a resposta de forma clara e objetiva, usando emojis para melhor visualização.
 `;
 
+    const t0 = Date.now();
     const result = await model.generateContent(prompt);
     const response = await result.response;
+    logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] analisarPadroes');
     return response.text();
   } catch (error: any) {
-    console.error('[GEMINI] Erro na análise de padrões:', error?.message || error);
+    logger.error({ userId, err: error?.message || error }, '[GEMINI] analisarPadroes erro');
     return null;
   }
 }
@@ -191,11 +191,13 @@ Forneça:
 Formato a resposta de forma motivacional e prática, usando emojis.
 `;
 
+    const t0 = Date.now();
     const result = await model.generateContent(prompt);
     const response = await result.response;
+    logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] gerarSugestoes');
     return response.text();
   } catch (error: any) {
-    console.error('[GEMINI] Erro ao gerar sugestões:', error?.message || error);
+    logger.error({ userId, err: error?.message || error }, '[GEMINI] gerarSugestoes erro');
     return null;
   }
 }
@@ -225,11 +227,13 @@ Forneça:
 Formato a resposta de forma clara e objetiva.
 `;
 
+    const t0 = Date.now();
     const result = await model.generateContent(prompt);
     const response = await result.response;
+    logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] preverGastos');
     return response.text();
   } catch (error: any) {
-    console.error('[GEMINI] Erro na previsão:', error?.message || error);
+    logger.error({ userId, err: error?.message || error }, '[GEMINI] preverGastos erro');
     return null;
   }
 }
@@ -241,14 +245,9 @@ export async function responderPerguntaFinanceira(
   contexto: any = null
 ): Promise<string | null> {
   const model = getTextModel();
-  if (!model) {
-    console.log('[GEMINI][responderPerguntaFinanceira] Gemini indisponível, retornando null');
-    return null;
-  }
+  if (!model) return null;
 
   try {
-    console.log('[GEMINI][responderPerguntaFinanceira] Chamando modelo', GEMINI_TEXT_MODEL);
-
     let prompt = `Responda à seguinte pergunta sobre finanças pessoais de forma clara e objetiva:
 
 Pergunta: "${pergunta}"`;
@@ -259,16 +258,14 @@ Pergunta: "${pergunta}"`;
 
     prompt += `\n\nForneça uma resposta prática e útil, usando linguagem simples e emojis quando apropriado.`;
 
+    const t0 = Date.now();
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const texto = response.text();
-    console.log(
-      '[GEMINI][responderPerguntaFinanceira] Resposta recebida (primeiros 120 chars):',
-      (texto || '').slice(0, 120)
-    );
+    logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] responderPergunta');
     return texto;
   } catch (error: any) {
-    console.error('[GEMINI] Erro ao responder pergunta:', error?.message || error);
+    logger.error({ userId, err: error?.message || error }, '[GEMINI] responderPergunta erro');
     return null;
   }
 }
@@ -309,12 +306,10 @@ export async function analisarVoucherFinanceiro(
   parcelas?: number;
 } | null> {
   const model = getVisionModel();
-  if (!model) {
-    console.log('[GEMINI][analisarVoucherFinanceiro] Gemini indisponível');
-    return null;
-  }
+  if (!model) return null;
 
   try {
+    const t0 = Date.now();
     const base64Data = fileBuffer.toString('base64');
     const prompt = `Você é uma IA que lê comprovantes financeiros (voucher/recibo/extrato) e extrai os campos abaixo. Atenção: responda APENAS um JSON válido.
 
@@ -353,14 +348,14 @@ Regras:
 
     const jsonMatch = textResp.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.log('[GEMINI][analisarVoucherFinanceiro] Não conseguiu extrair JSON da resposta');
+      logger.warn({ userId }, '[GEMINI] analisarVoucher sem JSON na resposta');
       return null;
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
     // Validação mínima
     if (!parsed || !parsed.valor || !parsed.tipo) {
-      console.log('[GEMINI][analisarVoucherFinanceiro] JSON sem campos essenciais');
+      logger.warn({ userId }, '[GEMINI] analisarVoucher JSON sem campos essenciais');
       return null;
     }
 
@@ -390,19 +385,10 @@ Regras:
       parcelas: typeof parsed.parcelas === 'number' ? parsed.parcelas : 1
     };
 
-    console.log('[GEMINI][analisarVoucherFinanceiro] OK →', {
-      tipo: resultado.tipo,
-      valor: resultado.valor,
-      categoria: resultado.categoria,
-      formaPagamento: resultado.formaPagamento,
-      data: resultado.data,
-      parcelado: resultado.parcelado,
-      parcelas: resultado.parcelas
-    });
-
+    logger.info({ userId, latencyMs: Date.now() - t0, tipo: resultado.tipo, valor: resultado.valor, categoria: resultado.categoria, parcelado: resultado.parcelado }, '[GEMINI] analisarVoucher');
     return resultado;
   } catch (error: any) {
-    console.error('[GEMINI][analisarVoucherFinanceiro] Erro:', error?.message || error);
+    logger.error({ userId, err: error?.message || error }, '[GEMINI] analisarVoucher erro');
     return null;
   }
 }
@@ -422,12 +408,10 @@ export async function transcreverAudioFinanceiro(
   data: string;
 } | null> {
   const model = getVisionModel();
-  if (!model) {
-    console.log('[GEMINI][transcreverAudioFinanceiro] Gemini indisponível');
-    return null;
-  }
+  if (!model) return null;
 
   try {
+    const t0 = Date.now();
     const base64Data = audioBuffer.toString('base64');
     const prompt = `Você receberá um áudio (mensagem de voz). Tarefas:
 1) Transcreva fielmente o conteúdo em português.
@@ -462,13 +446,13 @@ Regras:
     const textResp = response.text();
     const jsonMatch = textResp.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.log('[GEMINI][transcreverAudioFinanceiro] Não conseguiu extrair JSON da resposta');
+      logger.warn({ userId }, '[GEMINI] transcreverAudio sem JSON na resposta');
       return null;
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
     if (!parsed || !parsed.transcricao || !parsed.valor || !parsed.tipo) {
-      console.log('[GEMINI][transcreverAudioFinanceiro] JSON sem campos essenciais');
+      logger.warn({ userId }, '[GEMINI] transcreverAudio JSON sem campos essenciais');
       return null;
     }
 
@@ -496,18 +480,10 @@ Regras:
       data: dataISO,
     };
 
-    console.log('[GEMINI][transcreverAudioFinanceiro] OK →', {
-      tipo: resultado.tipo,
-      valor: resultado.valor,
-      categoria: resultado.categoria,
-      formaPagamento: resultado.formaPagamento,
-      data: resultado.data,
-      transcricaoLen: resultado.transcricao.length,
-    });
-
+    logger.info({ userId, latencyMs: Date.now() - t0, tipo: resultado.tipo, valor: resultado.valor, categoria: resultado.categoria, transcricaoLen: resultado.transcricao.length }, '[GEMINI] transcreverAudio');
     return resultado;
   } catch (error: any) {
-    console.error('[GEMINI][transcreverAudioFinanceiro] Erro:', error?.message || error);
+    logger.error({ userId, err: error?.message || error }, '[GEMINI] transcreverAudio erro');
     return null;
   }
 }

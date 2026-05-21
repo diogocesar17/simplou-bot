@@ -1,5 +1,6 @@
 import Redis from 'ioredis';
 import type { EstadoRedis } from '../types/domain';
+import { logger } from '../infrastructure/logger';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
@@ -61,6 +62,7 @@ export async function definirEstado<T extends Record<string, unknown>>(
 ): Promise<void> {
   const valor: EstadoRedis = { etapa, dadosParciais };
   await redis.set(`${PREFIXO}${userId}`, JSON.stringify(valor), 'EX', ttlSegundos);
+  logger.debug({ userId, etapa, ttl: ttlSegundos }, '[STATE] definirEstado');
 }
 
 export async function obterEstado<T extends Record<string, unknown>>(
@@ -72,4 +74,5 @@ export async function obterEstado<T extends Record<string, unknown>>(
 
 export async function limparEstado(userId: string): Promise<void> {
   await redis.del(`${PREFIXO}${userId}`);
+  logger.debug({ userId }, '[STATE] limparEstado');
 }

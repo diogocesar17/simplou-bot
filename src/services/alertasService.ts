@@ -187,7 +187,7 @@ async function buscarAlertasVencimento(userId: string, eLembreteFinal: boolean =
     
     return mensagem;
   } catch (error) {
-    logger.error('Erro ao buscar alertas de vencimento:', error);
+    logger.error({ userId, err: (error as any)?.message || error }, '[ALERTAS] Erro ao buscar alertas de vencimento');
     return null;
   }
 }
@@ -228,7 +228,7 @@ async function buscarAlertaPremium(userId: string, eLembreteFinal: boolean = fal
     
     return null;
   } catch (error) {
-    logger.error('Erro ao buscar alerta premium:', error);
+    logger.error({ userId, err: (error as any)?.message || error }, '[ALERTAS] Erro ao buscar alerta premium');
     return null;
   }
 }
@@ -329,7 +329,7 @@ async function buscarAlertasLembretes(userId: string, eLembreteFinal: boolean = 
     
     return mensagem;
   } catch (error) {
-    logger.error('Erro ao buscar alertas de lembretes:', error);
+    logger.error({ userId, err: (error as any)?.message || error }, '[ALERTAS] Erro ao buscar alertas de lembretes');
     return null;
   }
 }
@@ -403,39 +403,33 @@ async function temAlertas(userId: string): Promise<boolean> {
  */
 async function verificarEEnviarAlertasAutomaticos(sock: WASocket, eLembreteFinal: boolean = false): Promise<EstatisticasAlertas> {
   try {
-    logger.debug(`🔔 Iniciando verificação automática de alertas${eLembreteFinal ? ' (LEMBRETE FINAL)' : ''}...`);
-    
-    // Buscar todos os usuários ativos
     const usuarios = await listarUsuarios({ ativos: true });
-    logger.debug(`📊 Verificando alertas para ${usuarios.length} usuários`);
-    
+    logger.info({ totalUsuarios: usuarios.length, lembreteFinal: eLembreteFinal }, '[ALERTAS] Verificação automática iniciada');
+
     let enviados = 0;
     let erros = 0;
-    
-    // Verificar alertas de cada usuário
+
     for (const usuario of usuarios) {
       try {
         const alertas = await buscarTodosAlertas(usuario.user_id, eLembreteFinal);
-        
+
         if (alertas) {
           await sock.sendMessage(usuario.user_id, { text: alertas });
           enviados++;
-          logger.debug(`✅ Alerta enviado para ${usuario.user_id}`);
-          
-          // Aguardar um pouco para não sobrecarregar
+          logger.info({ userId: usuario.user_id, lembreteFinal: eLembreteFinal }, '[ALERTAS] Alerta enviado');
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } catch (error) {
         erros++;
-        logger.error(`❌ Erro ao enviar alerta para ${usuario.user_id}:`, error);
+        logger.error({ userId: usuario.user_id, err: (error as any)?.message || error }, '[ALERTAS] Erro ao enviar alerta');
       }
     }
-    
-    logger.warn(`🎯 Verificação concluída: ${enviados} alertas enviados, ${erros} erros`);
+
+    logger.info({ enviados, erros, totalUsuarios: usuarios.length }, '[ALERTAS] Verificação concluída');
     return { enviados, erros };
-    
+
   } catch (error) {
-    logger.error('❌ Erro na verificação automática de alertas:', error);
+    logger.error({ err: (error as any)?.message || error }, '[ALERTAS] Erro na verificação automática');
     return { enviados: 0, erros: 1 };
   }
 }
