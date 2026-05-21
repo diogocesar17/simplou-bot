@@ -341,11 +341,11 @@ async function criarRecorrente(userId, parsed, cartaoInfo: any = null) {
 }
 
 // Função para gerar mensagem de sucesso
-async function gerarMensagemSucesso(parsed, cartao: any = null) {
+async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) {
   const isReceita = parsed.tipo && parsed.tipo.toLowerCase() === 'receita';
   const tipoTexto = isReceita ? 'Receita' : 'Gasto';
   const emoji = isReceita ? '💰' : '💸';
-  
+
   // Mensagem específica para cartão de crédito (tolerante a acentos)
   const pagamentoSemAcentosMsg = removerAcentos((parsed.pagamento || '').toLowerCase());
   if (cartao && !isReceita && (pagamentoSemAcentosMsg.includes('credito') || pagamentoSemAcentosMsg.includes('cartao'))) {
@@ -353,7 +353,7 @@ async function gerarMensagemSucesso(parsed, cartao: any = null) {
     const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartao.dia_vencimento);
     const dataContabilizacao = resultadoContabilizacao.dataContabilizacao;
     const dataContabilizacaoFormatada = formatarDateParaISO(dataContabilizacao).split('-').reverse().join('/');
-    
+
     let mensagem = `💳 ${tipoTexto} registrado no cartão ${cartao.nome_cartao}!\n\n`;
     mensagem += `📅 Data: ${parsed.data}\n`;
     mensagem += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
@@ -361,21 +361,40 @@ async function gerarMensagemSucesso(parsed, cartao: any = null) {
     mensagem += `💳 Pagamento: ${parsed.pagamento}\n`;
     mensagem += `📝 Descrição: ${parsed.descricao}\n`;
     mensagem += `📊 Contabilização: ${dataContabilizacaoFormatada}`;
+    const agora = new Date();
+    const resumoMes = await lancamentosService.getResumoDoMesAtual(userId);
+    const nomesMes = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    const nomeMes = nomesMes[agora.getMonth()];
+    if (parsed.tipo?.toLowerCase() === 'gasto') {
+      mensagem += `\n\n📊 Seus gastos de ${nomeMes}: R$ ${formatarValor(resumoMes.totalDespesas)}`;
+    } else {
+      mensagem += `\n\n📊 Suas receitas de ${nomeMes}: R$ ${formatarValor(resumoMes.totalReceitas)}`;
+    }
     return mensagem;
   }
-  
+
   // Mensagem padrão
   let mensagem = `${emoji} ${tipoTexto} registrado com sucesso!\n\n`;
   mensagem += `📅 Data: ${parsed.data}\n`;
   mensagem += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
   mensagem += `📂 Categoria: ${parsed.categoria}\n`;
-  
+
   if (!isReceita) {
     mensagem += `💳 Pagamento: ${parsed.pagamento}\n`;
   }
-  
+
   mensagem += `📝 Descrição: ${parsed.descricao}`;
-  
+
+  const agora = new Date();
+  const resumoMes = await lancamentosService.getResumoDoMesAtual(userId);
+  const nomesMes = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const nomeMes = nomesMes[agora.getMonth()];
+  if (parsed.tipo?.toLowerCase() === 'gasto') {
+    mensagem += `\n\n📊 Seus gastos de ${nomeMes}: R$ ${formatarValor(resumoMes.totalDespesas)}`;
+  } else {
+    mensagem += `\n\n📊 Suas receitas de ${nomeMes}: R$ ${formatarValor(resumoMes.totalReceitas)}`;
+  }
+
   return mensagem;
 }
 
@@ -742,7 +761,7 @@ async function lancamentoCommand(sock, userId, texto) {
   logger.info({ tipo: dados.tipo, valor: dados.valor, categoria: dados.categoria, pagamento: dados.pagamento, cartao: dados.cartao_nome }, '🔔 Dados do lançamento (resumo)');
     await lancamentosService.salvarLancamento(userId, dados as any);
     await limparEstado(userId);
-    await sock.sendMessage(userId, { text: await gerarMensagemSucesso(parsed, cartaoEscolhido) });
+    await sock.sendMessage(userId, { text: await gerarMensagemSucesso(userId, parsed, cartaoEscolhido) });
     return;
   }
 
@@ -849,7 +868,7 @@ async function processarLancamento(sock, userId, parsed) {
       await lancamentosService.salvarLancamento(userId, dados);
       logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'sem_cartao' }, '[LANCAMENTO] Salvo');
       await sock.sendMessage(userId, {
-        text: await gerarMensagemSucesso(parsed) + `\n\n💡 *Dica:* Para controlar faturas, use "configurar cartao"!`
+        text: await gerarMensagemSucesso(userId, parsed) + `\n\n💡 *Dica:* Para controlar faturas, use "configurar cartao"!`
       });
       return;
     }
@@ -906,10 +925,10 @@ async function processarLancamento(sock, userId, parsed) {
 
       await lancamentosService.salvarLancamento(userId, dados);
       logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, cartao: cartao.nome_cartao, origem: 'simples_cartao' }, '[LANCAMENTO] Salvo');
-      await sock.sendMessage(userId, { text: await gerarMensagemSucesso(parsed, cartao) });
+      await sock.sendMessage(userId, { text: await gerarMensagemSucesso(userId, parsed, cartao) });
       return;
     }
-    
+
     if (cartoes.length > 1) {
       // Múltiplos cartões, pedir para escolher
   logger.info('🔔 Múltiplos cartões, pedir para escolher');
@@ -972,7 +991,7 @@ async function processarLancamento(sock, userId, parsed) {
 
   await lancamentosService.salvarLancamento(userId, dados);
   logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'simples' }, '[LANCAMENTO] Salvo');
-  await sock.sendMessage(userId, { text: await gerarMensagemSucesso(parsed) });
+  await sock.sendMessage(userId, { text: await gerarMensagemSucesso(userId, parsed) });
 
   // Alerta se gasto > R$ 500 (threshold configurável)
   const THRESHOLD_GASTO_ALTO = Number(process.env.THRESHOLD_GASTO_ALTO || 500);
