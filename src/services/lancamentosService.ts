@@ -272,3 +272,7 @@ export async function buscarLancamentosParaExclusao(userId: string, limite: numb
 export async function gerarRelatorioCSV(userId: string, mes: number, ano: number): Promise<any> {
   return await databaseService.gerarRelatorioCSV(userId, mes, ano);
 }
+
+export async function contarLancamentos(userId: string): Promise<number> {
+  return await databaseService.contarLancamentos(userId);
+}
