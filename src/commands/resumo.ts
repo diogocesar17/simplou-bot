@@ -23,7 +23,7 @@ async function resumoCommand(sock, userId, texto) {
             itens: [
               `Receitas: R$ ${formatarValor(resumo.totalReceitas)}`,
               `Despesas: R$ ${formatarValor(resumo.totalDespesas)}`,
-              `Saldo: R$ ${formatarValor(resumo.saldo)}`,
+              `${resumo.saldo >= 0 ? '🟢' : '🔴'} Saldo: R$ ${formatarValor(resumo.saldo)}`,
               `Lançamentos: ${resumo.totalLancamentos}`
             ],
             emoji: '💰'
@@ -48,7 +48,7 @@ async function resumoCommand(sock, userId, texto) {
         itens: [
           `Receitas: R$ ${formatarValor(resumo.totalReceitas)}`,
           `Despesas: R$ ${formatarValor(resumo.totalDespesas)}`,
-          `Saldo: R$ ${formatarValor(resumo.saldo)}`,
+          `${resumo.saldo >= 0 ? '🟢' : '🔴'} Saldo: R$ ${formatarValor(resumo.saldo)}`,
           `Lançamentos: ${resumo.totalLancamentos}`
         ],
         emoji: '💰'
@@ -96,7 +96,7 @@ async function resumoCommand(sock, userId, texto) {
       itens: [
         `Receitas: R$ ${formatarValor(resumo.totalReceitas)}`,
         `Despesas: R$ ${formatarValor(resumo.totalDespesas)}`,
-        `Saldo: R$ ${formatarValor(resumo.saldo)}`,
+        `${resumo.saldo >= 0 ? '🟢' : '🔴'} Saldo: R$ ${formatarValor(resumo.saldo)}`,
         `Lançamentos: ${resumo.totalLancamentos}`
       ],
       emoji: '💰'
