@@ -149,11 +149,16 @@ Exemplos de análise:
 IMPORTANTE: Para materiais de construção, ferramentas, móveis, eletrodomésticos → use "Casa"
 Para material de escritório, equipamentos profissionais → use "Trabalho"
 
+DATAS RELATIVAS: Se a mensagem mencionar "ontem", use a data de ontem. "anteontem" = 2 dias atrás. "segunda", "terça" etc = o dia mais recente dessa semana. "semana passada" = 7 dias atrás. "dia 15" = dia 15 do mês atual (ou anterior se já passou). Se não houver referência de data, use a data atual.
+
 ${categoriaPorPalavrasChave ? `CATEGORIA DETECTADA: "${categoriaPorPalavrasChave}" - Use esta categoria se for apropriada.` : ''}
 
 Mensagem para analisar: "${texto}"
 
 Data atual: ${new Date().toLocaleDateString('pt-BR')}
+Dia da semana atual: ${['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'][new Date().getDay()]}
+Ontem: ${new Date(Date.now() - 86400000).toLocaleDateString('pt-BR')}
+Anteontem: ${new Date(Date.now() - 2*86400000).toLocaleDateString('pt-BR')}
 `;
 
     // Abstração de timeout para a chamada de IA
