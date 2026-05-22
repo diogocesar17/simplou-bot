@@ -305,15 +305,15 @@ async function initializeDatabase() {
       END $$;
     `);
 
+    // logs_auditoria não tem FK para usuarios intencionalmente:
+    // registra ações do sistema ('sistema') e histórico de usuários deletados
     await client.query(`
       DO $$ BEGIN
-        IF NOT EXISTS (
+        IF EXISTS (
           SELECT 1 FROM information_schema.table_constraints
           WHERE constraint_name = 'fk_logs_auditoria_user_id'
         ) THEN
-          ALTER TABLE logs_auditoria
-            ADD CONSTRAINT fk_logs_auditoria_user_id
-            FOREIGN KEY (user_id) REFERENCES usuarios(user_id) ON DELETE CASCADE;
+          ALTER TABLE logs_auditoria DROP CONSTRAINT fk_logs_auditoria_user_id;
         END IF;
       END $$;
     `);
