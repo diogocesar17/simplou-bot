@@ -4,7 +4,7 @@
 import ajudaCommand from './commands/ajuda';
 import resumoCommand from './commands/resumo';
 import resumoDetalhadoCommand from './commands/resumoDetalhado';
-import historicoCommand from './commands/historico';
+import historicoCommand, { historicoMaisCommand } from './commands/historico';
 import faturaCommand from './commands/fatura';
 import categoriaCommand from './commands/categoria';
 import valorAltoCommand from './commands/valorAlto';
@@ -87,6 +87,13 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   }
 
   logger.info(`Estado: ${estado?.etapa}`);
+
+  // Paginação do histórico: "mais" tem prioridade sobre qualquer outro estado
+  if (estado?.etapa === 'historico_exibido' && textoLower === 'mais') {
+    await historicoMaisCommand(sock, userId);
+    return;
+  }
+
   // Tratar qualquer etapa de fluxo (aguardando_*, confirmando_*, etc.)
   if (estado?.etapa) {
     // Salvaguarda global de cancelamento em estados ativos
