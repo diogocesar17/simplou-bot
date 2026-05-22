@@ -4,8 +4,8 @@ import makeWASocket, {
   WASocket,
   WAMessage,
   MessageUpsertType,
-  downloadContentFromMessage,
 } from '@whiskeysockets/baileys'
+import { BaileysAdapter } from './infrastructure/whatsapp/BaileysAdapter'
 import qrcode from 'qrcode-terminal'
 import { Boom } from '@hapi/boom'
 
@@ -199,29 +199,23 @@ async function createSocket(): Promise<void> {
       })
     }
 
+    const adapter = new BaileysAdapter(sock!)
+
     const hasAudio = Boolean((raw as any)?.audioMessage)
     if (hasAudio) {
       const premiumAudio = await isPremium(userId)
       if (!premiumAudio) {
-        await sock!.sendMessage(userId, { text: MSG_UPGRADE })
+        await adapter.sendMessage(userId, { text: MSG_UPGRADE })
         return
       }
       try {
-        await sock!.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
+        await adapter.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
         const audioMessage = (raw as any)?.audioMessage
-        const stream = await downloadContentFromMessage(audioMessage, 'audio')
-        const chunks: Buffer[] = []
-
-        for await (const chunk of stream) {
-          chunks.push(chunk as Buffer)
-        }
-
-        const fileBuffer = Buffer.concat(chunks)
-        const mimeType: string = (audioMessage as any)?.mimetype || 'audio/ogg'
+        const { buffer: fileBuffer, mimeType } = await adapter.downloadAudio(audioMessage)
         const analiseAudio = await geminiService.transcreverAudioFinanceiro(fileBuffer, mimeType, userId)
 
         if (!analiseAudio) {
-          await sock!.sendMessage(userId, {
+          await adapter.sendMessage(userId, {
             text: '❌ Não consegui entender o áudio. Você pode enviar o lançamento em texto? Ex.: "mercado 50 pix"',
           })
           return
@@ -241,11 +235,11 @@ async function createSocket(): Promise<void> {
           `📝 Descrição: ${analiseAudio.descricao}\n\n` +
           `✅ Confirmar lançamento? Responda com "S" para salvar ou "N" para cancelar.`
 
-        await sock!.sendMessage(userId, { text: resumo })
+        await adapter.sendMessage(userId, { text: resumo })
         return
       } catch (err) {
         logger.error({ err: (err as any)?.message || err }, '[AUDIO] Erro ao processar áudio')
-        await sock!.sendMessage(userId, { text: '⚠️ Ocorreu um erro ao ler o áudio. Tente novamente mais tarde ou envie em texto.' })
+        await adapter.sendMessage(userId, { text: '⚠️ Ocorreu um erro ao ler o áudio. Tente novamente mais tarde ou envie em texto.' })
         return
       }
     }
@@ -254,26 +248,20 @@ async function createSocket(): Promise<void> {
     if (hasVoucherMedia) {
       const premiumVoucher = await isPremium(userId)
       if (!premiumVoucher) {
-        await sock!.sendMessage(userId, { text: MSG_UPGRADE })
+        await adapter.sendMessage(userId, { text: MSG_UPGRADE })
         return
       }
       try {
-        await sock!.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
+        await adapter.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
         const isImage = Boolean((raw as any)?.imageMessage)
         const mediaMessage = (raw as any)?.imageMessage || (raw as any)?.documentMessage
-        const stream = await downloadContentFromMessage(mediaMessage, isImage ? 'image' : 'document')
-        const chunks: Buffer[] = []
-
-        for await (const chunk of stream) {
-          chunks.push(chunk as Buffer)
-        }
-
-        const fileBuffer = Buffer.concat(chunks)
-        const mimeType: string = (mediaMessage as any)?.mimetype || (isImage ? 'image/jpeg' : 'application/pdf')
+        const { buffer: fileBuffer, mimeType } = isImage
+          ? await adapter.downloadImage(mediaMessage)
+          : await adapter.downloadDocument(mediaMessage)
         const analise = await geminiService.analisarVoucherFinanceiro(fileBuffer, mimeType, userId)
 
         if (!analise) {
-          await sock!.sendMessage(userId, {
+          await adapter.sendMessage(userId, {
             text: '❌ Não consegui interpretar o comprovante. Você pode enviar o lançamento em texto? Ex.: "mercado 50 pix"',
           })
           return
@@ -293,11 +281,11 @@ async function createSocket(): Promise<void> {
           parceladoTexto +
           `\n\n✅ Confirmar lançamento? Responda com "S" para confirmar ou "N" para cancelar.`
 
-        await sock!.sendMessage(userId, { text: resumo })
+        await adapter.sendMessage(userId, { text: resumo })
         return
       } catch (err) {
         logger.error({ err: (err as any)?.message || err }, '[VOUCHER] Erro ao processar comprovante')
-        await sock!.sendMessage(userId, { text: '⚠️ Ocorreu um erro ao ler o comprovante. Tente novamente mais tarde ou envie em texto.' })
+        await adapter.sendMessage(userId, { text: '⚠️ Ocorreu um erro ao ler o comprovante. Tente novamente mais tarde ou envie em texto.' })
         return
       }
     }
@@ -306,7 +294,7 @@ async function createSocket(): Promise<void> {
       return
     }
 
-    await handleMessage(sock!, userId, texto)
+    await handleMessage(adapter, userId, texto)
   })
 }
 
