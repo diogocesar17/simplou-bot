@@ -2,6 +2,7 @@
 
 // Imports dos comandos
 import ajudaCommand from './commands/ajuda';
+import { ajudaLancamentosCommand, ajudaResumoCommand, ajudaCartaoCommand, ajudaLembreteCommand, ajudaPremiumCommand } from './commands/ajudaContextual';
 import resumoCommand from './commands/resumo';
 import resumoDetalhadoCommand from './commands/resumoDetalhado';
 import historicoCommand, { historicoMaisCommand } from './commands/historico';
@@ -64,15 +65,16 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     await sock.sendMessage(userId, {
       text:
         '👋 *Olá! Bem-vindo ao Simplou!*\n\n' +
-        '💰 Sou seu assistente financeiro pessoal. Vou te ajudar a organizar suas finanças de forma simples e rápida pelo WhatsApp!\n\n' +
-        '📋 *Comandos básicos:*\n' +
-        '• *gastei 50 no mercado* — registrar um gasto\n' +
-        '• *recebi 1000 salário* — registrar uma receita\n' +
-        '• *resumo* — ver o resumo do mês\n' +
-        '• *historico* — ver seus últimos lançamentos\n' +
-        '• *lembrete* — criar um lembrete de conta\n' +
-        '• *ajuda* — ver todos os comandos disponíveis\n\n' +
-        'Para começar, tente registrar seu primeiro gasto! Ex: *gastei 30 no almoço*'
+        'Sou seu assistente financeiro pelo WhatsApp. Com uma mensagem simples, você:\n\n' +
+        '✅ Registra gastos e receitas\n' +
+        '📊 Acompanha resumos do mês\n' +
+        '⏰ Cria lembretes de contas a pagar\n' +
+        '💳 Controla faturas de cartão\n\n' +
+        '🚀 *Para começar agora:*\n' +
+        '• _gastei 50 no mercado_ → registra um gasto\n' +
+        '• _recebi 1500 salário_ → registra uma receita\n' +
+        '• _resumo_ → vê quanto gastou este mês\n\n' +
+        '💡 *Dica:* Escreva naturalmente — não precisa decorar comandos. Se quiser ver tudo que posso fazer, digite *ajuda*.'
     });
     return;
   }
@@ -226,6 +228,23 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     logger.warn({ err: e?.message || e }, '[INTENT] erro no roteamento');
   }
 
+  // Roteamento para ajuda contextual (deve vir antes do ajudaCommand genérico)
+  if (textoLower === 'ajuda lancamentos' || textoLower === 'ajuda lançamentos') {
+    await ajudaLancamentosCommand(sock, userId); return;
+  }
+  if (textoLower === 'ajuda resumo' || textoLower === 'ajuda resumos') {
+    await ajudaResumoCommand(sock, userId); return;
+  }
+  if (textoLower === 'ajuda cartao' || textoLower === 'ajuda cartão' || textoLower === 'ajuda cartoes' || textoLower === 'ajuda cartões') {
+    await ajudaCartaoCommand(sock, userId); return;
+  }
+  if (textoLower === 'ajuda lembrete' || textoLower === 'ajuda lembretes') {
+    await ajudaLembreteCommand(sock, userId); return;
+  }
+  if (textoLower === 'ajuda premium' || textoLower === 'ajuda planos' || textoLower === 'ajuda plano') {
+    await ajudaPremiumCommand(sock, userId); return;
+  }
+
   // Roteamento para o comando de ajuda
   if (["ajuda", "menu", "help"].includes(textoLower)) {
     await ajudaCommand(sock, userId);
@@ -235,15 +254,16 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   // Roteamento para mensagens de boas-vindas
   if (["oi", "olá", "ola", "hello", "hi", "ei", "opa"].includes(textoLower)) {
     await sock.sendMessage(userId, {
-      text: `👋 *Olá! Bem-vindo ao Simplou!*\n\n` +
-            `💰 *Seu assistente financeiro pessoal*\n\n` +
-            `📊 *Comandos principais:*\n` +
-            `• resumo: ver resumo do mês\n` +
-            `• gastei 50 no mercado: registrar gasto\n` +
-            `• recebi 1000 salário: registrar receita\n` +
-            `• histórico: ver últimos lançamentos\n` +
-            `• ajuda: menu completo\n\n` +
-            `💡 *Dica:* Digite *ajuda* para ver todos os comandos disponíveis!`
+      text:
+        '👋 *Olá! Estou aqui.*\n\n' +
+        '📊 *Consultas rápidas:*\n' +
+        '• *resumo* — como foi o mês\n' +
+        '• *resumo hoje* — o que aconteceu hoje\n' +
+        '• *historico* — últimos lançamentos\n\n' +
+        '📝 *Registrar:*\n' +
+        '• _gastei 50 no mercado_\n' +
+        '• _recebi 1000 salário_\n\n' +
+        'Digite *ajuda* para ver tudo que posso fazer.'
     });
     return;
   }
