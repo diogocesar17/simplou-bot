@@ -40,6 +40,10 @@ import relatorioCommand from './commands/relatorio';
 import lembreteCommand from './commands/lembrete';
 import meusLembretesCommand from './commands/meuslembretes';
 import assinarCommand from './commands/assinar';
+import desfazerCommand, { desfazerConfirmarCommand } from './commands/desfazer';
+import orcamentoCommand from './commands/orcamento';
+import trialCommand from './commands/trial';
+import quantoGasteiCommand from './commands/quantoGastei';
 
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
@@ -201,6 +205,12 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
       return;
     }
 
+    // Confirmação do comando desfazer
+    if (estado.etapa === 'confirmando_desfazer') {
+      await desfazerConfirmarCommand(sock, userId, texto);
+      return;
+    }
+
     // Roteamento para estados de meus lembretes (mais específicos) primeiro
     if (
       estado.etapa.includes('selecao_lembrete') ||
@@ -327,6 +337,14 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
     return;
   }
 
+  // Roteamento para orçamentos (deve vir antes de excluir genérico)
+  if (textoLower.startsWith('orcamento') || textoLower.startsWith('orçamento') || textoLower === 'meus orcamentos' || textoLower === 'meus orçamentos') {
+    await orcamentoCommand(sock, userId, texto); return;
+  }
+  if (textoLower.startsWith('excluir orcamento') || textoLower.startsWith('excluir orçamento')) {
+    await orcamentoCommand(sock, userId, texto); return;
+  }
+
   // Roteamento para o comando de excluir (menu inteligente)
   if (textoLower.startsWith('excluir')) {
     await excluirComMenuCommand(sock, userId, texto);
@@ -445,6 +463,27 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   if (["assinar", "premium", "planos", "assine"].includes(textoLower)) {
     await assinarCommand(sock, userId);
     return;
+  }
+
+  // Roteamento para trial premium
+  if (['trial', 'teste gratis', 'teste grátis', 'experimentar', 'testar premium'].includes(textoLower)) {
+    await trialCommand(sock, userId); return;
+  }
+
+  // Roteamento para o comando desfazer
+  if (['desfazer', 'undo', 'cancelar lançamento', 'cancelar lancamento'].includes(textoLower)) {
+    await desfazerCommand(sock, userId); return;
+  }
+
+  // Roteamento para consulta "quanto gastei em X?"
+  if (
+    textoLower.startsWith('quanto gastei') ||
+    textoLower.startsWith('quanto eu gastei') ||
+    textoLower.startsWith('quanto foi gasto') ||
+    textoLower.startsWith('quanto já gastei') ||
+    textoLower.startsWith('quanto ja gastei')
+  ) {
+    await quantoGasteiCommand(sock, userId, texto); return;
   }
 
   // Se não reconheceu nenhum comando, tenta registrar lançamento

@@ -276,3 +276,43 @@ export async function gerarRelatorioCSV(userId: string, mes: number, ano: number
 export async function contarLancamentos(userId: string): Promise<number> {
   return await databaseService.contarLancamentos(userId);
 }
+
+export async function getResumoDoAno(userId: string, ano: number): Promise<any> {
+  const meses: any[] = [];
+  for (let mes = 1; mes <= 12; mes++) {
+    const inicio = new Date(ano, mes - 1, 1);
+    const fim = new Date(ano, mes, 1);
+    const result = await databaseService.queryDatabase(
+      `SELECT tipo, COALESCE(SUM(valor), 0) as total, COUNT(*) as quantidade
+       FROM lancamentos
+       WHERE user_id = $1 AND data >= $2 AND data < $3
+       GROUP BY tipo`,
+      [userId, inicio, fim]
+    );
+    let receitas = 0, despesas = 0, lancamentos = 0;
+    for (const row of result.rows) {
+      if (row.tipo === 'receita') receitas = parseFloat(row.total);
+      else despesas = parseFloat(row.total);
+      lancamentos += parseInt(row.quantidade);
+    }
+    meses.push({ mes, receitas, despesas, saldo: receitas - despesas, lancamentos });
+  }
+  const totalReceitas = meses.reduce((a, m) => a + m.receitas, 0);
+  const totalDespesas = meses.reduce((a, m) => a + m.despesas, 0);
+  return { meses, totalReceitas, totalDespesas, saldo: totalReceitas - totalDespesas };
+}
+
+export async function buscarLancamentoPorId(userId: string, id: string): Promise<any | null> {
+  const result = await databaseService.queryDatabase(
+    'SELECT * FROM lancamentos WHERE id = $1 AND user_id = $2',
+    [id, userId]
+  );
+  return result.rows[0] || null;
+}
+
+export async function excluirLancamento(userId: string, id: string): Promise<void> {
+  await databaseService.queryDatabase(
+    'DELETE FROM lancamentos WHERE id = $1 AND user_id = $2',
+    [id, userId]
+  );
+}

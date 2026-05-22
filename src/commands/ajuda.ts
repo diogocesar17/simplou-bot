@@ -39,7 +39,9 @@ async function ajudaCommand(sock, userId) {
             'historico alimentação — por categoria',
             'fatura nubank 05/2025 — fatura do cartão',
             'parcelados — parcelas ativas',
-            'relatorio — exportar CSV do mês'
+            'relatorio — exportar CSV do mês',
+            'orcamento alimentação 500 — definir limite mensal por categoria',
+            'meus orcamentos — ver orçamentos e % usado'
           ],
           emoji: '📊'
         },

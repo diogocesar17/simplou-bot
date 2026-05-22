@@ -168,6 +168,37 @@ async function initializeDatabase() {
       ON CONFLICT (chave) DO NOTHING
     `);
 
+    // Criar tabela de orçamentos por categoria
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS orcamentos (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        categoria VARCHAR(50) NOT NULL,
+        limite DECIMAL(10,2) NOT NULL,
+        criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, categoria)
+      );
+      CREATE INDEX IF NOT EXISTS idx_orcamentos_user_id ON orcamentos (user_id);
+    `);
+
+    // Adicionar FK de orçamentos
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'fk_orcamentos_user_id'
+        ) THEN
+          ALTER TABLE orcamentos ADD CONSTRAINT fk_orcamentos_user_id
+            FOREIGN KEY (user_id) REFERENCES usuarios(user_id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `);
+
+    // Migração: adicionar coluna trial_ativado se não existir
+    await client.query(`
+      ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS trial_ativado BOOLEAN DEFAULT false;
+    `);
+
     // Migração: Adicionar colunas de cartão se não existirem
     await migrateCartaoColumns(client);
     
@@ -2961,6 +2992,52 @@ async function contarLancamentos(userId: string): Promise<number> {
   return parseInt(result.rows[0]?.total || '0', 10);
 }
 
+async function salvarOrcamento(userId: string, categoria: string, limite: number): Promise<void> {
+  await queryDatabase(
+    `INSERT INTO orcamentos (user_id, categoria, limite)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, categoria) DO UPDATE SET limite = $3`,
+    [userId, categoria, limite]
+  );
+}
+
+async function listarOrcamentos(userId: string): Promise<any[]> {
+  const result = await queryDatabase(
+    'SELECT categoria, limite FROM orcamentos WHERE user_id = $1 ORDER BY categoria',
+    [userId]
+  );
+  return result.rows;
+}
+
+async function excluirOrcamento(userId: string, categoria: string): Promise<void> {
+  await queryDatabase(
+    'DELETE FROM orcamentos WHERE user_id = $1 AND categoria ILIKE $2',
+    [userId, categoria]
+  );
+}
+
+async function buscarOrcamento(userId: string, categoria: string): Promise<any | null> {
+  const result = await queryDatabase(
+    'SELECT limite FROM orcamentos WHERE user_id = $1 AND categoria ILIKE $2',
+    [userId, categoria]
+  );
+  return result.rows[0] || null;
+}
+
+async function getTotalCategoriaNoMes(userId: string, categoria: string): Promise<number> {
+  const agora = new Date();
+  const inicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
+  const fim = new Date(agora.getFullYear(), agora.getMonth() + 1, 1);
+  const result = await queryDatabase(
+    `SELECT COALESCE(SUM(valor), 0) as total
+     FROM lancamentos
+     WHERE user_id = $1 AND categoria ILIKE $2 AND tipo = 'gasto'
+       AND data >= $3 AND data < $4`,
+    [userId, categoria, inicio, fim]
+  );
+  return parseFloat(result.rows[0]?.total || '0');
+}
+
 export {
   pool,
   initializeDatabase,
@@ -3025,5 +3102,10 @@ export {
   registrarAcesso,
   buscarUsuariosPremiumExpiracao,
   gerarRelatorioCSV,
-  contarLancamentos
+  contarLancamentos,
+  salvarOrcamento,
+  listarOrcamentos,
+  excluirOrcamento,
+  buscarOrcamento,
+  getTotalCategoriaNoMes
 };

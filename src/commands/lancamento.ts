@@ -17,6 +17,7 @@ import { parseMessage } from '../utils/parseUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import * as cartoesService from '../services/cartoesService';
 import * as geminiService from '../services/geminiService';
+import * as databaseService from '../infrastructure/databaseService';
 import { formatarValor } from '../utils/formatUtils';
 import { converterDataParaISO } from '../utils/dataUtils';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
@@ -774,9 +775,28 @@ async function lancamentoCommand(sock, userId, texto) {
       data_vencimento: converterDataParaISO(parsed.dataVencimento)
     };
   logger.info({ tipo: dados.tipo, valor: dados.valor, categoria: dados.categoria, pagamento: dados.pagamento, cartao: dados.cartao_nome }, '🔔 Dados do lançamento (resumo)');
-    await lancamentosService.salvarLancamento(userId, dados as any);
+    const novoIdEscolhido = await lancamentosService.salvarLancamento(userId, dados as any);
     await limparEstado(userId);
     await sock.sendMessage(userId, { text: await gerarMensagemSucesso(userId, parsed, cartaoEscolhido) });
+    await definirEstado(userId, 'ultimo_lancamento', { lancamentoId: novoIdEscolhido, timestamp: Date.now() });
+
+    // Verificar orçamento da categoria
+    if (parsed.tipo === 'gasto' && parsed.categoria) {
+      const orcamento = await databaseService.buscarOrcamento(userId, parsed.categoria);
+      if (orcamento) {
+        const totalMes = await databaseService.getTotalCategoriaNoMes(userId, parsed.categoria);
+        const pct = Math.round((totalMes / orcamento.limite) * 100);
+        if (pct >= 100) {
+          await sock.sendMessage(userId, {
+            text: `🔴 *Orçamento estourado!* ${parsed.categoria}: R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)} (${pct}%)`
+          });
+        } else if (pct >= 80) {
+          await sock.sendMessage(userId, {
+            text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)})`
+          });
+        }
+      }
+    }
     return;
   }
 
@@ -883,11 +903,30 @@ async function processarLancamento(sock, userId, parsed) {
         data_vencimento: converterDataParaISO(parsed.dataVencimento)
       };
       
-      await lancamentosService.salvarLancamento(userId, dados);
+      const novoIdSemCartao = await lancamentosService.salvarLancamento(userId, dados);
       logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'sem_cartao' }, '[LANCAMENTO] Salvo');
       await sock.sendMessage(userId, {
         text: await gerarMensagemSucesso(userId, parsed) + `\n\n💡 *Dica:* Para controlar faturas, use "configurar cartao"!`
       });
+      await definirEstado(userId, 'ultimo_lancamento', { lancamentoId: novoIdSemCartao, timestamp: Date.now() });
+
+      // Verificar orçamento da categoria
+      if (parsed.tipo === 'gasto' && parsed.categoria) {
+        const orcamento = await databaseService.buscarOrcamento(userId, parsed.categoria);
+        if (orcamento) {
+          const totalMes = await databaseService.getTotalCategoriaNoMes(userId, parsed.categoria);
+          const pct = Math.round((totalMes / orcamento.limite) * 100);
+          if (pct >= 100) {
+            await sock.sendMessage(userId, {
+              text: `🔴 *Orçamento estourado!* ${parsed.categoria}: R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)} (${pct}%)`
+            });
+          } else if (pct >= 80) {
+            await sock.sendMessage(userId, {
+              text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)})`
+            });
+          }
+        }
+      }
       return;
     }
 
@@ -941,9 +980,28 @@ async function processarLancamento(sock, userId, parsed) {
         data_vencimento: converterDataParaISO(parsed.dataVencimento)
       };
 
-      await lancamentosService.salvarLancamento(userId, dados);
+      const novoIdCartao = await lancamentosService.salvarLancamento(userId, dados);
       logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, cartao: cartao.nome_cartao, origem: 'simples_cartao' }, '[LANCAMENTO] Salvo');
       await sock.sendMessage(userId, { text: await gerarMensagemSucesso(userId, parsed, cartao) });
+      await definirEstado(userId, 'ultimo_lancamento', { lancamentoId: novoIdCartao, timestamp: Date.now() });
+
+      // Verificar orçamento da categoria
+      if (parsed.tipo === 'gasto' && parsed.categoria) {
+        const orcamento = await databaseService.buscarOrcamento(userId, parsed.categoria);
+        if (orcamento) {
+          const totalMes = await databaseService.getTotalCategoriaNoMes(userId, parsed.categoria);
+          const pct = Math.round((totalMes / orcamento.limite) * 100);
+          if (pct >= 100) {
+            await sock.sendMessage(userId, {
+              text: `🔴 *Orçamento estourado!* ${parsed.categoria}: R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)} (${pct}%)`
+            });
+          } else if (pct >= 80) {
+            await sock.sendMessage(userId, {
+              text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)})`
+            });
+          }
+        }
+      }
       return;
     }
 
@@ -1007,9 +1065,28 @@ async function processarLancamento(sock, userId, parsed) {
     data_vencimento: converterDataParaISO(parsed.dataVencimento)
   };
 
-  await lancamentosService.salvarLancamento(userId, dados);
+  const novoId = await lancamentosService.salvarLancamento(userId, dados);
   logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'simples' }, '[LANCAMENTO] Salvo');
   await sock.sendMessage(userId, { text: await gerarMensagemSucesso(userId, parsed) });
+  await definirEstado(userId, 'ultimo_lancamento', { lancamentoId: novoId, timestamp: Date.now() });
+
+  // Verificar orçamento da categoria
+  if (parsed.tipo === 'gasto' && parsed.categoria) {
+    const orcamento = await databaseService.buscarOrcamento(userId, parsed.categoria);
+    if (orcamento) {
+      const totalMes = await databaseService.getTotalCategoriaNoMes(userId, parsed.categoria);
+      const pct = Math.round((totalMes / orcamento.limite) * 100);
+      if (pct >= 100) {
+        await sock.sendMessage(userId, {
+          text: `🔴 *Orçamento estourado!* ${parsed.categoria}: R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)} (${pct}%)`
+        });
+      } else if (pct >= 80) {
+        await sock.sendMessage(userId, {
+          text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)})`
+        });
+      }
+    }
+  }
 
   // Alerta se gasto > R$ 500 (threshold configurável)
   const THRESHOLD_GASTO_ALTO = Number(process.env.THRESHOLD_GASTO_ALTO || 500);

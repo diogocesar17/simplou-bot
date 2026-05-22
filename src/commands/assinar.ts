@@ -11,6 +11,7 @@ async function assinarCommand(sock: any, userId: string) {
     '• Sugestões personalizadas de economia\n\n' +
     '💰 *Investimento:* Consulte os planos disponíveis\n\n' +
     `🔗 *Para assinar:* ${linkPagamento}\n\n` +
+    '• Ou experimente *7 dias grátis* digitando *trial*\n\n' +
     '_Após o pagamento, seu acesso é ativado em até 24h._';
 
   await sock.sendMessage(userId, { text: msg });

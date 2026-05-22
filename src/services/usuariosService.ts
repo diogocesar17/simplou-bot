@@ -90,6 +90,22 @@ export async function processarComandoUsuarios(): Promise<any> {
   }
 }
 
+export async function ativarTrialPremium(userId: string): Promise<{ sucesso: boolean; motivo?: string }> {
+  const usuario = await databaseService.buscarUsuario(userId);
+  if (!usuario) return { sucesso: false, motivo: 'Usuário não encontrado.' };
+  if (usuario.trial_ativado) return { sucesso: false, motivo: 'já_usado' };
+  if (usuario.plano === 'premium') return { sucesso: false, motivo: 'já_premium' };
+
+  const expiracao = new Date();
+  expiracao.setDate(expiracao.getDate() + 7);
+
+  await databaseService.queryDatabase(
+    `UPDATE usuarios SET plano = 'premium', data_expiracao_premium = $2, trial_ativado = true, atualizado_em = CURRENT_TIMESTAMP WHERE user_id = $1`,
+    [userId, expiracao]
+  );
+  return { sucesso: true };
+}
+
 // Função para processar comando de remoção de usuário
 export async function processarComandoRemover(texto: string, adminId: string): Promise<any> {
   try {

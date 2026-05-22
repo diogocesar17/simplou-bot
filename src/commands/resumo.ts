@@ -9,6 +9,48 @@ async function resumoCommand(sock, userId, texto) {
   let mesAno = texto.toLowerCase().replace('resumo', '').trim();
   let resumo;
 
+  // Resumo anual: "resumo 2025" ou "resumo anual" ou "resumo anual 2025"
+  const matchAno = mesAno.match(/^(?:anual\s*)?(\d{4})$/) || (mesAno === 'anual' ? ['', String(new Date().getFullYear())] : null);
+  if (matchAno) {
+    const ano = parseInt(matchAno[1]);
+    const resumoAno = await lancamentosService.getResumoDoAno(userId, ano);
+    const nomesMeses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const itensMeses = resumoAno.meses
+      .filter((m: any) => m.lancamentos > 0)
+      .map((m: any) => {
+        const emoji = m.saldo >= 0 ? '🟢' : '🔴';
+        return `${nomesMeses[m.mes-1]}: ${emoji} R$ ${formatarValor(m.saldo)} (↓${formatarValor(m.despesas)} ↑${formatarValor(m.receitas)})`;
+      });
+    if (!itensMeses.length) itensMeses.push('Nenhum lançamento encontrado neste ano.');
+    await sock.sendMessage(userId, {
+      text: formatarMensagem({
+        titulo: `Resumo de ${ano}`,
+        emojiTitulo: '📅',
+        secoes: [
+          {
+            titulo: 'Mês a mês',
+            itens: itensMeses,
+            emoji: '📊'
+          },
+          {
+            titulo: 'Total do ano',
+            itens: [
+              `Receitas: R$ ${formatarValor(resumoAno.totalReceitas)}`,
+              `Despesas: R$ ${formatarValor(resumoAno.totalDespesas)}`,
+              `${resumoAno.saldo >= 0 ? '🟢' : '🔴'} Saldo: R$ ${formatarValor(resumoAno.saldo)}`
+            ],
+            emoji: '💰'
+          }
+        ],
+        dicas: [
+          { texto: 'Resumo do mês atual', comando: 'resumo' },
+          { texto: 'Histórico detalhado', comando: 'historico' }
+        ]
+      })
+    });
+    return;
+  }
+
   // Resumo do dia
   if (["hoje", "dia", "diario", "diário", "do dia", "do dia atual", "do dia de hoje", "de hoje"].includes(mesAno)) {
     resumo = await lancamentosService.getResumoDoDia(userId);
