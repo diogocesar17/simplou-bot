@@ -563,8 +563,8 @@ async function lancamentoCommand(sock, userId, texto) {
         // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
         if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento)) {
           await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
-          await sock.sendMessage(userId, { 
-            text: '💳 Qual foi a forma de pagamento?\n\n1. PIX\n2. Dinheiro\n3. Crédito\n4. Débito\n5. Boleto\n6. Transferência\n\nDigite o número da opção:' 
+          await sock.sendMessage(userId, {
+            text: '💳 Como pagou?\n\nResponda: *pix* · *cartão* · *dinheiro* · *débito* · *boleto* · *transferência*'
           });
           return;
         }
@@ -588,8 +588,8 @@ async function lancamentoCommand(sock, userId, texto) {
       // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
       if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento)) {
         await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
-        await sock.sendMessage(userId, { 
-          text: '💳 Qual foi a forma de pagamento?\n\n1. PIX\n2. Dinheiro\n3. Crédito\n4. Débito\n5. Boleto\n6. Transferência\n\nDigite o número da opção:' 
+        await sock.sendMessage(userId, {
+          text: '💳 Como pagou?\n\nResponda: *pix* · *cartão* · *dinheiro* · *débito* · *boleto* · *transferência*'
         });
         return;
       }
@@ -612,19 +612,29 @@ async function lancamentoCommand(sock, userId, texto) {
   if (estado?.etapa === 'aguardando_forma_pagamento') {
     const parsed = estado.dadosParciais as any;
     await limparEstado(userId);
-    
-    // Validar forma de pagamento
-    const formasPagamento = ['pix', 'dinheiro', 'credito', 'debito', 'boleto', 'transferencia'];
-    const escolha = parseInt(texto.trim());
-    
-    if (isNaN(escolha) || escolha < 1 || escolha > formasPagamento.length) {
-      await sock.sendMessage(userId, { 
-        text: `❌ Opção inválida. Digite um número entre 1 e ${formasPagamento.length}.` 
+
+    const textoNorm = texto.trim().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    const mapaFormas: Record<string, string> = {
+      '1': 'pix', 'pix': 'pix',
+      '2': 'dinheiro', 'dinheiro': 'dinheiro',
+      '3': 'credito', 'credito': 'credito', 'cartao': 'credito',
+      '4': 'debito', 'debito': 'debito',
+      '5': 'boleto', 'boleto': 'boleto',
+      '6': 'transferencia', 'transferencia': 'transferencia', 'ted': 'transferencia', 'doc': 'transferencia',
+    };
+
+    const formaPagamento = mapaFormas[textoNorm];
+    if (!formaPagamento) {
+      await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
+      await sock.sendMessage(userId, {
+        text: '❌ Não entendi. Responda: *pix*, *cartão*, *dinheiro*, *débito*, *boleto* ou *transferência*'
       });
       return;
     }
-    
-    parsed.pagamento = formasPagamento[escolha - 1];
+
+    parsed.pagamento = formaPagamento;
     return await processarLancamento(sock, userId, parsed);
   }
 
@@ -806,8 +816,8 @@ async function lancamentoCommand(sock, userId, texto) {
   // 5. Falta forma de pagamento
   if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (parsed.faltaFormaPagamento || parsed.pagamento === 'NÃO INFORMADO')) {
     await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
-    await sock.sendMessage(userId, { 
-      text: '💳 Qual foi a forma de pagamento?\n\n1. PIX\n2. Dinheiro\n3. Crédito\n4. Débito\n5. Boleto\n6. Transferência\n\nDigite o número da opção:' 
+    await sock.sendMessage(userId, {
+      text: '💳 Como pagou?\n\nResponda: *pix* · *cartão* · *dinheiro* · *débito* · *boleto* · *transferência*'
     });
     return;
   }
