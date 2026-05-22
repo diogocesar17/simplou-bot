@@ -227,6 +227,66 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_config_sistema_chave ON config_sistema(chave);
     `);
 
+    // Criar índices faltantes para performance
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_cartoes_user_id ON cartoes_config (user_id);
+      CREATE INDEX IF NOT EXISTS idx_lancamentos_user_criado ON lancamentos (user_id, criado_em DESC);
+      CREATE INDEX IF NOT EXISTS idx_lancamentos_user_tipo ON lancamentos (user_id, tipo);
+    `);
+
+    // Adicionar Foreign Keys com ON DELETE CASCADE (idempotentes)
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'fk_lancamentos_user_id'
+        ) THEN
+          ALTER TABLE lancamentos
+            ADD CONSTRAINT fk_lancamentos_user_id
+            FOREIGN KEY (user_id) REFERENCES usuarios(user_id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `);
+
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'fk_cartoes_user_id'
+        ) THEN
+          ALTER TABLE cartoes_config
+            ADD CONSTRAINT fk_cartoes_user_id
+            FOREIGN KEY (user_id) REFERENCES usuarios(user_id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `);
+
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'fk_lembretes_user_id'
+        ) THEN
+          ALTER TABLE lembretes
+            ADD CONSTRAINT fk_lembretes_user_id
+            FOREIGN KEY (user_id) REFERENCES usuarios(user_id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `);
+
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE constraint_name = 'fk_logs_auditoria_user_id'
+        ) THEN
+          ALTER TABLE logs_auditoria
+            ADD CONSTRAINT fk_logs_auditoria_user_id
+            FOREIGN KEY (user_id) REFERENCES usuarios(user_id) ON DELETE CASCADE;
+        END IF;
+      END $$;
+    `);
+
     // Migração: Migrar usuários do config.js para a tabela
     await migrarUsuariosConfig(client);
 
@@ -741,17 +801,17 @@ async function getDatabaseData(userId) {
 
 async function getResumoDoMesAtual(userId) {
   const query = `
-    SELECT 
+    SELECT
       tipo,
       SUM(valor) as total,
       COUNT(*) as quantidade
-    FROM lancamentos 
-    WHERE user_id = $1 
-      AND EXTRACT(MONTH FROM data) = EXTRACT(MONTH FROM CURRENT_DATE)
-      AND EXTRACT(YEAR FROM data) = EXTRACT(YEAR FROM CURRENT_DATE)
+    FROM lancamentos
+    WHERE user_id = $1
+      AND data >= DATE_TRUNC('month', CURRENT_DATE)
+      AND data < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
     GROUP BY tipo
   `;
-  
+
   const result = await queryDatabase(query, [userId]);
   
   let totalReceitas = 0;
@@ -818,22 +878,25 @@ async function getResumoDoDia(userId) {
 async function getResumoPorMes(userId, mes, ano) {
   logger.debug('[DEBUG] getResumoPorMes chamada com:', { userId, mes, ano });
   
+  const inicio = new Date(ano, mes - 1, 1);
+  const fim = new Date(ano, mes, 1);
+
   const query = `
-    SELECT 
+    SELECT
       tipo,
       SUM(valor) as total,
       COUNT(*) as quantidade
-    FROM lancamentos 
-    WHERE user_id = $1 
+    FROM lancamentos
+    WHERE user_id = $1
       AND (
-        (EXTRACT(MONTH FROM data) = $2 AND EXTRACT(YEAR FROM data) = $3)
+        (data >= $2 AND data < $3)
         OR
-        (data_contabilizacao IS NOT NULL AND EXTRACT(MONTH FROM data_contabilizacao) = $2 AND EXTRACT(YEAR FROM data_contabilizacao) = $3)
+        (data_contabilizacao IS NOT NULL AND data_contabilizacao >= $2 AND data_contabilizacao < $3)
       )
     GROUP BY tipo
   `;
-  
-  const params = [userId, mes, ano];
+
+  const params = [userId, inicio, fim];
   logger.debug('[DEBUG] Query params:', params);
   logger.debug('[DEBUG] Query SQL:', query);
   
@@ -881,12 +944,14 @@ async function getGastosPorCategoria(userId, mes = null, ano = null) {
   let paramIndex = 2;
   
   if (mes !== null && ano !== null) {
-    query += ` AND EXTRACT(MONTH FROM data) = $${paramIndex} AND EXTRACT(YEAR FROM data) = $${paramIndex + 1}`;
-    params.push(mes + 1, ano); // +1 porque PostgreSQL usa 1-12
+    const inicio = new Date(ano, mes, 1); // mes já é 0-indexed aqui (mes+1 era o ajuste antigo)
+    const fim = new Date(ano, mes + 1, 1);
+    query += ` AND data >= $${paramIndex} AND data < $${paramIndex + 1}`;
+    params.push(inicio, fim);
   } else {
-    query += ` AND EXTRACT(MONTH FROM data) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM data) = EXTRACT(YEAR FROM CURRENT_DATE)`;
+    query += ` AND data >= DATE_TRUNC('month', CURRENT_DATE) AND data < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'`;
   }
-  
+
   query += ` GROUP BY categoria ORDER BY total DESC`;
   
   const result = await queryDatabase(query, params);
@@ -936,12 +1001,14 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
   
   if (mes !== null && ano !== null) {
     // Histórico por período: filtra por data do gasto (data, data_lancamento ou data_contabilizacao)
+    const inicio = new Date(ano, mes - 1, 1);
+    const fim = new Date(ano, mes, 1);
     query += ` AND (
-      (EXTRACT(MONTH FROM data) = $${paramIndex} AND EXTRACT(YEAR FROM data) = $${paramIndex + 1}) OR
-      (data_lancamento IS NOT NULL AND EXTRACT(MONTH FROM data_lancamento) = $${paramIndex} AND EXTRACT(YEAR FROM data_lancamento) = $${paramIndex + 1}) OR
-      (data_contabilizacao IS NOT NULL AND EXTRACT(MONTH FROM data_contabilizacao) = $${paramIndex} AND EXTRACT(YEAR FROM data_contabilizacao) = $${paramIndex + 1})
+      (data >= $${paramIndex} AND data < $${paramIndex + 1}) OR
+      (data_lancamento IS NOT NULL AND data_lancamento >= $${paramIndex} AND data_lancamento < $${paramIndex + 1}) OR
+      (data_contabilizacao IS NOT NULL AND data_contabilizacao >= $${paramIndex} AND data_contabilizacao < $${paramIndex + 1})
     )`;
-    params.push(mes, ano);
+    params.push(inicio, fim);
     query += ` ORDER BY COALESCE(data_contabilizacao, data_lancamento, data) DESC LIMIT $${paramIndex + 2}`;
     params.push(limite * 5); // Busca mais para garantir agrupamento
   } else {
@@ -1436,12 +1503,14 @@ async function getTotalGastosPorPagamento(userId, pagamento, mes = null, ano = n
   let paramIndex = 3;
   
   if (mes !== null && ano !== null) {
-    query += ` AND EXTRACT(MONTH FROM data) = $${paramIndex} AND EXTRACT(YEAR FROM data) = $${paramIndex + 1}`;
-    params.push(mes + 1, ano); // +1 porque PostgreSQL usa 1-12
+    const inicio = new Date(ano, mes, 1); // mes é 0-indexed nesta função (chamador faz mes+1)
+    const fim = new Date(ano, mes + 1, 1);
+    query += ` AND data >= $${paramIndex} AND data < $${paramIndex + 1}`;
+    params.push(inicio, fim);
   } else {
-    query += ` AND EXTRACT(MONTH FROM data) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM data) = EXTRACT(YEAR FROM CURRENT_DATE)`;
+    query += ` AND data >= DATE_TRUNC('month', CURRENT_DATE) AND data < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'`;
   }
-  
+
   const result = await queryDatabase(query, params);
   return result.rows[0].total ? parseFloat(result.rows[0].total) : 0;
 }
@@ -1728,12 +1797,14 @@ async function getResumoReal(userId, mes = null, ano = null) {
   let paramIndex = 2;
   
   if (mes !== null && ano !== null) {
-    query += ` AND EXTRACT(MONTH FROM data) = $${paramIndex} AND EXTRACT(YEAR FROM data) = $${paramIndex + 1}`;
-    params.push(mes + 1, ano); // +1 porque PostgreSQL usa 1-12
+    const inicio = new Date(ano, mes, 1); // mes é 0-indexed nesta função (chamador faz mes+1)
+    const fim = new Date(ano, mes + 1, 1);
+    query += ` AND data >= $${paramIndex} AND data < $${paramIndex + 1}`;
+    params.push(inicio, fim);
   } else {
-    query += ` AND EXTRACT(MONTH FROM data) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM data) = EXTRACT(YEAR FROM CURRENT_DATE)`;
+    query += ` AND data >= DATE_TRUNC('month', CURRENT_DATE) AND data < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'`;
   }
-  
+
   query += ` GROUP BY tipo`;
   
   const result = await queryDatabase(query, params);
@@ -1764,10 +1835,12 @@ async function getResumoReal(userId, mes = null, ano = null) {
   
   const paramsPendentes = [userId];
   if (mes !== null && ano !== null) {
-    queryPendentes += ` AND EXTRACT(MONTH FROM data_lancamento) = $2 AND EXTRACT(YEAR FROM data_lancamento) = $3`;
-    paramsPendentes.push(mes + 1, ano);
+    const inicioP = new Date(ano, mes, 1); // mes é 0-indexed nesta função
+    const fimP = new Date(ano, mes + 1, 1);
+    queryPendentes += ` AND data_lancamento >= $2 AND data_lancamento < $3`;
+    paramsPendentes.push(inicioP, fimP);
   } else {
-    queryPendentes += ` AND EXTRACT(MONTH FROM data_lancamento) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM data_lancamento) = EXTRACT(YEAR FROM CURRENT_DATE)`;
+    queryPendentes += ` AND data_lancamento >= DATE_TRUNC('month', CURRENT_DATE) AND data_lancamento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'`;
   }
   
   const resultPendentes = await queryDatabase(queryPendentes, paramsPendentes);
@@ -2212,15 +2285,17 @@ async function gerarRelatorioCSV(userId, mes, ano) {
         data_lancamento,
         status_fatura,
         data_vencimento
-      FROM lancamentos 
-      WHERE user_id = $1 
-        AND EXTRACT(MONTH FROM data) = $2 
-        AND EXTRACT(YEAR FROM data) = $3
+      FROM lancamentos
+      WHERE user_id = $1
+        AND data >= $2
+        AND data < $3
       ORDER BY data ASC, id ASC
     `;
-    
-    console.log(`[DATABASE_SERVICE] Executando query com parâmetros:`, [userId, mes, ano]);
-    const result = await queryDatabase(query, [userId, mes, ano]);
+
+    const inicio = new Date(ano, mes - 1, 1);
+    const fim = new Date(ano, mes, 1);
+    console.log(`[DATABASE_SERVICE] Executando query com parâmetros:`, [userId, inicio, fim]);
+    const result = await queryDatabase(query, [userId, inicio, fim]);
     const lancamentos = result.rows;
     console.log(`[DATABASE_SERVICE] Lançamentos encontrados:`, lancamentos.length);
     
@@ -2540,16 +2615,18 @@ async function buscarGastosPorCategoria(userId, categoria, limite = 20, mes = nu
     let paramIndex = 3;
     
     if (mes && ano) {
-      query += ` AND EXTRACT(MONTH FROM l.data) = $${paramIndex} AND EXTRACT(YEAR FROM l.data) = $${paramIndex + 1}`;
-      params.push(mes, ano);
+      const inicio = new Date(ano, mes - 1, 1);
+      const fim = new Date(ano, mes, 1);
+      query += ` AND l.data >= $${paramIndex} AND l.data < $${paramIndex + 1}`;
+      params.push(inicio, fim);
       paramIndex += 2;
     }
-    
+
     query += ` ORDER BY l.data DESC LIMIT $${paramIndex}`;
     params.push(limite);
-    
+
     const result = await queryDatabase(query, params);
-    
+
     return result.rows.map(row => ({
       ...row,
       valor: parseFloat(row.valor)
@@ -2575,16 +2652,18 @@ async function buscarGastosValorAlto(userId, valorMinimo = 100, limite = 20, mes
     let paramIndex = 3;
     
     if (mes && ano) {
-      query += ` AND EXTRACT(MONTH FROM l.data) = $${paramIndex} AND EXTRACT(YEAR FROM l.data) = $${paramIndex + 1}`;
-      params.push(mes, ano);
+      const inicio = new Date(ano, mes - 1, 1);
+      const fim = new Date(ano, mes, 1);
+      query += ` AND l.data >= $${paramIndex} AND l.data < $${paramIndex + 1}`;
+      params.push(inicio, fim);
       paramIndex += 2;
     }
-    
+
     query += ` ORDER BY l.valor DESC, l.data DESC LIMIT $${paramIndex}`;
     params.push(limite);
-    
+
     const result = await queryDatabase(query, params);
-    
+
     return result.rows.map(row => ({
       ...row,
       valor: parseFloat(row.valor)
