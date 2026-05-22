@@ -11,12 +11,20 @@ async function historicoCommand(sock, userId, texto) {
   const partes = texto.trim().split(/\s+/);
   let mesAno: { mes: number; ano: number } | null = null;
   let limite = 10; // padrão
-  
-  if (partes.length > 1) {
-    const resto = partes.slice(1).join(' ');
-    mesAno = parseMesAno(resto);
-    if (mesAno) limite = 9999;
+
+  // Detectar filtro de tipo
+  let filtroTipo: string | null = null;
+  const palavrasFiltro = partes.slice(1).map(p => p.toLowerCase());
+  if (palavrasFiltro.includes('gastos') || palavrasFiltro.includes('gasto') || palavrasFiltro.includes('despesas')) {
+    filtroTipo = 'gasto';
+  } else if (palavrasFiltro.includes('receitas') || palavrasFiltro.includes('receita') || palavrasFiltro.includes('entradas')) {
+    filtroTipo = 'receita';
   }
+  // Remover a palavra do filtro antes de parsear mês/ano
+  const restoParts = partes.slice(1).filter(p => !['gastos','gasto','despesas','receitas','receita','entradas'].includes(p.toLowerCase()));
+  const restoTexto = restoParts.join(' ');
+  mesAno = restoTexto.trim() ? parseMesAno(restoTexto) : null;
+  if (mesAno) limite = 9999;
   
   // Validar se não é mês futuro (apenas se especificado um mês)
   if (mesAno) {
@@ -66,9 +74,14 @@ async function historicoCommand(sock, userId, texto) {
     }
   }
   
+  // Aplicar filtro por tipo se solicitado
+  if (filtroTipo) {
+    ultimos = ultimos.filter(l => l.tipo === filtroTipo);
+  }
+
   // Salvar lista no estado para permitir exclusão e edição
-  await definirEstado(userId, 'historico_exibido', { 
-    lista: ultimos, 
+  await definirEstado(userId, 'historico_exibido', {
+    lista: ultimos,
     mesAno: mesAno,
     timestamp: Date.now()
   });
@@ -132,9 +145,10 @@ async function historicoCommand(sock, userId, texto) {
     return item;
   });
 
-  const titulo = mesAno 
-    ? `Histórico ${getNomeMes(mesAno.mes - 1)}/${mesAno.ano}`
-    : 'Últimos Lançamentos';
+  const labelTipo = filtroTipo === 'gasto' ? ' — Gastos' : filtroTipo === 'receita' ? ' — Receitas' : '';
+  const titulo = mesAno
+    ? `Histórico ${getNomeMes(mesAno.mes - 1)}/${mesAno.ano}${labelTipo}`
+    : `Últimos Lançamentos${labelTipo}`;
 
   const dicas = [
     { texto: 'Editar lançamento', comando: 'editar <número>' },
