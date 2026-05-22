@@ -908,6 +908,17 @@ async function getGastosPorCategoria(userId, mes = null, ano = null) {
   };
 }
 
+async function getCategorias(userId: string): Promise<string[]> {
+  const query = `
+    SELECT DISTINCT categoria
+    FROM lancamentos
+    WHERE user_id = $1 AND categoria IS NOT NULL
+    ORDER BY categoria
+  `;
+  const result = await queryDatabase(query, [userId]);
+  return result.rows.map((row: any) => row.categoria as string);
+}
+
 // Listar lançamentos com agrupamento de parcelados e recorrentes
 async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
   let query = `
@@ -2880,6 +2891,7 @@ export {
   getResumoDoDia,
   getResumoPorMes,
   getGastosPorCategoria,
+  getCategorias,
   listarLancamentos,
   formatarValor,
   getUltimosLancamentos,

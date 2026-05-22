@@ -1,6 +1,7 @@
 import { formatarValor } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
+import * as databaseService from '../infrastructure/databaseService';
 import { definirEstado, obterEstado } from '../configs/stateManager';
 import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
@@ -10,27 +11,35 @@ const ITENS_POR_PAGINA = 10;
 function formatarItemLancamento(l: any, idx: number, usarCriadoEm: boolean): string {
   const dataParaExibir: Date | string = usarCriadoEm ? (l.criado_em || l.data) : l.data;
 
-  const dataBR = (dataParaExibir instanceof Date)
-    ? dataParaExibir.toLocaleDateString('pt-BR')
+  const dateObj = (dataParaExibir instanceof Date)
+    ? dataParaExibir
     : (typeof dataParaExibir === 'string' && dataParaExibir.match(/\d{4}-\d{2}-\d{2}/)
-        ? new Date(dataParaExibir).toLocaleDateString('pt-BR')
-        : (typeof dataParaExibir === 'string' ? dataParaExibir : new Date(dataParaExibir as any).toLocaleDateString('pt-BR')));
+        ? new Date(dataParaExibir)
+        : new Date(dataParaExibir as any));
+
+  const dataBR = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
   const emojiTipo = l.tipo === 'receita' ? '💰' : '💸';
 
-  let item = `${idx + 1}. ${emojiTipo} ${dataBR} | R$ ${formatarValor(l.valor)} | 📂 ${l.categoria} | 💳 ${l.pagamento}`;
+  // Linha 1: N. emoji *R$ valor* — categoria
+  let item = `${idx + 1}. ${emojiTipo} *R$ ${formatarValor(l.valor)}* — ${l.categoria}`;
 
-  if (l.tipoAgrupamento === 'parcelado') {
-    item += ` | 📦 Parcelado: ${l.total_parcelas}x de R$ ${formatarValor(l.grupo && l.grupo[0] ? l.grupo[0].valor : 0)}`;
-  }
-  if (l.tipoAgrupamento === 'recorrente') {
-    item += ` | 🔁 Recorrente: ${l.grupo ? l.grupo.length : 0}x`;
-  }
+  // Linha 2: data · pagamento [· contabilização]
+  let linha2 = `   📅 ${dataBR} · 💳 ${l.pagamento}`;
   if (l.data_contabilizacao && l.data_contabilizacao !== l.data) {
-    const dataContabilizacao = new Date(l.data_contabilizacao).toLocaleDateString('pt-BR');
-    item += ` | 📊 Contabilização: ${dataContabilizacao}`;
+    const dataContabilizacao = new Date(l.data_contabilizacao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    linha2 += ` · 📊 Contab.: ${dataContabilizacao}`;
+  }
+  item += `\n${linha2}`;
+
+  // Linha 3 (opcional): parcelado ou recorrente
+  if (l.tipoAgrupamento === 'parcelado') {
+    item += `\n   📦 Parcelado: ${l.total_parcelas}x de R$ ${formatarValor(l.grupo && l.grupo[0] ? l.grupo[0].valor : 0)}`;
+  } else if (l.tipoAgrupamento === 'recorrente') {
+    item += `\n   🔁 Recorrente: ${l.grupo ? l.grupo.length : 0}x`;
   }
 
+  // Última linha (opcional): descrição
   if (l.descricao) {
     item += `\n   📝 ${l.descricao}`;
   }
@@ -57,6 +66,17 @@ async function historicoCommand(sock, userId, texto) {
   const restoParts = partes.slice(1).filter(p => !['gastos','gasto','despesas','receitas','receita','entradas'].includes(p.toLowerCase()));
   const restoTexto = restoParts.join(' ');
   mesAno = restoTexto.trim() ? parseMesAno(restoTexto) : null;
+
+  // Detectar filtro de categoria (só se não detectou tipo e o resto não é um mês/ano)
+  let filtroCategoria: string | null = null;
+  if (!filtroTipo) {
+    const textoRestante = restoParts.join(' ').toLowerCase().trim();
+    if (textoRestante && !mesAno) {
+      const categorias = await databaseService.getCategorias(userId);
+      const catMatch = categorias.find(c => textoRestante === c.toLowerCase() || textoRestante.includes(c.toLowerCase()));
+      if (catMatch) filtroCategoria = catMatch;
+    }
+  }
 
   // Validar se não é mês futuro (apenas se especificado um mês)
   if (mesAno) {
@@ -111,6 +131,11 @@ async function historicoCommand(sock, userId, texto) {
     ultimos = ultimos.filter(l => l.tipo === filtroTipo);
   }
 
+  // Aplicar filtro por categoria se solicitado
+  if (filtroCategoria) {
+    ultimos = ultimos.filter(l => l.categoria?.toLowerCase() === filtroCategoria!.toLowerCase());
+  }
+
   const totalRegistros = ultimos.length;
 
   // Para histórico sem filtro de mês, exibir apenas os primeiros ITENS_POR_PAGINA
@@ -148,7 +173,7 @@ async function historicoCommand(sock, userId, texto) {
     formatarItemLancamento(l, idx, usarCriadoEm)
   );
 
-  const labelTipo = filtroTipo === 'gasto' ? ' — Gastos' : filtroTipo === 'receita' ? ' — Receitas' : '';
+  const labelTipo = filtroTipo === 'gasto' ? ' — Gastos' : filtroTipo === 'receita' ? ' — Receitas' : filtroCategoria ? ` — ${filtroCategoria}` : '';
   const titulo = mesAno
     ? `Histórico ${getNomeMes(mesAno.mes - 1)}/${mesAno.ano}${labelTipo}`
     : `Últimos Lançamentos${labelTipo}`;
@@ -207,7 +232,7 @@ async function historicoMaisCommand(sock, userId) {
 
   if (!estado || estado.etapa !== 'historico_exibido') {
     await sock.sendMessage(userId, {
-      text: 'Não há histórico recente. Digite *historico* para ver seus lançamentos.'
+      text: 'Não há histórico ativo. Digite *historico* para ver seus lançamentos.'
     });
     return;
   }
@@ -216,7 +241,7 @@ async function historicoMaisCommand(sock, userId) {
   const TTL_HISTORICO_MS = 10 * 60 * 1000; // 10 minutos
   if (!dados || Date.now() - (dados.timestamp || 0) > TTL_HISTORICO_MS) {
     await sock.sendMessage(userId, {
-      text: 'Não há histórico recente. Digite *historico* para ver seus lançamentos.'
+      text: 'O histórico expirou (fica ativo por 10 minutos). Digite *historico* para recarregar.'
     });
     return;
   }

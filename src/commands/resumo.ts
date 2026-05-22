@@ -73,6 +73,8 @@ async function resumoCommand(sock, userId, texto) {
       const gastoEsperado = resumoAnterior.totalDespesas * (diaAtual / diasNoMes);
       const ritmoEmoji = resumo.totalDespesas > gastoEsperado * 1.1 ? '⚠️' : '✅';
       itensResumo.push(`${ritmoEmoji} Dia ${diaAtual}/${diasNoMes} do mês — ritmo de gastos: ${pctMes}% do mês, ${((resumo.totalDespesas / resumoAnterior.totalDespesas) * 100).toFixed(0)}% do gasto do mês anterior`);
+    } else if (resumo.totalDespesas > 0 && resumoAnterior.totalDespesas === 0) {
+      itensResumo.push(`📅 Dia ${diaAtual} de ${diasNoMes} — comparação disponível a partir do próximo mês`);
     } else {
       itensResumo.push(`📅 Dia ${diaAtual} de ${diasNoMes}`);
     }
@@ -84,7 +86,7 @@ async function resumoCommand(sock, userId, texto) {
         emoji: '💰'
       }
     ];
-    if (resumo.totalDespesas > 0 && gastosCat.categorias && gastosCat.categorias.length > 0) {
+    if (resumo.totalDespesas > 0 && gastosCat.categorias && gastosCat.categorias.length >= 2) {
       const top3 = gastosCat.categorias.slice(0, 3);
       secoes.push({
         titulo: 'Top gastos',
@@ -133,7 +135,7 @@ async function resumoCommand(sock, userId, texto) {
       emoji: '💰'
     }
   ];
-  if (resumo.totalDespesas > 0 && gastosCatEsp.categorias && gastosCatEsp.categorias.length > 0) {
+  if (resumo.totalDespesas > 0 && gastosCatEsp.categorias && gastosCatEsp.categorias.length >= 2) {
     const top3Esp = gastosCatEsp.categorias.slice(0, 3);
     secoesEsp.push({
       titulo: 'Top gastos',
