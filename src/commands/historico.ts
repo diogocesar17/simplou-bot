@@ -55,7 +55,7 @@ async function historicoCommand(sock, userId, texto) {
   } else {
     ultimos = await lancamentosService.listarLancamentos(userId, limite);
     if (!ultimos || ultimos.length === 0) {
-      await sock.sendMessage(userId, { 
+      await sock.sendMessage(userId, {
         text: formatarMensagem({
           titulo: 'Nenhum lançamento encontrado',
           emojiTitulo: '📭',
@@ -64,6 +64,11 @@ async function historicoCommand(sock, userId, texto) {
       });
       return;
     }
+  }
+
+  let totalRegistros: number | null = null;
+  if (!mesAno) {
+    totalRegistros = await lancamentosService.contarLancamentos(userId);
   }
   
   // Salvar lista no estado para permitir exclusão e edição
@@ -132,13 +137,14 @@ async function historicoCommand(sock, userId, texto) {
     return item;
   });
 
-  const titulo = mesAno 
+  const titulo = mesAno
     ? `Histórico ${getNomeMes(mesAno.mes - 1)}/${mesAno.ano}`
-    : 'Últimos Lançamentos';
+    : `Últimos ${ultimos.length} de ${totalRegistros} lançamentos`;
 
   const dicas = [
-    { texto: 'Editar lançamento', comando: 'editar <número>' },
-    { texto: 'Excluir lançamento', comando: 'excluir <número>' }
+    { texto: 'Editar item 3 da lista', comando: 'editar 3' },
+    { texto: 'Excluir item 3 da lista', comando: 'excluir 3' },
+    { texto: 'Use o número da lista acima', comando: '(1, 2, 3...)' }
   ];
 
   if (!mesAno) {

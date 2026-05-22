@@ -2863,6 +2863,14 @@ async function buscarUsuariosPremiumExpiracao(diasAntes = 7) {
   }
 }
 
+async function contarLancamentos(userId: string): Promise<number> {
+  const result = await queryDatabase(
+    'SELECT COUNT(*) as total FROM lancamentos WHERE user_id = $1',
+    [userId]
+  );
+  return parseInt(result.rows[0]?.total || '0', 10);
+}
+
 export {
   pool,
   initializeDatabase,
@@ -2925,5 +2933,6 @@ export {
   verificarAcessoUsuario,
   registrarAcesso,
   buscarUsuariosPremiumExpiracao,
-  gerarRelatorioCSV
+  gerarRelatorioCSV,
+  contarLancamentos
 };
