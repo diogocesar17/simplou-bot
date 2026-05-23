@@ -6,17 +6,15 @@ import makeWASocket, {
   MessageUpsertType,
 } from '@whiskeysockets/baileys'
 import { BaileysAdapter } from './infrastructure/whatsapp/BaileysAdapter'
+import { dispatchWhatsAppMessage } from './infrastructure/whatsapp/messageDispatcher'
 import qrcode from 'qrcode-terminal'
 import { Boom } from '@hapi/boom'
 
 import { initializeDatabase } from './infrastructure/databaseService'
 import { startHealthServer } from './infrastructure/healthServer'
-import { handleMessage } from './index'
 import { getHybridAuthState } from './infrastructure/auth/authRedisStorage'
 import { logger, debug } from './infrastructure/logger'
 const geminiService = require('./services/geminiService')
-import { definirEstado } from './configs/stateManager'
-import { formatarValor } from './utils/formatUtils'
 
 import {
   verificarEEnviarAlertasAutomaticos,
@@ -147,18 +145,15 @@ async function createSocket(): Promise<void> {
 
     const DEBUG_MESSAGES = process.env.DEBUG_MESSAGES === 'true'
 
-    type IncomingTextContent = {
-      conversation?: string
-      extendedTextMessage?: { text?: string }
-      imageMessage?: { caption?: string }
-      videoMessage?: { caption?: string }
-      buttonsResponseMessage?: { selectedButtonId?: string }
-      listResponseMessage?: { title?: string }
-      documentMessage?: { caption?: string }
-      [key: string]: unknown
-    }
+    const raw = msg?.message as Record<string, any> | undefined
+    const userId = msg.key.remoteJid
+    if (!userId) return
 
-    const raw = msg?.message as IncomingTextContent | undefined
+    const tipo = (raw as any)?.audioMessage ? 'audio'
+      : (raw as any)?.imageMessage ? 'image'
+      : (raw as any)?.documentMessage ? 'document'
+      : 'text'
+
     const texto: string = (
       raw?.conversation ??
       raw?.extendedTextMessage?.text ??
@@ -170,26 +165,7 @@ async function createSocket(): Promise<void> {
       ''
     ).trim()
 
-    const userId = msg.key.remoteJid
-    if (!userId) return
-
-    const tipoMensagem = raw?.conversation || raw?.extendedTextMessage?.text
-      ? 'texto'
-      : raw?.imageMessage
-      ? 'imagem'
-      : (raw as any)?.audioMessage
-      ? 'audio'
-      : raw?.documentMessage
-      ? 'documento'
-      : raw?.videoMessage
-      ? 'video'
-      : raw?.buttonsResponseMessage
-      ? 'botao'
-      : raw?.listResponseMessage
-      ? 'lista'
-      : 'desconhecido'
-
-    logger.info({ userId, tipoMensagem, trecho: texto.slice(0, 100) }, 'Mensagem recebida')
+    logger.info({ userId, tipo, trecho: texto.slice(0, 100) }, 'Mensagem recebida')
 
     if (DEBUG_MESSAGES && process.env.NODE_ENV !== 'production') {
       debug('Mensagem recebida (detalhe controlado)', {
@@ -199,102 +175,8 @@ async function createSocket(): Promise<void> {
       })
     }
 
-    const adapter = new BaileysAdapter(sock!)
-
-    const hasAudio = Boolean((raw as any)?.audioMessage)
-    if (hasAudio) {
-      const premiumAudio = await isPremium(userId)
-      if (!premiumAudio) {
-        await adapter.sendMessage(userId, { text: MSG_UPGRADE })
-        return
-      }
-      try {
-        await adapter.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
-        const audioMessage = (raw as any)?.audioMessage
-        const { buffer: fileBuffer, mimeType } = await adapter.downloadAudio(audioMessage)
-        const analiseAudio = await geminiService.transcreverAudioFinanceiro(fileBuffer, mimeType, userId)
-
-        if (!analiseAudio) {
-          await adapter.sendMessage(userId, {
-            text: '❌ Não consegui entender o áudio. Você pode enviar o lançamento em texto? Ex.: "mercado 50 pix"',
-          })
-          return
-        }
-
-        await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'audio', ...analiseAudio })
-
-        const valorFmt = formatarValor(analiseAudio.valor)
-        const transcricaoExibicao = String(analiseAudio.transcricao || '').slice(0, 400)
-        const resumo =
-          `🗣️ Transcrição:\n${transcricaoExibicao}\n\n` +
-          `🤖 Interpretação:\n` +
-          `📅 Data: ${analiseAudio.data}\n` +
-          `💰 Valor: R$ ${valorFmt}\n` +
-          `📂 Categoria: ${analiseAudio.categoria}\n` +
-          `💳 Pagamento: ${analiseAudio.formaPagamento}\n` +
-          `📝 Descrição: ${analiseAudio.descricao}\n\n` +
-          `✅ Confirmar lançamento? Responda com "S" para salvar ou "N" para cancelar.`
-
-        await adapter.sendMessage(userId, { text: resumo })
-        return
-      } catch (err) {
-        logger.error({ err: (err as any)?.message || err }, '[AUDIO] Erro ao processar áudio')
-        await adapter.sendMessage(userId, { text: '⚠️ Ocorreu um erro ao ler o áudio. Tente novamente mais tarde ou envie em texto.' })
-        return
-      }
-    }
-
-    const hasVoucherMedia = Boolean((raw as any)?.imageMessage || (raw as any)?.documentMessage)
-    if (hasVoucherMedia) {
-      const premiumVoucher = await isPremium(userId)
-      if (!premiumVoucher) {
-        await adapter.sendMessage(userId, { text: MSG_UPGRADE })
-        return
-      }
-      try {
-        await adapter.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
-        const isImage = Boolean((raw as any)?.imageMessage)
-        const mediaMessage = (raw as any)?.imageMessage || (raw as any)?.documentMessage
-        const { buffer: fileBuffer, mimeType } = isImage
-          ? await adapter.downloadImage(mediaMessage)
-          : await adapter.downloadDocument(mediaMessage)
-        const analise = await geminiService.analisarVoucherFinanceiro(fileBuffer, mimeType, userId)
-
-        if (!analise) {
-          await adapter.sendMessage(userId, {
-            text: '❌ Não consegui interpretar o comprovante. Você pode enviar o lançamento em texto? Ex.: "mercado 50 pix"',
-          })
-          return
-        }
-
-        await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'voucher', ...analise })
-
-        const valorFmt = formatarValor(analise.valor)
-        const parceladoTexto = analise.parcelado ? `\n🔢 Parcelado: Sim (${analise.parcelas}x)` : ''
-        const resumo =
-          `🤖 Análise do comprovante:\n\n` +
-          `📅 Data: ${analise.data}\n` +
-          `💰 Valor: R$ ${valorFmt}\n` +
-          `📂 Categoria: ${analise.categoria}\n` +
-          `💳 Pagamento: ${analise.formaPagamento}\n` +
-          `📝 Descrição: ${analise.descricao}` +
-          parceladoTexto +
-          `\n\n✅ Confirmar lançamento? Responda com "S" para confirmar ou "N" para cancelar.`
-
-        await adapter.sendMessage(userId, { text: resumo })
-        return
-      } catch (err) {
-        logger.error({ err: (err as any)?.message || err }, '[VOUCHER] Erro ao processar comprovante')
-        await adapter.sendMessage(userId, { text: '⚠️ Ocorreu um erro ao ler o comprovante. Tente novamente mais tarde ou envie em texto.' })
-        return
-      }
-    }
-
-    if (!texto) {
-      return
-    }
-
-    await handleMessage(adapter, userId, texto)
+    const mediaRaw = (raw as any)?.audioMessage ?? (raw as any)?.imageMessage ?? (raw as any)?.documentMessage
+    await dispatchWhatsAppMessage(new BaileysAdapter(sock!), userId, texto, tipo, mediaRaw)
   })
 }
 
