@@ -26,6 +26,8 @@ async function sugestoesCommand(sock, userId) {
     });
     return;
   }
+  await sock.sendMessage(userId, { text: '💡 Gerando sugestões personalizadas com IA... Isso pode levar alguns segundos.' });
+
   // Gerar sugestões usando IA real
   const sugestoes = await geminiService.gerarSugestoesEconomia(userId, dados);
   if (!sugestoes) {

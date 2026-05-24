@@ -14,6 +14,8 @@ async function analisarCommand(sock, userId) {
     await sock.sendMessage(userId, { text: '❌ Não há dados suficientes para análise. Registre lançamentos de pelo menos 2 meses primeiro.' });
     return;
   }
+  await sock.sendMessage(userId, { text: '🔍 Analisando seus padrões de gastos... Isso pode levar alguns segundos.' });
+
   // Gerar análise usando IA real
   const analise = await geminiService.analisarPadroesGastos(userId, dados);
   if (!analise) {
