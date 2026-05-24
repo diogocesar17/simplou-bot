@@ -14,6 +14,8 @@ async function previsaoCommand(sock, userId) {
     await sock.sendMessage(userId, { text: '❌ Não há dados suficientes para fazer previsões. Registre lançamentos de pelo menos 3 meses primeiro.' });
     return;
   }
+  await sock.sendMessage(userId, { text: '🔮 Analisando seus dados dos últimos meses... Isso pode levar alguns segundos.' });
+
   // Gerar previsão usando IA real
   const previsao = await geminiService.preverGastosFuturos(userId, dados);
   if (!previsao) {
