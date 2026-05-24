@@ -16,6 +16,7 @@ export async function dispatchWhatsAppMessage(
   texto: string,
   tipo: string,
   mediaRaw?: any,
+  nomeContato?: string,
 ): Promise<void> {
   if (tipo === 'audio') {
     const premium = await isPremium(userId)
@@ -105,6 +106,6 @@ export async function dispatchWhatsAppMessage(
   }
 
   if (texto) {
-    await handleMessage(adapter, userId, texto)
+    await handleMessage(adapter, userId, texto, nomeContato)
   }
 }

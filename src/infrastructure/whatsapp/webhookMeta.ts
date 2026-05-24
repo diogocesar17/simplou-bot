@@ -23,13 +23,14 @@ export function handleMetaWebhookVerification(req: IncomingMessage, res: ServerR
   return false;
 }
 
-// Parseia o payload do webhook da Meta e retorna { userId, texto, tipo, rawMessage }
+// Parseia o payload do webhook da Meta e retorna { userId, texto, tipo, rawMessage, nomeContato }
 // Retorna null se não for uma mensagem de texto/mídia processável
 export function parseMetaWebhookPayload(body: any): {
   userId: string;
   texto: string;
   tipo: 'text' | 'audio' | 'image' | 'document';
   rawMessage: any;
+  nomeContato?: string;
 } | null {
   try {
     const entry = body?.entry?.[0];
@@ -45,8 +46,9 @@ export function parseMetaWebhookPayload(body: any): {
 
     const tipo = message.type as 'text' | 'audio' | 'image' | 'document';
     const texto = message?.text?.body || message?.caption || '';
+    const nomeContato = value?.contacts?.[0]?.profile?.name as string | undefined;
 
-    return { userId, texto, tipo, rawMessage: message };
+    return { userId, texto, tipo, rawMessage: message, nomeContato };
   } catch (err) {
     logger.error({ err }, '[META WEBHOOK] Erro ao parsear payload');
     return null;

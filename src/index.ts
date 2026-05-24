@@ -48,6 +48,7 @@ import quantoGasteiCommand from './commands/quantoGastei';
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
 import { formatarCancelamento } from './utils/formatMessages';
+import { formatarValor } from './utils/formatUtils';
 import { logger, fileLogger } from './infrastructure/logger';
 import * as geminiService from './services/geminiService';
 import { initializeDatabase } from './infrastructure/databaseService';
@@ -57,7 +58,7 @@ import { buscarUsuario, cadastrarUsuario } from './services/usuariosService';
 import { verificarRateLimit } from './services/rateLimitService';
 
 // Exemplo de função de roteamento (simples)
-async function handleMessage(sock: any, userId: string, texto: string): Promise<void> {
+async function handleMessage(sock: any, userId: string, texto: string, nomeContato?: string): Promise<void> {
   const textoLower = texto.toLowerCase().trim();
 
   const estado = await obterEstado(userId);
@@ -65,10 +66,12 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   // Onboarding: cadastrar e dar boas-vindas a novos usuários
   const usuario = await buscarUsuario(userId);
   if (!usuario) {
-    await cadastrarUsuario(userId, { nome: 'Usuário' });
+    const nome = nomeContato || 'Usuário';
+    await cadastrarUsuario(userId, { nome });
+    const saudacao = nomeContato ? `Olá, ${nomeContato}!` : 'Olá!';
     await sock.sendMessage(userId, {
       text:
-        '👋 *Olá! Bem-vindo ao Simplou!*\n\n' +
+        `👋 *${saudacao} Bem-vindo ao Simplou!*\n\n` +
         'Sou seu assistente financeiro pelo WhatsApp. Com uma mensagem simples, você:\n\n' +
         '✅ Registra gastos e receitas\n' +
         '📊 Acompanha resumos do mês\n' +
@@ -262,18 +265,32 @@ async function handleMessage(sock: any, userId: string, texto: string): Promise<
   }
 
   // Roteamento para mensagens de boas-vindas
-  if (["oi", "olá", "ola", "hello", "hi", "ei", "opa"].includes(textoLower)) {
+  const SAUDACOES = ['oi', 'olá', 'ola', 'hello', 'hi', 'ei', 'opa', 'bom dia', 'boa tarde', 'boa noite', 'tudo bem', 'tudo bom', 'e aí', 'e ai'];
+  if (SAUDACOES.includes(textoLower)) {
+    const nomeUsuario = usuario.nome && usuario.nome !== 'Usuário' ? `, ${usuario.nome}` : '';
+    let corpo = '';
+    try {
+      const resumo = await lancamentosService.getResumoDoMesAtual(userId);
+      if (resumo.totalLancamentos > 0) {
+        const emoji = resumo.saldo >= 0 ? '🟢' : '🔴';
+        corpo =
+          '\n📊 *Este mês até agora:*\n' +
+          `• Gastos: R$ ${formatarValor(resumo.totalDespesas)}\n` +
+          `• Receitas: R$ ${formatarValor(resumo.totalReceitas)}\n` +
+          `• ${emoji} Saldo: R$ ${formatarValor(resumo.saldo)}\n\n` +
+          'Digite *resumo* para ver mais detalhes ou *ajuda* para todos os comandos.';
+      } else {
+        corpo =
+          '\n📝 Você ainda não tem lançamentos este mês.\n' +
+          '• _gastei 50 no mercado_ → registra um gasto\n' +
+          '• _recebi 1000 salário_ → registra uma receita\n\n' +
+          'Digite *ajuda* para ver tudo que posso fazer.';
+      }
+    } catch (_) {
+      corpo = '\nDigite *resumo* para ver seu mês ou *ajuda* para todos os comandos.';
+    }
     await sock.sendMessage(userId, {
-      text:
-        '👋 *Olá! Estou aqui.*\n\n' +
-        '📊 *Consultas rápidas:*\n' +
-        '• *resumo* — como foi o mês\n' +
-        '• *resumo hoje* — o que aconteceu hoje\n' +
-        '• *historico* — últimos lançamentos\n\n' +
-        '📝 *Registrar:*\n' +
-        '• _gastei 50 no mercado_\n' +
-        '• _recebi 1000 salário_\n\n' +
-        'Digite *ajuda* para ver tudo que posso fazer.'
+      text: `👋 *Olá${nomeUsuario}! Estou aqui.*${corpo}`
     });
     return;
   }

@@ -176,7 +176,8 @@ async function createSocket(): Promise<void> {
     }
 
     const mediaRaw = (raw as any)?.audioMessage ?? (raw as any)?.imageMessage ?? (raw as any)?.documentMessage
-    await dispatchWhatsAppMessage(new BaileysAdapter(sock!), userId, texto, tipo, mediaRaw)
+    const nomeContato = msg.pushName || undefined
+    await dispatchWhatsAppMessage(new BaileysAdapter(sock!), userId, texto, tipo, mediaRaw, nomeContato)
   })
 }
 
