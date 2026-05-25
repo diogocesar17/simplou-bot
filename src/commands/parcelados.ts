@@ -20,9 +20,7 @@ async function parceladosCommand(sock, userId) {
   }
   
   const itensParcelados = parcelados.map((parcelamento, idx) => {
-    const parcelasPagas = parcelamento.parcelas.filter(p => p.status === 'paga').length;
-    const parcelasPendentes = parcelamento.total_parcelas - parcelasPagas;
-    return `${idx + 1}. *${parcelamento.descricao}*\n   💰 Total: R$ ${formatarValor(parcelamento.valor_total)}\n   📦 ${parcelamento.total_parcelas}x de R$ ${formatarValor(parcelamento.valor_parcela)}\n   📊 ${parcelasPagas}/${parcelamento.total_parcelas} parcelas pagas, ${parcelasPendentes} pendentes\n   📂 ${parcelamento.categoria} | 💳 ${parcelamento.pagamento}\n   📅 ${parcelamento.primeira_parcela} a ${parcelamento.ultima_parcela}`;
+    return `${idx + 1}. *${parcelamento.descricao}*\n   💰 Total: R$ ${formatarValor(parcelamento.valor_total)} · ${parcelamento.total_parcelas}x de R$ ${formatarValor(parcelamento.valor_parcela)}\n   📅 ${parcelamento.primeira_parcela} a ${parcelamento.ultima_parcela}\n   📂 ${parcelamento.categoria} | 💳 ${parcelamento.pagamento}`;
   });
 
   await sock.sendMessage(userId, { 

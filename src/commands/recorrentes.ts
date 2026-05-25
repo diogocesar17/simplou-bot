@@ -24,9 +24,7 @@ async function recorrentesCommand(sock, userId) {
   await definirEstado(userId, 'recorrentes_listados', { recorrentes, timestamp: Date.now() });
 
   const itensRecorrentes = recorrentes.map((recorrente, idx) => {
-    const recorrenciasPagas = recorrente.recorrencias.filter(r => r.status === 'paga').length;
-    const recorrenciasPendentes = recorrente.total_recorrencias - recorrenciasPagas;
-    let item = `${idx + 1}. *${recorrente.descricao}*\n   💰 Valor: R$ ${formatarValor(recorrente.valor)}\n   🔄 ${recorrente.total_recorrencias} meses\n   ✅ Pagas: ${recorrenciasPagas} | ⏳ Pendentes: ${recorrenciasPendentes}\n   📂 ${recorrente.categoria} | 💳 ${recorrente.pagamento}\n   📅 ${recorrente.primeira_recorrencia} a ${recorrente.ultima_recorrencia}`;
+    let item = `${idx + 1}. *${recorrente.descricao}*\n   💰 R$ ${formatarValor(recorrente.valor)}/mês · ${recorrente.total_recorrencias} meses registrados\n   📅 ${recorrente.primeira_recorrencia} a ${recorrente.ultima_recorrencia}\n   📂 ${recorrente.categoria} | 💳 ${recorrente.pagamento}`;
     if (recorrente.recorrente_fim) {
       item += `\n   🛑 Fim: ${recorrente.recorrente_fim}`;
     }
