@@ -44,19 +44,20 @@ async function excluirCartaoCommand(sock, userId, texto) {
       cartaoEscolhido,
       totalLancamentos
     });
-    
-    await sock.sendMessage(userId, { 
-      text: formatarConfirmacao(
-        'Confirmar exclusão de cartão',
-        [
-          `Nome: ${cartaoEscolhido.nome_cartao}`,
-          `Vencimento: dia ${cartaoEscolhido.dia_vencimento}`,
-          `Fechamento: dia ${cartaoEscolhido.dia_fechamento}`,
-          `Lançamentos associados: ${totalLancamentos}`
-        ],
-        ['1 - Confirmar', '2 - Cancelar'],
-        'Detalhes do cartão'
-      )
+
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: '🗑️ Confirmar exclusão de cartão?',
+      body:
+        `💳 ${cartaoEscolhido.nome_cartao}\n` +
+        `📅 Vencimento: dia ${cartaoEscolhido.dia_vencimento}\n` +
+        `🔒 Fechamento: dia ${cartaoEscolhido.dia_fechamento}\n` +
+        `📊 Lançamentos associados: ${totalLancamentos}`,
+      footer: '⚠️ Esta ação não pode ser desfeita!',
+      buttons: [
+        { id: '1', title: '✅ Confirmar' },
+        { id: '2', title: '❌ Cancelar' },
+      ],
     });
     return;
   }
@@ -133,23 +134,23 @@ async function excluirCartaoCommand(sock, userId, texto) {
   }
 
   await definirEstado(userId, 'aguardando_escolha_exclusao_cartao', { cartoes });
-  
-  await sock.sendMessage(userId, { 
-    text: formatarMensagem({
-      titulo: 'Escolha o cartão para excluir',
-      emojiTitulo: '🗑️',
-      secoes: [{
-        titulo: 'Cartões disponíveis',
-        itens: cartoes.map((cartao, index) => 
-          `${index + 1}. ${cartao.nome_cartao} (vencimento: dia ${cartao.dia_vencimento})`
-        ),
-        emoji: '💳'
-      }],
-      dicas: [
-        { texto: 'Digite o número do cartão', comando: '1, 2, 3...' },
-        { texto: 'Cancelar exclusão', comando: '0 ou cancelar' }
-      ]
-    })
+
+  await sock.sendInteractiveMessage(userId, {
+    type: 'list',
+    header: '🗑️ Escolha o cartão para excluir',
+    body: 'Selecione o cartão que deseja excluir:',
+    footer: '⚠️ Esta ação não pode ser desfeita!',
+    buttonLabel: 'Ver cartões',
+    sections: [{
+      rows: [
+        ...cartoes.map((cartao: any, index: number) => ({
+          id: String(index + 1),
+          title: cartao.nome_cartao,
+          description: `Vencimento: dia ${cartao.dia_vencimento}`,
+        })),
+        { id: '0', title: '❌ Cancelar' },
+      ],
+    }],
   });
 }
 

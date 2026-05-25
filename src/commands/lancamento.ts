@@ -620,8 +620,19 @@ async function lancamentoCommand(sock, userId, texto) {
         // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
         if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento)) {
           await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
-          await sock.sendMessage(userId, {
-            text: '💳 Como pagou?\n\nResponda: *pix* · *cartão* · *dinheiro* · *débito* · *boleto* · *transferência*'
+          await sock.sendInteractiveMessage(userId, {
+            type: 'list',
+            header: '💳 Como pagou?',
+            body: 'Selecione a forma de pagamento:',
+            buttonLabel: 'Ver opções',
+            sections: [{ rows: [
+              { id: '1', title: '💠 Pix' },
+              { id: '2', title: '💵 Dinheiro' },
+              { id: '3', title: '💳 Cartão de crédito' },
+              { id: '4', title: '🏦 Débito' },
+              { id: '5', title: '📋 Boleto' },
+              { id: '6', title: '🔄 Transferência' },
+            ]}],
           });
           return;
         }
@@ -645,8 +656,19 @@ async function lancamentoCommand(sock, userId, texto) {
       // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
       if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento)) {
         await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
-        await sock.sendMessage(userId, {
-          text: '💳 Como pagou?\n\nResponda: *pix* · *cartão* · *dinheiro* · *débito* · *boleto* · *transferência*'
+        await sock.sendInteractiveMessage(userId, {
+          type: 'list',
+          header: '💳 Como pagou?',
+          body: 'Selecione a forma de pagamento:',
+          buttonLabel: 'Ver opções',
+          sections: [{ rows: [
+            { id: '1', title: '💠 Pix' },
+            { id: '2', title: '💵 Dinheiro' },
+            { id: '3', title: '💳 Cartão de crédito' },
+            { id: '4', title: '🏦 Débito' },
+            { id: '5', title: '📋 Boleto' },
+            { id: '6', title: '🔄 Transferência' },
+          ]}],
         });
         return;
       }
@@ -685,8 +707,19 @@ async function lancamentoCommand(sock, userId, texto) {
     const formaPagamento = mapaFormas[textoNorm];
     if (!formaPagamento) {
       await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
-      await sock.sendMessage(userId, {
-        text: '❌ Não entendi. Responda: *pix*, *cartão*, *dinheiro*, *débito*, *boleto* ou *transferência*'
+      await sock.sendInteractiveMessage(userId, {
+        type: 'list',
+        header: '❌ Opção inválida',
+        body: 'Selecione uma das formas de pagamento disponíveis:',
+        buttonLabel: 'Ver opções',
+        sections: [{ rows: [
+          { id: '1', title: '💠 Pix' },
+          { id: '2', title: '💵 Dinheiro' },
+          { id: '3', title: '💳 Cartão de crédito' },
+          { id: '4', title: '🏦 Débito' },
+          { id: '5', title: '📋 Boleto' },
+          { id: '6', title: '🔄 Transferência' },
+        ]}],
       });
       return;
     }
@@ -908,8 +941,19 @@ async function lancamentoCommand(sock, userId, texto) {
   // 5. Falta forma de pagamento
   if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (parsed.faltaFormaPagamento || parsed.pagamento === 'NÃO INFORMADO')) {
     await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
-    await sock.sendMessage(userId, {
-      text: '💳 Como pagou?\n\nResponda: *pix* · *cartão* · *dinheiro* · *débito* · *boleto* · *transferência*'
+    await sock.sendInteractiveMessage(userId, {
+      type: 'list',
+      header: '💳 Como pagou?',
+      body: 'Selecione a forma de pagamento:',
+      buttonLabel: 'Ver opções',
+      sections: [{ rows: [
+        { id: '1', title: '💠 Pix' },
+        { id: '2', title: '💵 Dinheiro' },
+        { id: '3', title: '💳 Cartão de crédito' },
+        { id: '4', title: '🏦 Débito' },
+        { id: '5', title: '📋 Boleto' },
+        { id: '6', title: '🔄 Transferência' },
+      ]}],
     });
     return;
   }
@@ -1059,21 +1103,21 @@ async function processarLancamento(sock, userId, parsed) {
       // Múltiplos cartões, pedir para escolher
   logger.info('🔔 Múltiplos cartões, pedir para escolher');
       await definirEstado(userId, 'aguardando_escolha_cartao', parsed);
-      let msg = formatarMensagem({
-        titulo: 'Escolha o Cartão',
-        emojiTitulo: '💳',
-        secoes: [{
-          titulo: 'Cartões Disponíveis',
-          itens: cartoes.map((cartao, index) => `${index + 1}. ${cartao.nome_cartao}`),
-          emoji: '💳'
+      await sock.sendInteractiveMessage(userId, {
+        type: 'list',
+        header: '💳 Escolha o cartão',
+        body: 'Selecione o cartão para registrar o lançamento:',
+        buttonLabel: 'Ver cartões',
+        sections: [{
+          rows: [
+            ...cartoes.map((cartao: any, index: number) => ({
+              id: String(index + 1),
+              title: cartao.nome_cartao,
+            })),
+            { id: '0', title: '❌ Cancelar' },
+          ],
         }],
-        dicas: [
-          { texto: 'Digite o número do cartão', comando: '1, 2, 3...' },
-          { texto: 'Cancelar operação', comando: '0 ou cancelar' }
-        ],
-        ajuda: 'Digite o número do cartão que deseja usar ou "0" para cancelar'
       });
-      await sock.sendMessage(userId, { text: msg });
       return;
     }
   }

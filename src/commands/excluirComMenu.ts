@@ -48,16 +48,16 @@ async function excluirComMenuCommand(sock, userId, texto) {
   // Se o usuário digitou apenas "excluir"
   if (textoLower === 'excluir') {
     await definirEstado(userId, 'aguardando_tipo_exclusao');
-    await sock.sendMessage(userId, {
-      text: formatarMenuComCancelamento(
-        'O que você quer excluir?',
-        [
-          'Lançamento - excluir gasto, receita, etc.',
-          'Cartão - excluir configuração de cartão'
-        ],
-        '⚠️ Atenção: Esta ação não pode ser desfeita!',
-        true
-      )
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: '🗑️ O que você quer excluir?',
+      body: 'Escolha o que deseja excluir:',
+      footer: '⚠️ Esta ação não pode ser desfeita!',
+      buttons: [
+        { id: '1', title: '📝 Lançamento' },
+        { id: '2', title: '💳 Cartão' },
+        { id: '0', title: '❌ Cancelar' },
+      ],
     });
     return;
   }
@@ -134,22 +134,17 @@ async function excluirComMenuCommand(sock, userId, texto) {
       };
 
       await definirEstado(userId, 'aguardando_escolha_exclusao_recorrente', { lancamento });
-      const mensagemEscolha = formatarMensagem({
-        titulo: 'Este lançamento é recorrente/fixo',
-        emojiTitulo: '🔁',
-        secoes: [{
-          titulo: 'O que deseja excluir?',
-          itens: [
-            '1. Apenas esta recorrência',
-            '2. Esta e todas as futuras'
-          ],
-          emoji: '⚠️'
-        }],
-        dicas: [
-          { texto: 'Cancelar', comando: '0 ou cancelar' }
-        ]
+      await sock.sendInteractiveMessage(userId, {
+        type: 'button',
+        header: '🔁 Lançamento recorrente',
+        body: `📝 ${lancamento.descricao}\n\nO que deseja excluir?`,
+        footer: 'Digite "cancelar" para abortar',
+        buttons: [
+          { id: '1', title: 'Só esta recorrência' },
+          { id: '2', title: 'Esta e futuras' },
+          { id: '0', title: '❌ Cancelar' },
+        ],
       });
-      await sock.sendMessage(userId, { text: mensagemEscolha });
       return;
     }
 
@@ -160,8 +155,16 @@ async function excluirComMenuCommand(sock, userId, texto) {
 
   // Se chegou até aqui, mostrar menu padrão
   await definirEstado(userId, 'aguardando_tipo_exclusao');
-  await sock.sendMessage(userId, {
-    text: '🗑️ *O que você quer excluir?*\n\n1️⃣ *Lançamento* - excluir gasto, receita, etc.\n2️⃣ *Cartão* - excluir configuração de cartão\n\n⚠️ *Atenção:* Esta ação não pode ser desfeita!\n\n💡 Digite o número da opção ou "cancelar"'
+  await sock.sendInteractiveMessage(userId, {
+    type: 'button',
+    header: '🗑️ O que você quer excluir?',
+    body: 'Escolha o que deseja excluir:',
+    footer: '⚠️ Esta ação não pode ser desfeita!',
+    buttons: [
+      { id: '1', title: '📝 Lançamento' },
+      { id: '2', title: '💳 Cartão' },
+      { id: '0', title: '❌ Cancelar' },
+    ],
   });
 }
 

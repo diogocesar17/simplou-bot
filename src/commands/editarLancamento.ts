@@ -82,22 +82,15 @@ async function editarLancamentoCommand(sock, userId, texto) {
         campo: campo,
         instrucao
       });
-      await sock.sendMessage(userId, {
-        text: formatarMensagem({
-          titulo: 'Este lançamento é parcelado',
-          emojiTitulo: '🧩',
-          secoes: [{
-            titulo: 'Como deseja aplicar a edição?',
-            itens: [
-              '1. Apenas esta parcela',
-              '2. Esta e todas as futuras parcelas'
-            ],
-            emoji: '⚙️'
-          }],
-          dicas: [
-            { texto: 'Cancelar edição', comando: '0 ou cancelar' }
-          ]
-        })
+      await sock.sendInteractiveMessage(userId, {
+        type: 'button',
+        header: '🧩 Lançamento parcelado',
+        body: `📝 ${contexto.lancamento?.descricao}\n\nComo deseja aplicar a edição?`,
+        buttons: [
+          { id: '1', title: 'Só esta parcela' },
+          { id: '2', title: 'Esta e futuras' },
+          { id: '0', title: '❌ Cancelar' },
+        ],
       });
     } else if (ehRecorrente) {
       await definirEstado(userId, 'aguardando_escolha_recorrente_edicao', {
@@ -106,22 +99,15 @@ async function editarLancamentoCommand(sock, userId, texto) {
         campo: campo,
         instrucao
       });
-      await sock.sendMessage(userId, {
-        text: formatarMensagem({
-          titulo: 'Este lançamento é recorrente/fixo',
-          emojiTitulo: '🔁',
-          secoes: [{
-            titulo: 'Como deseja aplicar a edição?',
-            itens: [
-              '1. Apenas esta recorrência',
-              '2. Esta e todas as futuras recorrências'
-            ],
-            emoji: '⚙️'
-          }],
-          dicas: [
-            { texto: 'Cancelar edição', comando: '0 ou cancelar' }
-          ]
-        })
+      await sock.sendInteractiveMessage(userId, {
+        type: 'button',
+        header: '🔁 Lançamento recorrente',
+        body: `📝 ${contexto.lancamento?.descricao}\n\nComo deseja aplicar a edição?`,
+        buttons: [
+          { id: '1', title: 'Só esta recorrência' },
+          { id: '2', title: 'Esta e futuras' },
+          { id: '0', title: '❌ Cancelar' },
+        ],
       });
     } else {
       await definirEstado(userId, 'aguardando_valor_edicao_lancamento', {
@@ -429,39 +415,24 @@ async function editarLancamentoCommand(sock, userId, texto) {
   }
 
   // Mostrar lançamento e opções de edição
-  await sock.sendMessage(userId, { 
-    text: formatarMensagem({
-      titulo: `Editar Lançamento ${idx + 1}`,
-      emojiTitulo: '📝',
-      secoes: [
-        {
-          titulo: 'Detalhes do Lançamento',
-          itens: [
-            `Data: ${dataExibir}`,
-            `Valor: R$ ${formatarValor(lancamento.valor)}`,
-            `Categoria: ${lancamento.categoria}`,
-            `Pagamento: ${lancamento.pagamento}`,
-            `Descrição: ${lancamento.descricao}`
-          ],
-          emoji: '📋'
-        },
-        {
-          titulo: 'Opções de Edição',
-          itens: [
-            '1. Valor',
-            '2. Categoria', 
-            '3. Descrição',
-            '4. Forma de pagamento',
-            '5. Data'
-          ],
-          emoji: '⚙️'
-        }
+  await sock.sendInteractiveMessage(userId, {
+    type: 'list',
+    header: `📝 Editar Lançamento ${idx + 1}`,
+    body:
+      `📅 ${dataExibir}  💰 R$ ${formatarValor(lancamento.valor)}\n` +
+      `📂 ${lancamento.categoria}  💳 ${lancamento.pagamento}\n` +
+      `📝 ${lancamento.descricao}\n\nQual campo deseja editar?`,
+    buttonLabel: 'Ver campos',
+    sections: [{
+      rows: [
+        { id: '1', title: '💰 Valor' },
+        { id: '2', title: '📂 Categoria' },
+        { id: '3', title: '📝 Descrição' },
+        { id: '4', title: '💳 Forma de pagamento' },
+        { id: '5', title: '📅 Data' },
+        { id: '0', title: '❌ Cancelar' },
       ],
-      dicas: [
-        { texto: 'Digite o número da opção', comando: '1, 2, 3, 4 ou 5' },
-        { texto: 'Cancelar edição', comando: '0 ou cancelar' }
-      ]
-    })
+    }],
   });
   
   logger.debug?.({ id: lancamento.id }, '[EDITAR_LANCAMENTO] lancamento id');

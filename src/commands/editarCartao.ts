@@ -201,23 +201,22 @@ async function editarCartaoCommand(sock, userId, texto) {
   }
 
   await definirEstado(userId, 'aguardando_escolha_edicao_cartao', { cartoes });
-  
-  await sock.sendMessage(userId, {
-    text: formatarMensagem({
-      titulo: 'Escolha o cartão para editar',
-      emojiTitulo: '✏️',
-      secoes: [{
-        titulo: 'Cartões disponíveis',
-        itens: cartoes.map((cartao, index) => 
-          `${index + 1}. ${cartao.nome_cartao} (vencimento: dia ${cartao.dia_vencimento})`
-        ),
-        emoji: '💳'
-      }],
-      dicas: [
-        { texto: 'Digite o número do cartão', comando: '1, 2, 3...' },
-        { texto: 'Cancelar edição', comando: '0 ou cancelar' }
-      ]
-    })
+
+  await sock.sendInteractiveMessage(userId, {
+    type: 'list',
+    header: '✏️ Escolha o cartão para editar',
+    body: 'Selecione o cartão que deseja editar:',
+    buttonLabel: 'Ver cartões',
+    sections: [{
+      rows: [
+        ...cartoes.map((cartao: any, index: number) => ({
+          id: String(index + 1),
+          title: cartao.nome_cartao,
+          description: `Vencimento: dia ${cartao.dia_vencimento}`,
+        })),
+        { id: '0', title: '❌ Cancelar' },
+      ],
+    }],
   });
 }
 

@@ -148,6 +148,15 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
       return;
     }
 
+    if (
+      estado.etapa === 'aguardando_confirmacao_ia' ||
+      estado.etapa === 'aguardando_forma_pagamento' ||
+      estado.etapa === 'aguardando_data_vencimento'
+    ) {
+      await lancamentoCommand(sock, userId, texto);
+      return;
+    }
+
     if(estado.etapa.includes('edicao_lancamento')) {
       await editarLancamentoCommand(sock, userId, texto);
       return;

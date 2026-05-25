@@ -48,16 +48,15 @@ async function editarComMenuCommand(sock, userId, texto) {
   // Se o usuário digitou apenas "editar"
   if (textoLower === 'editar') {
     await definirEstado(userId, 'aguardando_tipo_edicao');
-    await sock.sendMessage(userId, {
-      text: formatarMenuComCancelamento(
-        'O que você quer editar?',
-        [
-          'Lançamento - editar valor, categoria, data, etc.',
-          'Cartão - editar vencimento, fechamento'
-        ],
-        '💡 Escolha o tipo de edição que deseja realizar',
-        true
-      )
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: '✏️ O que você quer editar?',
+      body: 'Escolha o que deseja editar:',
+      buttons: [
+        { id: '1', title: '📝 Lançamento' },
+        { id: '2', title: '💳 Cartão' },
+        { id: '0', title: '❌ Cancelar' },
+      ],
     });
     return;
   }
@@ -143,40 +142,24 @@ async function editarComMenuCommand(sock, userId, texto) {
         dataExibir = String(lancamento.data);
       }
 
-      await sock.sendMessage(userId, { 
-        text: formatarMensagem({
-          titulo: `Editar Recorrente ${idx + 1}`,
-          emojiTitulo: '📝',
-          secoes: [
-            {
-              titulo: 'Detalhes da Recorrência (próxima pendente)'
-              ,
-              itens: [
-                `Data: ${dataExibir}`,
-                `Valor: R$ ${lancamento.valor}`,
-                `Categoria: ${lancamento.categoria}`,
-                `Pagamento: ${lancamento.pagamento}`,
-                `Descrição: ${lancamento.descricao}`
-              ],
-              emoji: '📋'
-            },
-            {
-              titulo: 'Opções de Edição',
-              itens: [
-                '1. Valor',
-                '2. Categoria', 
-                '3. Descrição',
-                '4. Forma de pagamento',
-                '5. Data'
-              ],
-              emoji: '⚙️'
-            }
+      await sock.sendInteractiveMessage(userId, {
+        type: 'list',
+        header: `📝 Editar Recorrente ${idx + 1}`,
+        body:
+          `📅 ${dataExibir}  💰 R$ ${lancamento.valor}\n` +
+          `📂 ${lancamento.categoria}  💳 ${lancamento.pagamento}\n` +
+          `📝 ${lancamento.descricao}\n\nQual campo deseja editar?`,
+        buttonLabel: 'Ver campos',
+        sections: [{
+          rows: [
+            { id: '1', title: '💰 Valor' },
+            { id: '2', title: '📂 Categoria' },
+            { id: '3', title: '📝 Descrição' },
+            { id: '4', title: '💳 Forma de pagamento' },
+            { id: '5', title: '📅 Data' },
+            { id: '0', title: '❌ Cancelar' },
           ],
-          dicas: [
-            { texto: 'Digite o número da opção', comando: '1, 2, 3, 4 ou 5' },
-            { texto: 'Cancelar edição', comando: '0 ou cancelar' }
-          ]
-        })
+        }],
       });
 
       await definirEstado(userId, 'aguardando_campo_edicao_lancamento', {
@@ -194,8 +177,15 @@ async function editarComMenuCommand(sock, userId, texto) {
 
   // Se chegou até aqui, mostrar menu padrão
   await definirEstado(userId, 'aguardando_tipo_edicao');
-  await sock.sendMessage(userId, {
-    text: '✏️ *O que você quer editar?*\n\n1️⃣ *Lançamento* - editar valor, categoria, data, etc.\n2️⃣ *Cartão* - editar vencimento, fechamento\n\n💡 Digite o número da opção ou "cancelar"'
+  await sock.sendInteractiveMessage(userId, {
+    type: 'button',
+    header: '✏️ O que você quer editar?',
+    body: 'Escolha o que deseja editar:',
+    buttons: [
+      { id: '1', title: '📝 Lançamento' },
+      { id: '2', title: '💳 Cartão' },
+      { id: '0', title: '❌ Cancelar' },
+    ],
   });
 }
 

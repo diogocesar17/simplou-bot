@@ -202,44 +202,18 @@ async function excluirLancamentoCommand(sock, userId, texto) {
 
     const escopoExclusao = escolha === '1' ? 'apenas_atual' : escolha === '2' ? 'atual_e_futuras' : 'todas_parcelas';
 
-    // Montar mensagem de confirmação específica
-    let mensagemConfirmacao;
+    const dataExib = lancamento.data instanceof Date ? lancamento.data.toLocaleDateString('pt-BR') : lancamento.data;
+    let header: string;
+    let body: string;
     if (escopoExclusao === 'apenas_atual') {
-      mensagemConfirmacao = formatarConfirmacao(
-        'Confirmar Exclusão (apenas esta parcela)',
-        [
-          `📝 Descrição: ${lancamento.descricao}`,
-          `💰 Valor: R$ ${lancamento.valor}`,
-          `📂 Categoria: ${lancamento.categoria}`,
-          `📅 Data: ${lancamento.data instanceof Date ? lancamento.data.toLocaleDateString('pt-BR') : lancamento.data}`
-        ],
-        ['Confirmar', 'Cancelar'],
-        'Dados da Parcela'
-      );
+      header = 'Excluir esta parcela?';
+      body = `📝 ${lancamento.descricao}\n💰 R$ ${lancamento.valor}\n📂 ${lancamento.categoria}\n📅 ${dataExib}`;
     } else if (escopoExclusao === 'atual_e_futuras') {
-      mensagemConfirmacao = formatarConfirmacao(
-        'Confirmar Exclusão (esta e futuras parcelas)',
-        [
-          `📝 Descrição: ${lancamento.descricao}`,
-          `📂 Categoria: ${lancamento.categoria}`,
-          `📅 Parcela atual: ${lancamento.parcela_atual} / ${lancamento.total_parcelas}`,
-          `⚠️ ATENÇÃO: Esta ação excluirá a parcela atual e todas as futuras.`
-        ],
-        ['Confirmar', 'Cancelar'],
-        'Dados do Parcelamento'
-      );
+      header = 'Excluir parcelas futuras?';
+      body = `📝 ${lancamento.descricao}\n📂 ${lancamento.categoria}\n📅 Parcela ${lancamento.parcela_atual}/${lancamento.total_parcelas}\n⚠️ Exclui esta e todas as futuras`;
     } else {
-      mensagemConfirmacao = formatarConfirmacao(
-        'Confirmar Exclusão (todas as parcelas)',
-        [
-          `📝 Descrição: ${lancamento.descricao}`,
-          `📂 Categoria: ${lancamento.categoria}`,
-          `📅 Parcelas: ${lancamento.total_parcelas}`,
-          `⚠️ ATENÇÃO: Esta ação excluirá TODAS as parcelas (passadas e futuras).`
-        ],
-        ['Confirmar', 'Cancelar'],
-        'Dados do Parcelamento'
-      );
+      header = 'Excluir TODAS as parcelas?';
+      body = `📝 ${lancamento.descricao}\n📂 ${lancamento.categoria}\n📅 ${lancamento.total_parcelas} parcelas\n⚠️ Inclui passadas e futuras`;
     }
 
     await definirEstado(userId, 'aguardando_confirmacao_exclusao_lancamento', {
@@ -248,7 +222,16 @@ async function excluirLancamentoCommand(sock, userId, texto) {
       escopoExclusao
     });
 
-    await sock.sendMessage(userId, { text: mensagemConfirmacao });
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header,
+      body,
+      footer: '⚠️ Esta ação não pode ser desfeita!',
+      buttons: [
+        { id: '1', title: '✅ Confirmar' },
+        { id: '2', title: '❌ Cancelar' },
+      ],
+    });
     return;
   }
 
@@ -284,32 +267,11 @@ async function excluirLancamentoCommand(sock, userId, texto) {
 
     const escopoExclusao = escolha === '1' ? 'apenas_atual' : 'atual_e_futuras';
 
-    // Montar mensagem de confirmação específica
-    let mensagemConfirmacao;
-    if (escopoExclusao === 'apenas_atual') {
-      mensagemConfirmacao = formatarConfirmacao(
-        'Confirmar Exclusão (apenas esta recorrência)',
-        [
-          `📝 Descrição: ${lancamento.descricao}`,
-          `💰 Valor: R$ ${lancamento.valor}`,
-          `📂 Categoria: ${lancamento.categoria}`,
-          `📅 Data: ${lancamento.data instanceof Date ? lancamento.data.toLocaleDateString('pt-BR') : lancamento.data}`
-        ],
-        ['Confirmar', 'Cancelar'],
-        'Dados da Recorrência'
-      );
-    } else {
-      mensagemConfirmacao = formatarConfirmacao(
-        'Confirmar Exclusão (esta e futuras recorrências)',
-        [
-          `📝 Descrição: ${lancamento.descricao}`,
-          `📂 Categoria: ${lancamento.categoria}`,
-          `⚠️ ATENÇÃO: Esta ação excluirá a recorrência atual e todas as futuras (não afeta passadas).`
-        ],
-        ['Confirmar', 'Cancelar'],
-        'Dados do Recorrente'
-      );
-    }
+    const dataExib = lancamento.data instanceof Date ? lancamento.data.toLocaleDateString('pt-BR') : lancamento.data;
+    const header = escopoExclusao === 'apenas_atual' ? 'Excluir esta recorrência?' : 'Excluir recorrências futuras?';
+    const body = escopoExclusao === 'apenas_atual'
+      ? `📝 ${lancamento.descricao}\n💰 R$ ${lancamento.valor}\n📂 ${lancamento.categoria}\n📅 ${dataExib}`
+      : `📝 ${lancamento.descricao}\n📂 ${lancamento.categoria}\n⚠️ Exclui esta e todas as futuras (passadas não afetadas)`;
 
     await definirEstado(userId, 'aguardando_confirmacao_exclusao_lancamento', {
       lancamentoId: lancamento.id,
@@ -317,7 +279,16 @@ async function excluirLancamentoCommand(sock, userId, texto) {
       escopoExclusao
     });
 
-    await sock.sendMessage(userId, { text: mensagemConfirmacao });
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header,
+      body,
+      footer: '⚠️ Esta ação não pode ser desfeita!',
+      buttons: [
+        { id: '1', title: '✅ Confirmar' },
+        { id: '2', title: '❌ Cancelar' },
+      ],
+    });
     return;
   }
   
@@ -381,62 +352,53 @@ async function excluirLancamentoCommand(sock, userId, texto) {
     await definirEstado(userId, 'aguardando_escolha_exclusao_parcelado', {
       lancamento
     });
-    const mensagemEscolha = formatarMensagem({
-      titulo: 'Este lançamento é parcelado',
-      emojiTitulo: '🧩',
-      secoes: [{
-        titulo: 'O que deseja excluir?',
-        itens: [
-          '1. Apenas esta parcela',
-          '2. Esta e todas as futuras',
-          '3. Todas as parcelas (passadas e futuras)'
-        ],
-        emoji: '⚠️'
-      }],
-      dicas: [
-        { texto: 'Cancelar', comando: '0 ou cancelar' }
-      ]
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: '🧩 Lançamento parcelado',
+      body: `📝 ${lancamento.descricao}\n\nO que deseja excluir?`,
+      footer: 'Digite "cancelar" para abortar',
+      buttons: [
+        { id: '1', title: 'Só esta parcela' },
+        { id: '2', title: 'Esta e futuras' },
+        { id: '3', title: 'Todas as parcelas' },
+      ],
     });
-    await sock.sendMessage(userId, { text: mensagemEscolha });
   } else if (lancamento.recorrente_id) {
     // Fluxo especial para recorrente: perguntar escopo
     await definirEstado(userId, 'aguardando_escolha_exclusao_recorrente', {
       lancamento
     });
-    const mensagemEscolha = formatarMensagem({
-      titulo: 'Este lançamento é recorrente/fixo',
-      emojiTitulo: '🔁',
-      secoes: [{
-        titulo: 'O que deseja excluir?',
-        itens: [
-          '1. Apenas esta recorrência',
-          '2. Esta e todas as futuras'
-        ],
-        emoji: '⚠️'
-      }],
-      dicas: [
-        { texto: 'Cancelar', comando: '0 ou cancelar' }
-      ]
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: '🔁 Lançamento recorrente',
+      body: `📝 ${lancamento.descricao}\n\nO que deseja excluir?`,
+      footer: 'Digite "cancelar" para abortar',
+      buttons: [
+        { id: '1', title: 'Só esta recorrência' },
+        { id: '2', title: 'Esta e futuras' },
+        { id: '0', title: '❌ Cancelar' },
+      ],
     });
-    await sock.sendMessage(userId, { text: mensagemEscolha });
   } else {
     // Se não for parcelado, confirmação normal
-    mensagemConfirmacao = formatarConfirmacao(
-      'Confirmar Exclusão',
-      [
-        `📝 Descrição: ${lancamento.descricao}`,
-        `💰 Valor: R$ ${lancamento.valor}`,
-        `📂 Categoria: ${lancamento.categoria}`,
-          `📅 Data: ${formatarDataParaExibicao(lancamento.data)}`
-      ],
-      ['Confirmar', 'Cancelar'],
-      'Dados do Lançamento'
-    );
     await definirEstado(userId, 'aguardando_confirmacao_exclusao_lancamento', {
       lancamentoId: lancamento.id,
       lancamento
     });
-    await sock.sendMessage(userId, { text: mensagemConfirmacao });
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: 'Confirmar exclusão?',
+      body:
+        `📝 ${lancamento.descricao}\n` +
+        `💰 R$ ${lancamento.valor}\n` +
+        `📂 ${lancamento.categoria}\n` +
+        `📅 ${formatarDataParaExibicao(lancamento.data)}`,
+      footer: '⚠️ Esta ação não pode ser desfeita!',
+      buttons: [
+        { id: '1', title: '✅ Confirmar' },
+        { id: '2', title: '❌ Cancelar' },
+      ],
+    });
   }
 }
 

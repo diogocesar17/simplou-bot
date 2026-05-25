@@ -185,8 +185,20 @@ async function meusLembretesCommand(sock, userId, texto) {
         case '1':
         case 'editar':
           await definirEstado(userId, 'edicao_lembrete_campo', { lembreteId });
-          await sock.sendMessage(userId, {
-            text: '✏️ O que deseja editar?\n\n1. Título\n2. Data de vencimento\n3. Valor\n4. Dias de antecedência\n5. Cancelar'
+          await sock.sendInteractiveMessage(userId, {
+            type: 'list',
+            header: '✏️ O que deseja editar?',
+            body: 'Selecione o campo que deseja alterar:',
+            buttonLabel: 'Ver opções',
+            sections: [{
+              rows: [
+                { id: '1', title: '📌 Título' },
+                { id: '2', title: '📅 Data de vencimento' },
+                { id: '3', title: '💰 Valor' },
+                { id: '4', title: '⏰ Antecedência' },
+                { id: '5', title: '❌ Cancelar' },
+              ],
+            }],
           });
           break;
           
@@ -218,9 +230,15 @@ async function meusLembretesCommand(sock, userId, texto) {
         case 'excluir':
         case 'deletar':
           await definirEstado(userId, 'confirmando_exclusao_lembrete', { lembreteId });
-          
-          await sock.sendMessage(userId, {
-            text: '⚠️ Tem certeza que deseja excluir este lembrete?\n\n1. Sim, excluir\n2. Não, cancelar\n\n💡 Esta ação não pode ser desfeita.'
+
+          await sock.sendInteractiveMessage(userId, {
+            type: 'button',
+            header: '⚠️ Confirmar exclusão?',
+            body: 'Tem certeza que deseja excluir este lembrete?\n\nEsta ação não pode ser desfeita.',
+            buttons: [
+              { id: '1', title: '✅ Sim, excluir' },
+              { id: '2', title: '❌ Cancelar' },
+            ],
           });
           break;
           
@@ -324,38 +342,24 @@ async function meusLembretesCommand(sock, userId, texto) {
     const descricaoTexto = lembreteSelecionado.descricao ? `\n📝 ${lembreteSelecionado.descricao}` : '';
     
     await definirEstado(userId, 'aguardando_acao_lembrete', { lembreteId: lembreteSelecionado.id });
-    
-    await sock.sendMessage(userId, {
-      text: formatarMensagem({
-        titulo: 'Detalhes do Lembrete',
-        emojiTitulo: '📋',
-        secoes: [
-          {
-            titulo: 'Informações',
-            itens: [
-              `📌 ${lembreteSelecionado.titulo}${valorTexto}${categoriaTexto}`,
-              `📅 Vence em: ${dataFormatada}${recorrenteTexto}`,
-              `⏰ Lembrar ${lembreteSelecionado.dias_antecedencia} dias antes`,
-              `🔔 Status: ${statusTexto}`,
-              ...(lembreteSelecionado.descricao ? [`📝 ${lembreteSelecionado.descricao}`] : [])
-            ],
-            emoji: '📊'
-          },
-          {
-            titulo: 'Ações Disponíveis',
-            itens: [
-              '1. ✏️ Editar',
-              `2. ${lembreteSelecionado.ativo ? '⏸️ Pausar' : '▶️ Ativar'}`,
-              '3. 🗑️ Excluir',
-              '4. ↩️ Voltar'
-            ],
-            emoji: '⚙️'
-          }
-        ],
-        dicas: [
-          { texto: 'Digite o número da ação desejada' }
-        ]
-      })
+
+    const bodyDetalhes = [
+      `📌 ${lembreteSelecionado.titulo}${valorTexto}${categoriaTexto}`,
+      `📅 Vence em: ${dataFormatada}${recorrenteTexto}`,
+      `⏰ Lembrar ${lembreteSelecionado.dias_antecedencia} dias antes`,
+      `🔔 Status: ${statusTexto}`,
+      ...(lembreteSelecionado.descricao ? [`📝 ${lembreteSelecionado.descricao}`] : [])
+    ].join('\n');
+
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: '📋 Detalhes do Lembrete',
+      body: bodyDetalhes,
+      buttons: [
+        { id: '1', title: '✏️ Editar' },
+        { id: '2', title: lembreteSelecionado.ativo ? '⏸️ Pausar' : '▶️ Ativar' },
+        { id: '3', title: '🗑️ Excluir' },
+      ],
     });
     return;
   }
@@ -414,60 +418,34 @@ async function meusLembretesCommand(sock, userId, texto) {
       return `${index + 1}. ${statusEmoji} ${lembrete.titulo}${valorTexto}${categoriaTexto}${recorrenteEmoji}\n   📅 ${dataFormatada}`;
     });
     
-    // Se há poucos lembretes, mostrar diretamente
-    if (lembretes.length <= 5) {
-      await sock.sendMessage(userId, {
-        text: formatarMensagem({
-          titulo,
-          emojiTitulo: '📋',
-          secoes: [
-            {
-              titulo: `${lembretes.length} lembrete(s) encontrado(s)`,
-              itens: itensLista,
-              emoji: '📊'
-            }
-          ],
-          dicas: [
-            { texto: 'Digite o número para ver detalhes' },
-            { texto: 'Criar novo lembrete', comando: 'lembrete' },
-            { texto: 'Ver apenas ativos', comando: 'meuslembretes ativos' },
-            { texto: 'Ver apenas pausados', comando: 'meuslembretes pausados' }
-          ]
-        }) + '\n\n💡 Digite o número do lembrete para ver detalhes e opções:'
-      });
-      
-      // Definir estado para aguardar seleção
-      await definirEstado(userId, 'aguardando_selecao_lembrete', { lembretes });
-      
-    } else {
-      // Muitos lembretes - mostrar lista paginada
-      await sock.sendMessage(userId, {
-        text: formatarMensagem({
-          titulo,
-          emojiTitulo: '📋',
-          secoes: [
-            {
-              titulo: `${lembretes.length} lembrete(s) encontrado(s)`,
-              itens: itensLista.slice(0, 10), // Mostrar apenas os primeiros 10
-              emoji: '📊'
-            },
-            ...(lembretes.length > 10 ? [{
-              titulo: 'Mais lembretes',
-              itens: [`... e mais ${lembretes.length - 10} lembrete(s)`],
-              emoji: '➕'
-            }] : [])
-          ],
-          dicas: [
-            { texto: 'Digite o número para ver detalhes' },
-            { texto: 'Filtrar por ativos', comando: 'meuslembretes ativos' },
-            { texto: 'Filtrar por pausados', comando: 'meuslembretes pausados' }
-          ]
-        }) + '\n\n💡 Digite o número do lembrete para ver detalhes:'
-      });
-      
-      // Definir estado para aguardar seleção
-      await definirEstado(userId, 'aguardando_selecao_lembrete', { lembretes });
-    }
+    // Montar lista interativa (máx 9 lembretes visíveis + cancelar = 10 itens)
+    const visiveis = lembretes.slice(0, 9);
+    const extras = lembretes.length - visiveis.length;
+    const bodyTexto = extras > 0
+      ? `${lembretes.length} lembretes encontrados. Mostrando os primeiros 9.\nUse "meuslembretes ativos" ou "pausados" para filtrar.`
+      : `${lembretes.length} lembrete(s) encontrado(s). Toque para ver detalhes.`;
+
+    await sock.sendInteractiveMessage(userId, {
+      type: 'list',
+      header: `📋 ${titulo}`,
+      body: bodyTexto,
+      buttonLabel: 'Ver lembretes',
+      sections: [{
+        rows: [
+          ...visiveis.map((l: any, i: number) => {
+            const data = new Date(l.data_vencimento).toLocaleDateString('pt-BR');
+            const valor = l.valor ? ` · R$ ${formatarValor(l.valor)}` : '';
+            const status = l.ativo ? '✅' : '⏸️';
+            const title = `${status} ${l.titulo}`.slice(0, 24);
+            return { id: String(i + 1), title, description: `📅 ${data}${valor}` };
+          }),
+          { id: '0', title: '↩️ Cancelar' },
+        ],
+      }],
+    });
+
+    // Definir estado para aguardar seleção
+    await definirEstado(userId, 'aguardando_selecao_lembrete', { lembretes });
     
   } catch (error) {
   logger.error({ err: (error as any)?.message || error }, '[MEUS_LEMBRETES] Erro ao listar lembretes');
