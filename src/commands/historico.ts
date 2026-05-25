@@ -2,7 +2,7 @@ import { formatarValor } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import * as databaseService from '../infrastructure/databaseService';
-import { definirEstado, obterEstado } from '../configs/stateManager';
+import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
 import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
@@ -49,6 +49,167 @@ function formatarItemLancamento(l: any, idx: number, usarCriadoEm: boolean): str
 
 async function historicoCommand(sock, userId, texto) {
   const textoLower = texto.toLowerCase().trim();
+
+  const estadoAtual = await obterEstado(userId);
+
+  // Handler: aguardando ação sobre lançamento selecionado do histórico
+  if (estadoAtual?.etapa === 'aguardando_acao_historico') {
+    const { lancamento } = estadoAtual.dadosParciais as any;
+    if (texto === '0' || textoLower === 'cancelar') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '↩️ Operação cancelada.' });
+      return;
+    }
+    if (texto === '1') {
+      await definirEstado(userId, 'aguardando_campo_edicao_lancamento', {
+        lancamentoId: lancamento.id,
+        lancamento,
+        campo: null
+      });
+      const dataExibir = new Date(lancamento.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      await sock.sendInteractiveMessage(userId, {
+        type: 'list',
+        header: '📝 Editar Lançamento',
+        body:
+          `📅 ${dataExibir}  💰 R$ ${formatarValor(lancamento.valor)}\n` +
+          `📂 ${lancamento.categoria}  💳 ${lancamento.pagamento}\n` +
+          `📝 ${lancamento.descricao}\n\nQual campo deseja editar?`,
+        buttonLabel: 'Ver campos',
+        sections: [{
+          rows: [
+            { id: '1', title: '💰 Valor' },
+            { id: '2', title: '📂 Categoria' },
+            { id: '3', title: '📝 Descrição' },
+            { id: '4', title: '💳 Forma de pagamento' },
+            { id: '5', title: '📅 Data' },
+            { id: '0', title: '❌ Cancelar' },
+          ],
+        }],
+      });
+      return;
+    }
+    if (texto === '2') {
+      if (lancamento.parcelamento_id) {
+        await definirEstado(userId, 'aguardando_escolha_exclusao_parcelado', { lancamento });
+        await sock.sendInteractiveMessage(userId, {
+          type: 'button',
+          header: '🧩 Lançamento parcelado',
+          body: `📝 ${lancamento.descricao}\n\nO que deseja excluir?`,
+          footer: 'Digite "cancelar" para abortar',
+          buttons: [
+            { id: '1', title: 'Só esta parcela' },
+            { id: '2', title: 'Esta e futuras' },
+            { id: '3', title: 'Todas as parcelas' },
+          ],
+        });
+      } else if (lancamento.recorrente_id) {
+        await definirEstado(userId, 'aguardando_escolha_exclusao_recorrente', { lancamento });
+        await sock.sendInteractiveMessage(userId, {
+          type: 'button',
+          header: '🔁 Lançamento recorrente',
+          body: `📝 ${lancamento.descricao}\n\nO que deseja excluir?`,
+          footer: 'Digite "cancelar" para abortar',
+          buttons: [
+            { id: '1', title: 'Só esta recorrência' },
+            { id: '2', title: 'Esta e futuras' },
+            { id: '0', title: '❌ Cancelar' },
+          ],
+        });
+      } else {
+        await definirEstado(userId, 'aguardando_confirmacao_exclusao_lancamento', {
+          lancamentoId: lancamento.id,
+          lancamento
+        });
+        await sock.sendInteractiveMessage(userId, {
+          type: 'button',
+          header: 'Confirmar exclusão?',
+          body:
+            `📝 ${lancamento.descricao}\n` +
+            `💰 R$ ${lancamento.valor}\n` +
+            `📂 ${lancamento.categoria}`,
+          footer: '⚠️ Esta ação não pode ser desfeita!',
+          buttons: [
+            { id: '1', title: '✅ Confirmar' },
+            { id: '2', title: '❌ Cancelar' },
+          ],
+        });
+      }
+      return;
+    }
+    await limparEstado(userId);
+    return;
+  }
+
+  // Handler: aguardando seleção de item no histórico interativo
+  if (estadoAtual?.etapa === 'aguardando_selecao_historico') {
+    const { lista, mesAno, timestamp, pagina } = estadoAtual.dadosParciais as any;
+
+    if (texto === '0' || textoLower === 'cancelar' || textoLower === 'fechar') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '↩️ Histórico fechado.' });
+      return;
+    }
+
+    if (textoLower === 'mais') {
+      const proximaPagina = (pagina ?? 0) + 1;
+      const inicio = proximaPagina * 9;
+      const chunk = lista.slice(inicio, inicio + 9);
+      if (chunk.length === 0) {
+        await sock.sendMessage(userId, { text: 'Não há mais lançamentos.' });
+        return;
+      }
+      const rows = chunk.map((l: any, i: number) => {
+        const tipoEmoji = l.tipo === 'receita' ? '💰' : '💸';
+        const title = `${tipoEmoji} R$ ${formatarValor(l.valor)} — ${l.categoria}`.slice(0, 24);
+        const dataStr = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        return { id: String(i + 1), title, description: `${dataStr} · ${l.pagamento}` };
+      });
+      const temMais = lista.length > inicio + chunk.length;
+      if (temMais) {
+        rows.push({ id: 'mais', title: '📋 Ver mais', description: '' });
+      } else {
+        rows.push({ id: '0', title: '↩️ Fechar', description: '' });
+      }
+      await definirEstado(userId, 'aguardando_selecao_historico', { lista, mesAno, timestamp, pagina: proximaPagina });
+      await sock.sendInteractiveMessage(userId, {
+        type: 'list',
+        header: '📋 Histórico',
+        body: `Lançamentos ${inicio + 1}–${inicio + chunk.length} de ${lista.length}`,
+        buttonLabel: 'Ver lançamentos',
+        sections: [{ rows }],
+      });
+      return;
+    }
+
+    const idx = parseInt(texto) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= lista.length) {
+      await sock.sendMessage(userId, { text: `❌ Número inválido.` });
+      return;
+    }
+
+    const l = lista[idx + (pagina ?? 0) * 9];
+    if (!l) {
+      await sock.sendMessage(userId, { text: `❌ Item não encontrado.` });
+      return;
+    }
+
+    await definirEstado(userId, 'aguardando_acao_historico', { lancamento: l });
+    const dataStr = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const tipoEmoji = l.tipo === 'receita' ? '💰' : '💸';
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: `${tipoEmoji} ${l.descricao || l.categoria}`,
+      body:
+        `📅 ${dataStr}  💰 R$ ${formatarValor(l.valor)}\n` +
+        `📂 ${l.categoria}  💳 ${l.pagamento}`,
+      buttons: [
+        { id: '1', title: '✏️ Editar' },
+        { id: '2', title: '🗑️ Excluir' },
+      ],
+    });
+    return;
+  }
+
   // Extrai o possível período após o comando
   const partes = texto.trim().split(/\s+/);
   let mesAno: { mes: number; ano: number } | null = null;
@@ -225,6 +386,36 @@ async function historicoCommand(sock, userId, texto) {
       })
     });
   }
+
+  // Lista interativa para selecionar item
+  const listaInterativa = ultimos.slice(0, 9);
+  const rowsInterativos = listaInterativa.map((l: any, i: number) => {
+    const tipoEmoji = l.tipo === 'receita' ? '💰' : '💸';
+    const title = `${tipoEmoji} R$ ${formatarValor(l.valor)} — ${l.categoria}`.slice(0, 24);
+    const dataStr = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    return { id: String(i + 1), title, description: `${dataStr} · ${l.pagamento}` };
+  });
+  const temMaisInterativo = ultimos.length > 9;
+  if (temMaisInterativo) {
+    rowsInterativos.push({ id: 'mais', title: '📋 Ver mais', description: '' });
+  } else {
+    rowsInterativos.push({ id: '0', title: '↩️ Fechar', description: '' });
+  }
+
+  await definirEstado(userId, 'aguardando_selecao_historico', {
+    lista: ultimos,
+    mesAno,
+    timestamp: Date.now(),
+    pagina: 0
+  });
+
+  await sock.sendInteractiveMessage(userId, {
+    type: 'list',
+    header: '📋 Selecione um lançamento',
+    body: 'Toque em um item para editar ou excluir:',
+    buttonLabel: 'Ver lançamentos',
+    sections: [{ rows: rowsInterativos }],
+  });
 }
 
 async function historicoMaisCommand(sock, userId) {

@@ -3,16 +3,64 @@ import editarLancamentoCommand from './editarLancamento';
 import editarCartaoCommand from './editarCartao';
 import { formatarCancelamento, formatarMenuComCancelamento, formatarMensagem } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
+import * as lancamentosService from '../services/lancamentosService';
+import { formatarValor } from '../utils/formatUtils';
 
 async function editarComMenuCommand(sock, userId, texto) {
   const textoLower = texto.toLowerCase().trim();
   const estado = await obterEstado(userId);
 
+  // Se está aguardando seleção de lançamento para edição
+  if (estado?.etapa === 'aguardando_selecao_lancamento_edicao') {
+    const lancamentos = (estado.dadosParciais as any).lancamentos as any[];
+
+    if (textoLower === 'cancelar' || texto === '0') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '↩️ Operação cancelada.' });
+      return;
+    }
+
+    const idx = parseInt(texto) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= lancamentos.length) {
+      await sock.sendMessage(userId, { text: `❌ Número inválido. Digite de 1 a ${lancamentos.length}.` });
+      return;
+    }
+
+    const l = lancamentos[idx];
+    await definirEstado(userId, 'aguardando_campo_edicao_lancamento', {
+      lancamentoId: l.id,
+      lancamento: l,
+      campo: null
+    });
+
+    const dataExibir = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    await sock.sendInteractiveMessage(userId, {
+      type: 'list',
+      header: '📝 Editar Lançamento',
+      body:
+        `📅 ${dataExibir}  💰 R$ ${formatarValor(l.valor)}\n` +
+        `📂 ${l.categoria}  💳 ${l.pagamento}\n` +
+        `📝 ${l.descricao}\n\nQual campo deseja editar?`,
+      buttonLabel: 'Ver campos',
+      sections: [{
+        rows: [
+          { id: '1', title: '💰 Valor' },
+          { id: '2', title: '📂 Categoria' },
+          { id: '3', title: '📝 Descrição' },
+          { id: '4', title: '💳 Forma de pagamento' },
+          { id: '5', title: '📅 Data' },
+          { id: '0', title: '❌ Cancelar' },
+        ],
+      }],
+    });
+    return;
+  }
+
   // Se está aguardando escolha do tipo de edição
   if (estado?.etapa === 'aguardando_tipo_edicao') {
     if (textoLower === 'cancelar' || texto === '0') {
       await limparEstado(userId);
-      await sock.sendMessage(userId, { 
+      await sock.sendMessage(userId, {
         text: formatarCancelamento('Edição', [
           { texto: 'Ver histórico', comando: 'historico' },
           { texto: 'Ver resumo do mês', comando: 'resumo' },
@@ -23,15 +71,37 @@ async function editarComMenuCommand(sock, userId, texto) {
     }
 
     const escolha = parseInt(texto);
-    
+
     switch (escolha) {
-      case 1:
-        await limparEstado(userId);
-        await sock.sendMessage(userId, { 
-          text: '📝 *Editar Lançamento*\n\n💡 Para editar um lançamento:\n1️⃣ Primeiro use "histórico" para ver os lançamentos\n2️⃣ Depois use "editar <número>"\n\n📋 Exemplo:\n• histórico\n• editar 2' 
+      case 1: {
+        const lancamentos = await lancamentosService.buscarLancamentosRecentes(userId, 10);
+        if (!lancamentos || lancamentos.length === 0) {
+          await limparEstado(userId);
+          await sock.sendMessage(userId, { text: '📭 Nenhum lançamento encontrado para editar.' });
+          return;
+        }
+        await definirEstado(userId, 'aguardando_selecao_lancamento_edicao', { lancamentos });
+        const rows = lancamentos.map((l: any, i: number) => {
+          const tipoEmoji = l.tipo === 'receita' ? '💰' : '💸';
+          const title = `${tipoEmoji} R$ ${formatarValor(l.valor)} — ${l.categoria}`.slice(0, 24);
+          const dataStr = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+          return {
+            id: String(i + 1),
+            title,
+            description: `${dataStr} · ${l.pagamento}`
+          };
+        });
+        rows.push({ id: '0', title: '↩️ Cancelar', description: '' });
+        await sock.sendInteractiveMessage(userId, {
+          type: 'list',
+          header: '📝 Selecione o lançamento',
+          body: 'Escolha o lançamento que deseja editar:',
+          buttonLabel: 'Ver lançamentos',
+          sections: [{ rows }],
         });
         return;
-        
+      }
+
       case 2:
         await limparEstado(userId);
         await editarCartaoCommand(sock, userId, 'editar cartão');
@@ -63,8 +133,25 @@ async function editarComMenuCommand(sock, userId, texto) {
 
   // Se o usuário digitou "editar lançamento" ou "editar cartão"
   if (textoLower === 'editar lancamento' || textoLower === 'editar lançamento') {
-    await sock.sendMessage(userId, { 
-      text: '📝 *Editar Lançamento*\n\n💡 Para editar um lançamento:\n1️⃣ Primeiro use "histórico" para ver os lançamentos\n2️⃣ Depois use "editar <número>"\n\n📋 Exemplo:\n• histórico\n• editar 2' 
+    const lancamentos = await lancamentosService.buscarLancamentosRecentes(userId, 10);
+    if (!lancamentos || lancamentos.length === 0) {
+      await sock.sendMessage(userId, { text: '📭 Nenhum lançamento encontrado para editar.' });
+      return;
+    }
+    await definirEstado(userId, 'aguardando_selecao_lancamento_edicao', { lancamentos });
+    const rows = lancamentos.map((l: any, i: number) => {
+      const tipoEmoji = l.tipo === 'receita' ? '💰' : '💸';
+      const title = `${tipoEmoji} R$ ${formatarValor(l.valor)} — ${l.categoria}`.slice(0, 24);
+      const dataStr = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      return { id: String(i + 1), title, description: `${dataStr} · ${l.pagamento}` };
+    });
+    rows.push({ id: '0', title: '↩️ Cancelar', description: '' });
+    await sock.sendInteractiveMessage(userId, {
+      type: 'list',
+      header: '📝 Selecione o lançamento',
+      body: 'Escolha o lançamento que deseja editar:',
+      buttonLabel: 'Ver lançamentos',
+      sections: [{ rows }],
     });
     return;
   }

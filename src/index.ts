@@ -151,7 +151,8 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     if (
       estado.etapa === 'aguardando_confirmacao_ia' ||
       estado.etapa === 'aguardando_forma_pagamento' ||
-      estado.etapa === 'aguardando_data_vencimento'
+      estado.etapa === 'aguardando_data_vencimento' ||
+      estado.etapa === 'aguardando_pos_lancamento'
     ) {
       await lancamentoCommand(sock, userId, texto);
       return;
@@ -174,7 +175,7 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
       return;
     }
   
-    if(estado.etapa.includes('tipo_edicao')) {
+    if(estado.etapa.includes('tipo_edicao') || estado.etapa.includes('selecao_lancamento_edicao')) {
       await editarComMenuCommand(sock, userId, texto);
       return;
     }
@@ -232,6 +233,12 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     // Roteamento para estados de recorrentes
     if (estado.etapa.includes('selecao_recorrente') || estado.etapa.includes('acao_recorrente')) {
       await recorrentesCommand(sock, userId, texto);
+      return;
+    }
+
+    // Roteamento para estados de histórico interativo
+    if (estado.etapa.includes('selecao_historico') || estado.etapa.includes('acao_historico')) {
+      await historicoCommand(sock, userId, texto);
       return;
     }
 

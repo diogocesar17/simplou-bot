@@ -404,9 +404,72 @@ async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) 
   return mensagem;
 }
 
+async function enviarConfirmacaoInterativa(sock, userId, lancamentoId: any, parsed: any, mensagemSucesso: string) {
+  const lancamentoParaEstado = {
+    id: lancamentoId,
+    data: parsed.data ? parsed.data.split('/').reverse().join('-') : new Date().toISOString().slice(0, 10),
+    tipo: parsed.tipo,
+    descricao: parsed.descricao,
+    valor: parsed.valor,
+    categoria: parsed.categoria,
+    pagamento: parsed.pagamento,
+  };
+  await sock.sendInteractiveMessage(userId, {
+    type: 'button',
+    header: '✅ Lançamento registrado!',
+    body: mensagemSucesso,
+    buttons: [
+      { id: '1', title: '✏️ Editar' },
+      { id: '2', title: '👍 OK' },
+    ],
+  });
+  await definirEstado(userId, 'aguardando_pos_lancamento', { lancamentoId, lancamento: lancamentoParaEstado });
+}
+
 async function lancamentoCommand(sock, userId, texto) {
   logger.info({ userId, textoLen: (texto || '').length }, '[LANCAMENTO] Comando iniciado');
-  
+
+  // 0. Fluxo aguardando ação pós-lançamento (botão Editar / OK)
+  const estadoInicial = await obterEstado(userId);
+  if (estadoInicial?.etapa === 'aguardando_pos_lancamento') {
+    const { lancamentoId, lancamento } = estadoInicial.dadosParciais as any;
+    const resposta = texto.trim();
+    if (resposta === '2' || resposta.toLowerCase() === 'ok') {
+      await limparEstado(userId);
+      return;
+    }
+    if (resposta === '1' || resposta.toLowerCase() === 'editar') {
+      await definirEstado(userId, 'aguardando_campo_edicao_lancamento', {
+        lancamentoId,
+        lancamento,
+        campo: null
+      });
+      const dataExibir = new Date(lancamento.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      await sock.sendInteractiveMessage(userId, {
+        type: 'list',
+        header: '📝 Editar Lançamento',
+        body:
+          `📅 ${dataExibir}  💰 R$ ${formatarValor(lancamento.valor)}\n` +
+          `📂 ${lancamento.categoria}  💳 ${lancamento.pagamento}\n` +
+          `📝 ${lancamento.descricao}\n\nQual campo deseja editar?`,
+        buttonLabel: 'Ver campos',
+        sections: [{
+          rows: [
+            { id: '1', title: '💰 Valor' },
+            { id: '2', title: '📂 Categoria' },
+            { id: '3', title: '📝 Descrição' },
+            { id: '4', title: '💳 Forma de pagamento' },
+            { id: '5', title: '📅 Data' },
+            { id: '0', title: '❌ Cancelar' },
+          ],
+        }],
+      });
+      return;
+    }
+    await limparEstado(userId);
+    return;
+  }
+
   // 1. Fluxo aguardando confirmação da IA
   const estado = await obterEstado(userId);
   if (estado?.etapa === 'aguardando_confirmacao_ia') {
@@ -847,8 +910,8 @@ async function lancamentoCommand(sock, userId, texto) {
   logger.info({ tipo: dados.tipo, valor: dados.valor, categoria: dados.categoria, pagamento: dados.pagamento, cartao: dados.cartao_nome }, '🔔 Dados do lançamento (resumo)');
     const novoIdEscolhido = await lancamentosService.salvarLancamento(userId, dados as any);
     await limparEstado(userId);
-    await sock.sendMessage(userId, { text: await gerarMensagemSucesso(userId, parsed, cartaoEscolhido) });
-    await definirEstado(userId, 'ultimo_lancamento', { lancamentoId: novoIdEscolhido, timestamp: Date.now() });
+    const msgEscolhido = await gerarMensagemSucesso(userId, parsed, cartaoEscolhido);
+    await enviarConfirmacaoInterativa(sock, userId, novoIdEscolhido, parsed, msgEscolhido);
 
     // Verificar orçamento da categoria
     if (parsed.tipo === 'gasto' && parsed.categoria) {
@@ -999,10 +1062,8 @@ async function processarLancamento(sock, userId, parsed) {
       
       const novoIdSemCartao = await lancamentosService.salvarLancamento(userId, dados);
       logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'sem_cartao' }, '[LANCAMENTO] Salvo');
-      await sock.sendMessage(userId, {
-        text: await gerarMensagemSucesso(userId, parsed) + `\n\n💡 *Dica:* Para controlar faturas, use "configurar cartao"!`
-      });
-      await definirEstado(userId, 'ultimo_lancamento', { lancamentoId: novoIdSemCartao, timestamp: Date.now() });
+      const msgSemCartao = await gerarMensagemSucesso(userId, parsed) + `\n\n💡 *Dica:* Para controlar faturas, use "configurar cartao"!`;
+      await enviarConfirmacaoInterativa(sock, userId, novoIdSemCartao, parsed, msgSemCartao);
 
       // Verificar orçamento da categoria
       if (parsed.tipo === 'gasto' && parsed.categoria) {
@@ -1076,8 +1137,8 @@ async function processarLancamento(sock, userId, parsed) {
 
       const novoIdCartao = await lancamentosService.salvarLancamento(userId, dados);
       logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, cartao: cartao.nome_cartao, origem: 'simples_cartao' }, '[LANCAMENTO] Salvo');
-      await sock.sendMessage(userId, { text: await gerarMensagemSucesso(userId, parsed, cartao) });
-      await definirEstado(userId, 'ultimo_lancamento', { lancamentoId: novoIdCartao, timestamp: Date.now() });
+      const msgCartao = await gerarMensagemSucesso(userId, parsed, cartao);
+      await enviarConfirmacaoInterativa(sock, userId, novoIdCartao, parsed, msgCartao);
 
       // Verificar orçamento da categoria
       if (parsed.tipo === 'gasto' && parsed.categoria) {
@@ -1161,8 +1222,8 @@ async function processarLancamento(sock, userId, parsed) {
 
   const novoId = await lancamentosService.salvarLancamento(userId, dados);
   logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'simples' }, '[LANCAMENTO] Salvo');
-  await sock.sendMessage(userId, { text: await gerarMensagemSucesso(userId, parsed) });
-  await definirEstado(userId, 'ultimo_lancamento', { lancamentoId: novoId, timestamp: Date.now() });
+  const msgSimples = await gerarMensagemSucesso(userId, parsed);
+  await enviarConfirmacaoInterativa(sock, userId, novoId, parsed, msgSimples);
 
   // Verificar orçamento da categoria
   if (parsed.tipo === 'gasto' && parsed.categoria) {
