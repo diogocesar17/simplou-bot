@@ -2457,11 +2457,20 @@ async function buscarParceladosAtivos(userId, limite = 20) {
         COUNT(*) OVER (PARTITION BY l.parcelamento_id) as total_parcelas,
         ROW_NUMBER() OVER (PARTITION BY l.parcelamento_id ORDER BY l.data) as parcela_atual
       FROM lancamentos l
-      WHERE l.user_id = $1 
+      WHERE l.user_id = $1
         AND l.parcelamento_id IS NOT NULL
         AND l.data >= CURRENT_DATE - INTERVAL '1 year'
+        AND l.parcelamento_id IN (
+          SELECT parcelamento_id
+          FROM lancamentos
+          WHERE user_id = $1
+            AND parcelamento_id IS NOT NULL
+            AND data >= CURRENT_DATE - INTERVAL '1 year'
+          GROUP BY parcelamento_id
+          ORDER BY MIN(data)
+          LIMIT $2
+        )
       ORDER BY l.parcelamento_id, l.data
-      LIMIT $2
     `;
     
     const result = await queryDatabase(query, [userId, limite]);
@@ -2519,11 +2528,20 @@ async function buscarRecorrentesAtivos(userId, limite = 20) {
         COUNT(*) OVER (PARTITION BY l.recorrente_id) as total_recorrencias,
         ROW_NUMBER() OVER (PARTITION BY l.recorrente_id ORDER BY l.data) as recorrencia_atual
       FROM lancamentos l
-      WHERE l.user_id = $1 
+      WHERE l.user_id = $1
         AND l.recorrente_id IS NOT NULL
         AND l.data >= CURRENT_DATE - INTERVAL '1 year'
+        AND l.recorrente_id IN (
+          SELECT recorrente_id
+          FROM lancamentos
+          WHERE user_id = $1
+            AND recorrente_id IS NOT NULL
+            AND data >= CURRENT_DATE - INTERVAL '1 year'
+          GROUP BY recorrente_id
+          ORDER BY MIN(data)
+          LIMIT $2
+        )
       ORDER BY l.recorrente_id, l.data
-      LIMIT $2
     `;
     
     const result = await queryDatabase(query, [userId, limite]);

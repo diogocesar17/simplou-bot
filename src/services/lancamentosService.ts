@@ -205,12 +205,12 @@ export async function buscarGastosValorAlto(userId: string, valorMinimo: number 
 }
 
 // Funções para parcelamentos e recorrentes
-export async function buscarParceladosAtivos(userId: string, _limite?: number): Promise<any[]> {
-  return await databaseService.buscarParceladosAtivos(userId);
+export async function buscarParceladosAtivos(userId: string, limite = 20): Promise<any[]> {
+  return await databaseService.buscarParceladosAtivos(userId, limite);
 }
 
-export async function buscarRecorrentesAtivos(userId: string, _limite?: number): Promise<any[]> {
-  return await databaseService.buscarRecorrentesAtivos(userId);
+export async function buscarRecorrentesAtivos(userId: string, limite = 20): Promise<any[]> {
+  return await databaseService.buscarRecorrentesAtivos(userId, limite);
 }
 
 export async function excluirParcelamentoPorId(userId: string, id: number): Promise<any> {

@@ -223,6 +223,18 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
       return;
     }
 
+    // Roteamento para estados de parcelados
+    if (estado.etapa.includes('selecao_parcelado') || estado.etapa.includes('acao_parcelado')) {
+      await parceladosCommand(sock, userId, texto);
+      return;
+    }
+
+    // Roteamento para estados de recorrentes
+    if (estado.etapa.includes('selecao_recorrente') || estado.etapa.includes('acao_recorrente')) {
+      await recorrentesCommand(sock, userId, texto);
+      return;
+    }
+
     // Roteamento para estados de meus lembretes (mais específicos) primeiro
     if (
       estado.etapa.includes('selecao_lembrete') ||
@@ -347,13 +359,13 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
 
   // Roteamento para o comando de parcelados
   if (["parcelados", "parcelado"].includes(textoLower)) {
-    await parceladosCommand(sock, userId);
+    await parceladosCommand(sock, userId, texto);
     return;
   }
 
   // Roteamento para o comando de recorrentes/fixos
   if (["recorrentes", "recorrente", "fixos", "fixo"].includes(textoLower)) {
-    await recorrentesCommand(sock, userId);
+    await recorrentesCommand(sock, userId, texto);
     return;
   }
 
