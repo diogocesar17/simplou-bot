@@ -39,17 +39,22 @@ export async function dispatchWhatsAppMessage(
       await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'audio', ...analise })
 
       const valorFmt = formatarValor(analise.valor)
-      const transcricao = String(analise.transcricao || '').slice(0, 400)
-      await adapter.sendMessage(userId, {
-        text:
-          `🗣️ Transcrição:\n${transcricao}\n\n` +
-          `🤖 Interpretação:\n` +
+      const transcricao = String(analise.transcricao || '').slice(0, 300)
+      await adapter.sendInteractiveMessage(userId, {
+        type: 'button',
+        header: '🤖 Interpretação do áudio',
+        body:
+          `🗣️ _${transcricao}_\n\n` +
           `📅 Data: ${analise.data}\n` +
           `💰 Valor: R$ ${valorFmt}\n` +
           `📂 Categoria: ${analise.categoria}\n` +
           `💳 Pagamento: ${analise.formaPagamento}\n` +
-          `📝 Descrição: ${analise.descricao}\n\n` +
-          `✅ Confirmar lançamento? Responda com "S" para salvar ou "N" para cancelar.`,
+          `📝 Descrição: ${analise.descricao}`,
+        footer: 'Para ajustar a categoria, digite: categoria [nome]',
+        buttons: [
+          { id: '1', title: '✅ Confirmar' },
+          { id: '2', title: '❌ Cancelar' },
+        ],
       })
     } catch (err) {
       logger.error({ err: (err as any)?.message || err }, '[AUDIO] Erro ao processar áudio')
@@ -85,16 +90,21 @@ export async function dispatchWhatsAppMessage(
 
       const valorFmt = formatarValor(analise.valor)
       const parcelado = analise.parcelado ? `\n🔢 Parcelado: Sim (${analise.parcelas}x)` : ''
-      await adapter.sendMessage(userId, {
-        text:
-          `🤖 Análise do comprovante:\n\n` +
+      await adapter.sendInteractiveMessage(userId, {
+        type: 'button',
+        header: '🤖 Análise do comprovante',
+        body:
           `📅 Data: ${analise.data}\n` +
           `💰 Valor: R$ ${valorFmt}\n` +
           `📂 Categoria: ${analise.categoria}\n` +
           `💳 Pagamento: ${analise.formaPagamento}\n` +
           `📝 Descrição: ${analise.descricao}` +
-          parcelado +
-          `\n\n✅ Confirmar lançamento? Responda com "S" para confirmar ou "N" para cancelar.`,
+          parcelado,
+        footer: 'Para ajustar a categoria, digite: categoria [nome]',
+        buttons: [
+          { id: '1', title: '✅ Confirmar' },
+          { id: '2', title: '❌ Cancelar' },
+        ],
       })
     } catch (err) {
       logger.error({ err: (err as any)?.message || err }, '[VOUCHER] Erro ao processar comprovante')

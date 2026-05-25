@@ -24,7 +24,10 @@ export function handleMetaWebhookVerification(req: IncomingMessage, res: ServerR
 }
 
 // Parseia o payload do webhook da Meta e retorna { userId, texto, tipo, rawMessage, nomeContato }
-// Retorna null se não for uma mensagem de texto/mídia processável
+// Retorna null se não for uma mensagem processável.
+// Mensagens interativas (button_reply / list_reply) são normalizadas:
+// o ID do botão/item selecionado vira o `texto`, permitindo que os handlers
+// existentes funcionem sem alteração (eles esperam "1", "2", etc.).
 export function parseMetaWebhookPayload(body: any): {
   userId: string;
   texto: string;
@@ -40,13 +43,19 @@ export function parseMetaWebhookPayload(body: any): {
 
     if (!message) return null;
 
-    // userId no formato compatível com Baileys: número@s.whatsapp.net
     const phone = message.from;
     const userId = `${phone}@s.whatsapp.net`;
+    const nomeContato = value?.contacts?.[0]?.profile?.name as string | undefined;
+
+    if (message.type === 'interactive') {
+      const reply = message.interactive?.button_reply ?? message.interactive?.list_reply;
+      if (!reply?.id) return null;
+      // ID é o número da opção ("1", "2", ...) — handlers existentes não precisam mudar
+      return { userId, texto: reply.id, tipo: 'text', rawMessage: message, nomeContato };
+    }
 
     const tipo = message.type as 'text' | 'audio' | 'image' | 'document';
     const texto = message?.text?.body || message?.caption || '';
-    const nomeContato = value?.contacts?.[0]?.profile?.name as string | undefined;
 
     return { userId, texto, tipo, rawMessage: message, nomeContato };
   } catch (err) {
@@ -54,9 +63,3 @@ export function parseMetaWebhookPayload(body: any): {
     return null;
   }
 }
-
-// TODO (migração completa): montar este handler no servidor HTTP
-// O servidor deve:
-//   GET  /webhook/meta → handleMetaWebhookVerification
-//   POST /webhook/meta → parsear payload, chamar handleMessage(adapter, userId, texto)
-//                        e tratar mídia (áudio, imagem, documento) via MetaCloudAdapter

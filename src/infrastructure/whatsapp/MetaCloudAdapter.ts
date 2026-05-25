@@ -1,4 +1,4 @@
-import { IWhatsAppAdapter, WhatsAppMessageContent } from './IWhatsAppAdapter';
+import { IWhatsAppAdapter, WhatsAppMessageContent, WhatsAppInteractiveMessage } from './IWhatsAppAdapter';
 
 // Variáveis de ambiente necessárias para ativar este adapter:
 // META_WHATSAPP_TOKEN      — token permanente do sistema gerado no Meta Business
@@ -41,6 +41,67 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
     } else {
       throw new Error('MetaCloudAdapter: tipo de conteúdo não suportado');
     }
+
+    const response = await fetch(BASE_URL(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Meta API erro ${response.status}: ${err}`);
+    }
+  }
+
+  async sendInteractiveMessage(to: string, interactive: WhatsAppInteractiveMessage): Promise<void> {
+    const phone = this.normalizePhone(to);
+
+    let interactivePayload: any;
+
+    if (interactive.type === 'button') {
+      interactivePayload = {
+        type: 'button',
+        ...(interactive.header ? { header: { type: 'text', text: interactive.header } } : {}),
+        body: { text: interactive.body },
+        ...(interactive.footer ? { footer: { text: interactive.footer } } : {}),
+        action: {
+          buttons: interactive.buttons.map((btn) => ({
+            type: 'reply',
+            reply: { id: btn.id, title: btn.title },
+          })),
+        },
+      };
+    } else {
+      interactivePayload = {
+        type: 'list',
+        ...(interactive.header ? { header: { type: 'text', text: interactive.header } } : {}),
+        body: { text: interactive.body },
+        ...(interactive.footer ? { footer: { text: interactive.footer } } : {}),
+        action: {
+          button: interactive.buttonLabel,
+          sections: interactive.sections.map((sec) => ({
+            ...(sec.title ? { title: sec.title } : {}),
+            rows: sec.rows.map((row) => ({
+              id: row.id,
+              title: row.title,
+              ...(row.description ? { description: row.description } : {}),
+            })),
+          })),
+        },
+      };
+    }
+
+    const body = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: phone,
+      type: 'interactive',
+      interactive: interactivePayload,
+    };
 
     const response = await fetch(BASE_URL(), {
       method: 'POST',

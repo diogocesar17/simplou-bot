@@ -426,8 +426,21 @@ async function lancamentoCommand(sock, userId, texto) {
         if (categoriasValidas.includes(novaCategoria)) {
           parsed.categoria = novaCategoria;
           const pagamentoView = parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO';
-          await sock.sendMessage(userId, {
-            text: `✅ Categoria alterada para: ${novaCategoria}\n\n🗣️ Transcrição:\n${String(parsed.transcricao || '').slice(0, 400)}\n\n🤖 *Interpretação:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${pagamentoView}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+          await sock.sendInteractiveMessage(userId, {
+            type: 'button',
+            header: '🤖 Interpretação do áudio',
+            body:
+              `🗣️ _${String(parsed.transcricao || '').slice(0, 300)}_\n\n` +
+              `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+              `📝 Descrição: ${parsed.descricao}\n` +
+              `📂 Categoria: ${parsed.categoria}\n` +
+              `💳 Pagamento: ${pagamentoView}\n` +
+              `📅 Data: ${parsed.data}`,
+            footer: 'Para ajustar a categoria, digite: categoria [nome]',
+            buttons: [
+              { id: '1', title: '✅ Confirmar' },
+              { id: '2', title: '❌ Cancelar' },
+            ],
           });
           return;
         } else {
@@ -496,9 +509,21 @@ async function lancamentoCommand(sock, userId, texto) {
           parsed.categoria = novaCategoria;
           const pagamentoView = parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO';
           const parceladoTexto = parsed.parcelado ? `\n🔢 Parcelado: Sim (${parsed.parcelas}x)` : '';
-          
-          await sock.sendMessage(userId, {
-            text: `✅ Categoria alterada para: ${novaCategoria}\n\n🤖 *Análise do comprovante:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${pagamentoView}\n📅 Data: ${parsed.data}${parceladoTexto}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+          await sock.sendInteractiveMessage(userId, {
+            type: 'button',
+            header: '🤖 Análise do comprovante',
+            body:
+              `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+              `📝 Descrição: ${parsed.descricao}\n` +
+              `📂 Categoria: ${parsed.categoria}\n` +
+              `💳 Pagamento: ${pagamentoView}\n` +
+              `📅 Data: ${parsed.data}` +
+              parceladoTexto,
+            footer: 'Para ajustar a categoria, digite: categoria [nome]',
+            buttons: [
+              { id: '1', title: '✅ Confirmar' },
+              { id: '2', title: '❌ Cancelar' },
+            ],
           });
           return;
         } else {
@@ -565,8 +590,20 @@ async function lancamentoCommand(sock, userId, texto) {
       
       if (categoriasValidas.includes(novaCategoria)) {
         parsed.categoria = novaCategoria;
-        await sock.sendMessage(userId, {
-          text: `✅ Categoria alterada para: ${novaCategoria}\n\n🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsed.valor)}\n📝 Descrição: ${parsed.descricao}\n📂 Categoria: ${parsed.categoria}\n💳 Pagamento: ${parsed.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsed.pagamento}\n📅 Data: ${parsed.data}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+        await sock.sendInteractiveMessage(userId, {
+          type: 'button',
+          header: '🤖 Análise da IA',
+          body:
+            `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+            `📝 Descrição: ${parsed.descricao}\n` +
+            `📂 Categoria: ${parsed.categoria}\n` +
+            `💳 Pagamento: ${parsed.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsed.pagamento}\n` +
+            `📅 Data: ${parsed.data}`,
+          footer: 'Para ajustar a categoria, digite: categoria [nome]',
+          buttons: [
+            { id: '1', title: '✅ Confirmar' },
+            { id: '2', title: '❌ Cancelar' },
+          ],
         });
         return;
       } else {
@@ -822,10 +859,23 @@ async function lancamentoCommand(sock, userId, texto) {
       const avisoConfianca = (parsedIA as any).confianca < 0.6
         ? '\n\n⚠️ _Não tenho certeza sobre este lançamento — revise os dados antes de confirmar._'
         : '';
-      await sock.sendMessage(userId, {
-        text: `🤖 *Análise da IA:*\n\n💰 Valor: R$ ${formatarValor(parsedIA.valor)}\n📝 Descrição: ${parsedIA.descricao}\n📂 Categoria: ${parsedIA.categoria}\n💳 Pagamento: ${parsedIA.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsedIA.pagamento}\n📅 Data: ${parsedIA.data}${avisoConfianca}\n\n✅ Confirma o lançamento?\n1. Sim\n2. Não\n\n💡 Para alterar a categoria, digite: "categoria [nova_categoria]"`
+      await sock.sendInteractiveMessage(userId, {
+        type: 'button',
+        header: '🤖 Análise da IA',
+        body:
+          `💰 Valor: R$ ${formatarValor(parsedIA.valor)}\n` +
+          `📝 Descrição: ${parsedIA.descricao}\n` +
+          `📂 Categoria: ${parsedIA.categoria}\n` +
+          `💳 Pagamento: ${parsedIA.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsedIA.pagamento}\n` +
+          `📅 Data: ${parsedIA.data}` +
+          avisoConfianca,
+        footer: 'Para ajustar a categoria, digite: categoria [nome]',
+        buttons: [
+          { id: '1', title: '✅ Confirmar' },
+          { id: '2', title: '❌ Cancelar' },
+        ],
       });
-      
+
       // Aguardar confirmação
       await definirEstado(userId, 'aguardando_confirmacao_ia', parsedIA);
       return;

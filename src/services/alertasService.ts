@@ -7,7 +7,7 @@ import {
 } from '../infrastructure/databaseService';
 import { logger } from '../infrastructure/logger';
 import * as lembretesService from './lembretesService';
-import { WASocket } from '@whiskeysockets/baileys';
+import { IWhatsAppAdapter } from '../infrastructure/whatsapp/IWhatsAppAdapter';
 import Redis from 'ioredis';
 
 // Interfaces para tipagem
@@ -417,7 +417,7 @@ function getNumeroSemana(data: Date): number {
 /**
  * Envia resumo semanal de gastos para um usuário
  */
-async function enviarResumoSemanal(sock: WASocket, userId: string): Promise<void> {
+async function enviarResumoSemanal(adapter: IWhatsAppAdapter, userId: string): Promise<void> {
   try {
     const agora = new Date();
     const semana = `${agora.getFullYear()}-W${String(getNumeroSemana(agora)).padStart(2, '0')}`;
@@ -439,7 +439,7 @@ async function enviarResumoSemanal(sock: WASocket, userId: string): Promise<void
 
     await redisDedup.set(chaveDedup, '1', 'EX', 7 * 24 * 60 * 60); // TTL: 7 dias
 
-    await sock.sendMessage(userId, {
+    await adapter.sendMessage(userId, {
       text: `📊 *Resumo da semana* — você gastou R$ ${formatarValorAlerta(total)} nos últimos 7 dias.`
     });
 
@@ -455,7 +455,7 @@ async function enviarResumoSemanal(sock: WASocket, userId: string): Promise<void
  * @param eLembreteFinal - Se é o lembrete final (11h)
  * @returns Estatísticas
  */
-async function verificarEEnviarAlertasAutomaticos(sock: WASocket, eLembreteFinal: boolean = false): Promise<EstatisticasAlertas> {
+async function verificarEEnviarAlertasAutomaticos(adapter: IWhatsAppAdapter, eLembreteFinal: boolean = false): Promise<EstatisticasAlertas> {
   try {
     const usuarios = await listarUsuarios({ ativos: true });
     logger.info({ totalUsuarios: usuarios.length, lembreteFinal: eLembreteFinal }, '[ALERTAS] Verificação automática iniciada');
@@ -468,7 +468,7 @@ async function verificarEEnviarAlertasAutomaticos(sock: WASocket, eLembreteFinal
         const alertas = await buscarTodosAlertas(usuario.user_id, eLembreteFinal);
 
         if (alertas) {
-          await sock.sendMessage(usuario.user_id, { text: alertas });
+          await adapter.sendMessage(usuario.user_id, { text: alertas });
           enviados++;
           logger.info({ userId: usuario.user_id, lembreteFinal: eLembreteFinal }, '[ALERTAS] Alerta enviado');
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -477,7 +477,7 @@ async function verificarEEnviarAlertasAutomaticos(sock: WASocket, eLembreteFinal
         // Só envia na segunda-feira
         const diaSemana = new Date().getDay(); // 0=dom, 1=seg
         if (diaSemana === 1) {
-          await enviarResumoSemanal(sock, usuario.user_id);
+          await enviarResumoSemanal(adapter, usuario.user_id);
         }
       } catch (error) {
         erros++;
