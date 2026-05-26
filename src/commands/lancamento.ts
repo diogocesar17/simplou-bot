@@ -34,29 +34,62 @@ function gerarIdUnico() {
 // Função para categorização baseada em palavras-chave
 function categorizarPorPalavrasChave(texto) {
   logger.debug?.(`[CATEGORIZACAO] Analisando texto: "${texto}"`);
-  const textoLower = texto.toLowerCase();
+  const textoLower = texto.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   logger.debug?.(`[CATEGORIZACAO] Texto em lowercase: "${textoLower}"`);
-  
-  // Mapeamento de palavras-chave para categorias
+
+  // ── Detecção driver com contexto (precisa de verbo + plataforma/keyword) ──
+  // Verifica antes do loop genérico para evitar classificação errada de plataformas como receita
+  const verbosReceita = ['ganhei', 'fiz', 'recebi', 'faturei', 'rodei'];
+  const temVerboReceita = verbosReceita.some(v => textoLower.includes(v));
+
+  if (temVerboReceita) {
+    if (textoLower.includes('uber')) { logger.debug?.('[CATEGORIZACAO] ✅ Driver receita: Uber'); return 'Uber'; }
+    if (textoLower.includes('99pop') || /\b99\b/.test(textoLower)) { logger.debug?.('[CATEGORIZACAO] ✅ Driver receita: 99Pop'); return '99Pop'; }
+    if (textoLower.includes('ifood') || textoLower.includes('i food')) { logger.debug?.('[CATEGORIZACAO] ✅ Driver receita: iFood'); return 'iFood'; }
+    if (textoLower.includes('rappi')) { logger.debug?.('[CATEGORIZACAO] ✅ Driver receita: Rappi'); return 'Rappi'; }
+    if (textoLower.includes('loggi')) { logger.debug?.('[CATEGORIZACAO] ✅ Driver receita: Loggi'); return 'Loggi'; }
+    if (textoLower.includes('entrega particular')) { logger.debug?.('[CATEGORIZACAO] ✅ Driver receita: Entrega Particular'); return 'Entrega Particular'; }
+    if (textoLower.includes('corrida particular')) { logger.debug?.('[CATEGORIZACAO] ✅ Driver receita: Corrida Particular'); return 'Corrida Particular'; }
+  }
+
+  // Despesas inequivocamente operacionais de driver
+  if (textoLower.includes('abasteci') || textoLower.includes('gasolina') || textoLower.includes('etanol') || textoLower.includes('diesel')) {
+    logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Combustivel'); return 'Combustível';
+  }
+  if (textoLower.includes('pedagio')) { logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Pedagio'); return 'Pedágio'; }
+  if (textoLower.includes('lava jato') || textoLower.includes('lavagem do carro') || textoLower.includes('lavei o carro')) {
+    logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Lavagem'); return 'Lavagem';
+  }
+  if (textoLower.includes('troquei oleo') || textoLower.includes('troca de oleo') || textoLower.includes('borracharia') || textoLower.includes('alinhamento') || textoLower.includes('balanceamento')) {
+    logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Manutencao'); return 'Manutenção';
+  }
+  if (textoLower.includes('ipva') || textoLower.includes('licenciamento')) {
+    logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: IPVA'); return 'IPVA';
+  }
+  if (textoLower.includes('multa de transito')) {
+    logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Multa'); return 'Multa';
+  }
+
+  // ── Mapeamento genérico (comportamento original) ──
   const categorias = {
     'Alimentação': [
       'mercado', 'supermercado', 'restaurante', 'lanche', 'delivery', 'ifood', 'rappi', 'uber eats',
-      'comida', 'almoço', 'jantar', 'café', 'padaria', 'açougue', 'hortifruti', 'feira'
+      'comida', 'almoco', 'jantar', 'cafe', 'padaria', 'acougue', 'hortifruti', 'feira'
     ],
     'Transporte': [
-      'uber', '99', 'taxi', 'combustível', 'gasolina', 'etanol', 'ônibus', 'metrô', 'trem',
-      'transporte público', 'estacionamento', 'pedágio', 'uber eats', 'rappi'
+      'uber', '99', 'taxi', 'combustivel', 'gasolina', 'etanol', 'onibus', 'metro', 'trem',
+      'transporte publico', 'estacionamento', 'pedagio', 'uber eats', 'rappi'
     ],
     'Saúde': [
-      'médico', 'farmácia', 'plano de saúde', 'consulta', 'exame', 'laboratório', 'hospital',
-      'dentista', 'psicólogo', 'fisioterapeuta', 'remédio', 'medicamento'
+      'medico', 'farmacia', 'plano de saude', 'consulta', 'exame', 'laboratorio', 'hospital',
+      'dentista', 'psicologo', 'fisioterapeuta', 'remedio', 'medicamento'
     ],
     'Educação': [
       'curso', 'faculdade', 'universidade', 'escola', 'livro', 'material escolar', 'mensalidade',
-      'matrícula', 'apostila', 'workshop', 'treinamento'
+      'matricula', 'apostila', 'workshop', 'treinamento'
     ],
     'Moradia': [
-      'aluguel', 'condomínio', 'conta de luz', 'energia elétrica', 'água', 'gás', 'internet',
+      'aluguel', 'condominio', 'conta de luz', 'energia eletrica', 'agua', 'gas', 'internet',
       'telefone', 'iptu', 'seguro residencial'
     ],
     'Lazer': [
@@ -64,30 +97,30 @@ function categorizarPorPalavrasChave(texto) {
       'academia', 'esporte', 'hobby', 'jogo', 'netflix', 'spotify'
     ],
     'Vestuário': [
-      'roupa', 'calçado', 'acessório', 'loja de roupas', 'sapato', 'tenis', 'camisa', 'calça',
-      'vestido', 'bolsa', 'carteira', 'relógio'
+      'roupa', 'calcado', 'acessorio', 'loja de roupas', 'sapato', 'tenis', 'camisa', 'calca',
+      'vestido', 'bolsa', 'carteira', 'relogio'
     ],
     'Serviços': [
-      'manutenção', 'conserto', 'limpeza', 'beleza', 'barbearia', 'salão', 'cabeleireiro',
+      'manutencao', 'conserto', 'limpeza', 'beleza', 'barbearia', 'salao', 'cabeleireiro',
       'manicure', 'pedicure', 'lavanderia', 'oficina'
     ],
     'Casa': [
-      'móveis', 'eletrodomésticos', 'decoração', 'material de construção', 'construção',
+      'moveis', 'eletrodomesticos', 'decoracao', 'material de construcao', 'construcao',
       'reforma', 'ferramenta', 'tinta', 'cimento', 'areia', 'tijolo', 'telha', 'canos',
-      'fiação', 'lâmpada', 'sofa', 'cama', 'mesa', 'geladeira', 'fogão', 'microondas',
+      'fiacao', 'lampada', 'sofa', 'cama', 'mesa', 'geladeira', 'fogao', 'microondas',
       'tv', 'computador', 'notebook', 'celular', 'smartphone'
     ],
     'Trabalho': [
-      'material de escritório', 'equipamento profissional', 'ferramenta profissional',
-      'computador', 'notebook', 'impressora', 'papel', 'caneta', 'lápis', 'mochila',
-      'uniforme', 'epi', 'equipamento de proteção'
+      'material de escritorio', 'equipamento profissional', 'ferramenta profissional',
+      'computador', 'notebook', 'impressora', 'papel', 'caneta', 'lapis', 'mochila',
+      'uniforme', 'epi', 'equipamento de protecao'
     ],
     'Renda': [
-      'salário', 'freela', 'bônus', 'comissão', 'renda extra', 'pagamento', 'recebimento',
-      'transferência recebida', 'depósito'
+      'salario', 'freela', 'bonus', 'comissao', 'renda extra', 'pagamento', 'recebimento',
+      'transferencia recebida', 'deposito'
     ]
   };
-  
+
   // Verificar cada categoria
   for (const [categoria, palavrasChave] of Object.entries(categorias)) {
     logger.debug?.(`[CATEGORIZACAO] Verificando categoria: ${categoria}`);
@@ -98,9 +131,9 @@ function categorizarPorPalavrasChave(texto) {
       }
     }
   }
-  
+
   logger.debug?.(`[CATEGORIZACAO] ❌ Nenhuma palavra-chave encontrada`);
-  return null; // Não encontrou correspondência
+  return null;
 }
 
 // Função para análise inteligente com IA
@@ -130,31 +163,74 @@ Retorne APENAS um JSON válido com a seguinte estrutura:
 }
 
 CATEGORIAS DISPONÍVEIS (use exatamente estas):
-- Alimentação (comida, restaurante, mercado, lanche, delivery)
-- Transporte (uber, 99, combustível, transporte público, taxi)
+
+RECEITAS DE MOTORISTA/ENTREGADOR (tipo = "receita"):
+- Uber (ganhos como motorista na plataforma Uber)
+- 99Pop (ganhos como motorista na plataforma 99)
+- iFood (ganhos como entregador no iFood)
+- Rappi (ganhos como entregador no Rappi)
+- Loggi (ganhos como entregador na Loggi)
+- Entrega Particular (entregas fora de plataforma)
+- Corrida Particular (corridas fora de plataforma)
+- Ganhos (receita de trabalho autônomo sem plataforma específica)
+
+DESPESAS OPERACIONAIS DE MOTORISTA/ENTREGADOR (tipo = "gasto"):
+- Combustível (gasolina, etanol, diesel, abastecimento)
+- Manutenção (óleo, pneu, mecânico, freio, bateria, alinhamento, borracharia)
+- Pedágio (pedágio de rodovia ou pista)
+- Estacionamento (estacionamento pago)
+- Lavagem (lava-jato, lavagem do carro)
+- Seguro Auto (seguro do veículo)
+- Financiamento (parcela do financiamento do carro/moto)
+- IPVA (IPVA, licenciamento do veículo)
+- Multa (multa de trânsito)
+- Celular (plano de celular, internet móvel)
+
+CATEGORIAS GERAIS:
+- Alimentação (comida, restaurante, mercado, lanche — não usar para ganhos de delivery)
+- Transporte (passagem de ônibus, metrô, taxi de passageiro)
 - Saúde (médico, farmácia, plano de saúde, consulta, exame)
 - Educação (curso, faculdade, escola, livro, material escolar)
-- Moradia (aluguel, condomínio, conta de luz, água, gás, internet)
+- Moradia (aluguel, condomínio, conta de luz, água, gás)
 - Lazer (cinema, teatro, show, viagem, passeio, entretenimento)
-- Vestuário (roupa, calçado, acessórios, loja de roupas)
-- Serviços (manutenção, conserto, limpeza, beleza, barbearia)
+- Vestuário (roupa, calçado, acessórios)
+- Serviços (limpeza, beleza, barbearia, salão)
 - Casa (móveis, eletrodomésticos, decoração, material de construção)
 - Trabalho (material de escritório, equipamentos, ferramentas)
 - Renda (salário, freela, bônus, comissão, renda extra)
 - Outros (quando não se encaixa nas categorias acima)
 
-Exemplos de análise:
-- "Gasto de 2619,92 com Plano de Saúde no pix" → {"tipo": "gasto", "valor": 2619.92, "descricao": "Plano de Saúde", "categoria": "Saúde", "pagamento": "pix", "data": "06/08/2025", "confianca": 0.95}
-- "Paguei 2619,92 do plano de saúde no pix" → {"tipo": "gasto", "valor": 2619.92, "descricao": "Plano de Saúde", "categoria": "Saúde", "pagamento": "pix", "data": "06/08/2025", "confianca": 0.9}
-- "Gastei 78,80 na loja de materiais de construção no pix" → {"tipo": "gasto", "valor": 78.80, "descricao": "Loja de Materiais de Construção", "categoria": "Casa", "pagamento": "pix", "data": "06/08/2025", "confianca": 0.95}
-- "Recebi 5000 de salário" → {"tipo": "receita", "valor": 5000, "descricao": "Salário", "categoria": "Renda", "pagamento": "transferencia", "data": "06/08/2025", "confianca": 0.95}
+REGRAS CRÍTICAS PARA MOTORISTAS/ENTREGADORES:
+1. "ganhei X no uber" / "fiz X na 99" / "recebi X no ifood" → tipo="receita", categoria=plataforma (Uber/99Pop/iFood)
+2. "abasteci X" / "coloquei X de gasolina" → tipo="gasto", categoria="Combustível"
+3. "paguei pedágio X" / "X de pedágio" → tipo="gasto", categoria="Pedágio"
+4. "troquei óleo X" / "pneu X" / "mecânico X" → tipo="gasto", categoria="Manutenção"
+5. "lava jato X" / "lavagem X" → tipo="gasto", categoria="Lavagem"
+6. Uber/99/iFood/Rappi como RECEITA nunca usam categoria "Transporte" ou "Alimentação"
+7. "faturei X" / "rodei X hoje" sem plataforma → tipo="receita", categoria="Ganhos"
 
-IMPORTANTE: Para materiais de construção, ferramentas, móveis, eletrodomésticos → use "Casa"
-Para material de escritório, equipamentos profissionais → use "Trabalho"
+Exemplos driver:
+- "ganhei 280 no uber" → {"tipo": "receita", "valor": 280, "descricao": "Uber", "categoria": "Uber", "pagamento": "pix", "confianca": 0.97}
+- "fiz 150 na 99 hoje" → {"tipo": "receita", "valor": 150, "descricao": "99Pop", "categoria": "99Pop", "pagamento": "pix", "confianca": 0.97}
+- "recebi 90 no ifood" → {"tipo": "receita", "valor": 90, "descricao": "iFood", "categoria": "iFood", "pagamento": "pix", "confianca": 0.97}
+- "abasteci 180" → {"tipo": "gasto", "valor": 180, "descricao": "Combustível", "categoria": "Combustível", "pagamento": "NÃO INFORMADO", "confianca": 0.95}
+- "paguei 18 de pedágio" → {"tipo": "gasto", "valor": 18, "descricao": "Pedágio", "categoria": "Pedágio", "pagamento": "NÃO INFORMADO", "confianca": 0.95}
+- "troquei óleo 220" → {"tipo": "gasto", "valor": 220, "descricao": "Manutenção", "categoria": "Manutenção", "pagamento": "NÃO INFORMADO", "confianca": 0.95}
+- "lavagem 35" → {"tipo": "gasto", "valor": 35, "descricao": "Lavagem", "categoria": "Lavagem", "pagamento": "NÃO INFORMADO", "confianca": 0.9}
+- "faturei 320 hoje" → {"tipo": "receita", "valor": 320, "descricao": "Ganhos do dia", "categoria": "Ganhos", "pagamento": "pix", "confianca": 0.9}
 
-DATAS RELATIVAS: Se a mensagem mencionar "ontem", use a data de ontem. "anteontem" = 2 dias atrás. "segunda", "terça" etc = o dia mais recente dessa semana. "semana passada" = 7 dias atrás. "dia 15" = dia 15 do mês atual (ou anterior se já passou). Se não houver referência de data, use a data atual.
+Exemplos gerais:
+- "Gasto de 2619,92 com Plano de Saúde no pix" → {"tipo": "gasto", "valor": 2619.92, "descricao": "Plano de Saúde", "categoria": "Saúde", "pagamento": "pix", "confianca": 0.95}
+- "Gastei 78,80 na loja de materiais de construção no pix" → {"tipo": "gasto", "valor": 78.80, "descricao": "Loja de Materiais de Construção", "categoria": "Casa", "pagamento": "pix", "confianca": 0.95}
+- "Recebi 5000 de salário" → {"tipo": "receita", "valor": 5000, "descricao": "Salário", "categoria": "Renda", "pagamento": "transferencia", "confianca": 0.95}
 
-${categoriaPorPalavrasChave ? `CATEGORIA DETECTADA: "${categoriaPorPalavrasChave}" - Use esta categoria se for apropriada.` : ''}
+OUTRAS REGRAS:
+- Materiais de construção, móveis, eletrodomésticos → "Casa"
+- Material de escritório, equipamentos profissionais → "Trabalho"
+
+DATAS RELATIVAS: "ontem" = data de ontem. "anteontem" = 2 dias atrás. "segunda", "terça" etc = o dia mais recente dessa semana. "semana passada" = 7 dias atrás. "dia 15" = dia 15 do mês atual (ou anterior se já passou). Sem referência de data → use a data atual.
+
+${categoriaPorPalavrasChave ? `CATEGORIA DETECTADA: "${categoriaPorPalavrasChave}" — Use esta categoria se for apropriada para o contexto.` : ''}
 
 Mensagem para analisar: "${texto}"
 
