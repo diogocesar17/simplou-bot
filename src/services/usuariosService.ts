@@ -110,14 +110,14 @@ export async function ativarTrialPremium(userId: string): Promise<{ sucesso: boo
 export async function processarComandoRemover(texto: string, adminId: string): Promise<any> {
   try {
     // Extrair ID do usuário do texto
-    const match = texto.match(/remover\s+(.+)/i);
+    const match = texto.match(/remover\s+usuario\s+(.+)/i);
     if (!match) {
       return {
         success: false,
-        message: '❌ Formato inválido. Use: *remover <ID_DO_USUARIO>*\n\n💡 *Exemplo:* remover 556193096344@s.whatsapp.net'
+        message: '❌ Formato inválido. Use: *remover usuario <ID>*\n\n💡 *Exemplo:* remover usuario 556193096344@s.whatsapp.net'
       };
     }
-    
+
     const userIdParaRemover = match[1].trim();
     
     // Verificar se não está tentando remover a si mesmo

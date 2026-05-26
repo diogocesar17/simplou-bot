@@ -30,11 +30,8 @@ import sugestoesCommand from './commands/sugestoes';
 import previsaoCommand from './commands/previsao';
 import ajudaInteligenteCommand from './commands/ajudaInteligente';
 import lancamentoCommand from './commands/lancamento';
-import cadastrarUsuarioCommand from './commands/cadastrarUsuario';
 import listarUsuariosCommand from './commands/listarUsuarios';
-import promoverPremiumCommand from './commands/promoverPremium';
 import removerUsuarioCommand from './commands/removerUsuario';
-import statusUsuarioCommand from './commands/statusUsuario';
 import alertasCommand from './commands/alertas';
 import relatorioCommand from './commands/relatorio';
 import lembreteCommand from './commands/lembrete';
@@ -418,24 +415,12 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
   // Fluxo padrão segue sem globais. Pergunta inteligente é tratada via stateManager.
 
   // Roteamento para comandos administrativos
-  if (textoLower.startsWith('cadastrar ')) {
-    await cadastrarUsuarioCommand(sock, userId, texto);
-    return;
-  }
   if (textoLower === 'usuarios' || textoLower === 'usuários') {
     await listarUsuariosCommand(sock, userId, texto);
     return;
   }
-  if (textoLower.startsWith('premium ')) {
-    await promoverPremiumCommand(sock, userId, texto);
-    return;
-  }
-  if (textoLower.startsWith('remover ')) {
+  if (textoLower.startsWith('remover usuario ')) {
     await removerUsuarioCommand(sock, userId, texto);
-    return;
-  }
-  if (textoLower.startsWith('status ')) {
-    await statusUsuarioCommand(sock, userId, texto);
     return;
   }
   if (textoLower === 'status') {
@@ -458,7 +443,7 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     await logsCommand(sock, userId);
     return;
   }
-  if (["perfil", "minha conta", "meuid", "quemsou"].includes(textoLower)) {
+  if (["perfil", "minha conta"].includes(textoLower)) {
     await perfilCommand(sock, userId);
     return;
   }
@@ -491,15 +476,15 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     await analisarCommand(sock, userId);
     return;
   }
-  if (["sugestoes", "sugestões", "dicas", "economia", "economizar"].includes(textoLower)) {
+  if (["sugestoes", "sugestões", "dicas"].includes(textoLower)) {
     await sugestoesCommand(sock, userId);
     return;
   }
-  if (["previsao", "previsão", "prever", "futuro"].includes(textoLower)) {
+  if (["previsao", "previsão", "prever"].includes(textoLower)) {
     await previsaoCommand(sock, userId);
     return;
   }
-  if (["ajuda inteligente", "ajuda financeira", "consulta", "pergunta"].includes(textoLower)) {
+  if (["ajuda inteligente", "ajuda financeira"].includes(textoLower)) {
     await ajudaInteligenteCommand(sock, userId);
     return;
   }
