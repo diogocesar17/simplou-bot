@@ -45,7 +45,7 @@ import { driverResumoCommand } from './commands/driverResumo';
 import { metaCommand } from './commands/meta';
 import { driverPerfilCommand } from './commands/driverPerfil';
 import { custoFixoCommand } from './commands/custoFixo';
-import { handleOnboardingTipoTrabalho, handleOnboardingMetaDiaria } from './commands/onboarding';
+import { perguntarTipoTrabalho, handleOnboardingTipoTrabalho, handleOnboardingMetaDiaria } from './commands/onboarding';
 import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery } from './utils/driverParser';
 import * as driverService from './services/driverService';
 
@@ -90,16 +90,9 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
         '🎯 *Dica:* Digite _meta diária 300_ para definir uma meta de ganhos e acompanhar o progresso a cada lançamento.\n\n' +
         'Escreva naturalmente — não precisa decorar comandos. Digite *ajuda* para ver tudo que posso fazer.'
     });
-    // Iniciar wizard de onboarding
+    // Iniciar wizard de onboarding com botões interativos
     await definirEstado(userId, 'onboarding_tipo_trabalho', {});
-    await sock.sendMessage(userId, {
-      text:
-        '🚗 *Qual é o seu trabalho principal?*\n\n' +
-        '1️⃣ Motorista de app (Uber, 99)\n' +
-        '2️⃣ Entregador/Delivery (iFood, Rappi, Loggi)\n' +
-        '3️⃣ Os dois\n\n' +
-        '_Responda com o número ou descreva._'
-    });
+    await perguntarTipoTrabalho(sock, userId);
     return;
   }
 

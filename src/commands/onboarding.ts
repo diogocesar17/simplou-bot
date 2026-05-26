@@ -8,6 +8,21 @@ const TIPO_LABELS: Record<string, string> = {
   AMBOS: 'Motorista e entregador',
 };
 
+const BOTOES_TIPO_TRABALHO = [
+  { id: '1', title: '🚗 Motorista de app' },
+  { id: '2', title: '🛵 Entregador/Delivery' },
+  { id: '3', title: '⚡ Os dois' },
+];
+
+export async function perguntarTipoTrabalho(sock: any, userId: string): Promise<void> {
+  await sock.sendInteractiveMessage(userId, {
+    type: 'button',
+    header: '🚗 Qual é o seu trabalho principal?',
+    body: 'Isso me ajuda a reconhecer automaticamente suas corridas, entregas e custos operacionais.',
+    buttons: BOTOES_TIPO_TRABALHO,
+  });
+}
+
 function detectarTipoTrabalho(texto: string): 'MOTORISTA_APP' | 'DELIVERY' | 'AMBOS' | null {
   const norm = texto.toLowerCase().trim();
   if (norm === '1' || /motorista|app|\buber\b|\b99\b/.test(norm)) return 'MOTORISTA_APP';
@@ -20,32 +35,35 @@ export async function handleOnboardingTipoTrabalho(sock: any, userId: string, te
   const tipo = detectarTipoTrabalho(texto);
 
   if (!tipo) {
-    await sock.sendMessage(userId, {
-      text:
-        '⚠️ Não entendi. Responda com o número ou descreva:\n\n' +
-        '1️⃣ Motorista de app (Uber, 99)\n' +
-        '2️⃣ Entregador/Delivery (iFood, Rappi, Loggi)\n' +
-        '3️⃣ Os dois',
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: '🚗 Qual é o seu trabalho principal?',
+      body: 'Toque em uma das opções abaixo para continuar:',
+      buttons: BOTOES_TIPO_TRABALHO,
     });
     return;
   }
 
   await driverService.upsertDriverProfile(userId, { tipo });
   await definirEstado(userId, 'onboarding_meta_diaria', {});
-  await sock.sendMessage(userId, {
-    text:
-      `✅ Perfil salvo: *${TIPO_LABELS[tipo]}*\n\n` +
+
+  await sock.sendInteractiveMessage(userId, {
+    type: 'button',
+    header: `✅ ${TIPO_LABELS[tipo]}`,
+    body:
       '🎯 *Quer definir uma meta diária de ganhos?*\n\n' +
       'A cada corrida ou entrega registrada, vou mostrar quanto você já lucrou e quanto falta para bater a meta.\n\n' +
-      '_Ex: responda *300* para R$ 300/dia._\n' +
-      '_Ou responda *pular* para configurar depois._',
+      'Se sim, responda com o valor desejado (ex: _300_ para R$ 300/dia).',
+    buttons: [
+      { id: 'pular', title: '⏭️ Definir depois' },
+    ],
   });
 }
 
 export async function handleOnboardingMetaDiaria(sock: any, userId: string, texto: string): Promise<void> {
   const norm = texto.toLowerCase().trim();
 
-  const pulou = ['pular', 'nao', 'não', 'agora nao', 'agora não', 'depois', 'skip'].includes(norm);
+  const pulou = ['pular', 'nao', 'não', 'agora nao', 'agora não', 'depois', 'skip', 'definir depois'].includes(norm);
   if (pulou) {
     await limparEstado(userId);
     await sock.sendMessage(userId, {
@@ -62,16 +80,26 @@ export async function handleOnboardingMetaDiaria(sock: any, userId: string, text
 
   const match = norm.match(/(\d+(?:[.,]\d+)?)/);
   if (!match) {
-    await sock.sendMessage(userId, {
-      text: '⚠️ Informe um valor (ex: _300_) ou responda *pular*.',
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: '🎯 Meta diária de ganhos',
+      body: 'Informe o valor da meta (ex: _300_ para R$ 300/dia) ou toque em "Definir depois":',
+      buttons: [
+        { id: 'pular', title: '⏭️ Definir depois' },
+      ],
     });
     return;
   }
 
   const valor = parseFloat(match[1].replace(',', '.'));
   if (!valor || valor <= 0) {
-    await sock.sendMessage(userId, {
-      text: '⚠️ Valor inválido. Informe um número maior que zero (ex: _300_) ou *pular*.',
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: '🎯 Meta diária de ganhos',
+      body: 'Valor inválido. Informe um número maior que zero (ex: _300_) ou toque em "Definir depois":',
+      buttons: [
+        { id: 'pular', title: '⏭️ Definir depois' },
+      ],
     });
     return;
   }
