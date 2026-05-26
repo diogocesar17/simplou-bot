@@ -272,6 +272,16 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
       return;
     }
 
+    // Roteamento para estados do wizard de custos fixos
+    if (
+      estado.etapa === 'aguardando_acao_custo_fixo' ||
+      estado.etapa === 'confirmando_remocao_custo_fixo' ||
+      estado.etapa.includes('custo_fixo')
+    ) {
+      await custoFixoCommand(sock, userId, texto);
+      return;
+    }
+
     // Roteamento para estados de meus lembretes (mais específicos) primeiro
     if (
       estado.etapa.includes('selecao_lembrete') ||
@@ -288,7 +298,7 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
       await lembreteCommand(sock, userId, texto);
       return;
     }
-  
+
     // ... outros fluxos aqui se necessário
   }
   
