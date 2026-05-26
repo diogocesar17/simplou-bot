@@ -262,6 +262,16 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
       return;
     }
 
+    // Roteamento para estados do wizard de metas
+    if (
+      estado.etapa === 'aguardando_acao_meta' ||
+      estado.etapa === 'aguardando_novo_valor_meta' ||
+      estado.etapa === 'confirmando_remocao_meta'
+    ) {
+      await metaCommand(sock, userId, texto);
+      return;
+    }
+
     // Roteamento para estados de meus lembretes (mais específicos) primeiro
     if (
       estado.etapa.includes('selecao_lembrete') ||
