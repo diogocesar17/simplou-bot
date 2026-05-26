@@ -7,32 +7,34 @@ export async function ajudaLancamentosCommand(sock, userId) {
       emojiTitulo: '📝',
       secoes: [
         {
-          titulo: 'Gastos simples',
+          titulo: 'Corridas e entregas',
           itens: [
-            'gastei 50 no mercado',
-            'gastei 80 farmácia no débito',
-            'paguei 120 conta de luz no boleto',
-            'gastei 30 almoço dia 15/05'
-          ],
-          emoji: '💸'
-        },
-        {
-          titulo: 'Parcelado e recorrente',
-          itens: [
-            'gastei 1200 notebook em 12x no crédito',
-            'gastei 100 academia todo mês',
-            'gastei 50 Netflix por 12 meses'
-          ],
-          emoji: '📦'
-        },
-        {
-          titulo: 'Receitas',
-          itens: [
-            'recebi 3000 salário',
-            'recebi 500 freela pix',
-            'entrada de 200 venda'
+            'ganhei 280 no uber',
+            'fiz 90 no ifood',
+            'recebi 150 na 99 pix',
+            'fiz 200 de entrega particular dia 10/06'
           ],
           emoji: '💰'
+        },
+        {
+          titulo: 'Custos operacionais',
+          itens: [
+            'abasteci 180 de gasolina no débito',
+            'paguei 12 de pedágio',
+            'lava jato 40',
+            'troquei óleo 120 no crédito',
+            'troquei pneu 400 em 2x no crédito'
+          ],
+          emoji: '⛽'
+        },
+        {
+          titulo: 'Outros gastos (parcelado e recorrente)',
+          itens: [
+            'paguei 1200 celular em 12x no crédito',
+            'paguei 100 seguro todo mês',
+            'financiamento 800 por 36 meses'
+          ],
+          emoji: '📦'
         },
         {
           titulo: 'Após registrar',
@@ -46,7 +48,7 @@ export async function ajudaLancamentosCommand(sock, userId) {
       ],
       dicas: [
         { texto: 'Ver lançamentos', comando: 'historico' },
-        { texto: 'Resumo do mês', comando: 'resumo' }
+        { texto: 'Lucro do dia', comando: 'lucro hoje' }
       ]
     })
   });
@@ -119,8 +121,9 @@ export async function ajudaCartaoCommand(sock, userId) {
         {
           titulo: 'Registrar gasto no cartão',
           itens: [
-            'gastei 200 restaurante no crédito nubank',
-            'gastei 600 passagem em 3x no crédito inter',
+            'abasteci 200 no crédito nubank',
+            'troquei óleo 150 no crédito inter',
+            'troquei pneu 600 em 3x no crédito nubank',
             'O gasto é lançado automaticamente na fatura correta'
           ],
           emoji: '💸'
@@ -207,10 +210,10 @@ export async function ajudaPremiumCommand(sock, userId) {
         {
           titulo: 'Exclusivo do Premium',
           itens: [
-            'Análise de padrões de gasto com IA (analisar)',
-            'Sugestões personalizadas de economia (sugestoes)',
-            'Previsão de gastos futuros (previsao)',
-            'Assistente financeiro por perguntas (ajuda inteligente)',
+            'Análise de padrões de ganhos e custos por plataforma (analisar)',
+            'Dicas para aumentar rentabilidade e reduzir custos (sugestoes)',
+            'Previsão de ganhos futuros (previsao)',
+            'Assistente driver por perguntas livres (ajuda inteligente)',
             'Registro por áudio e comprovante (foto/PDF)',
             'Lembretes ilimitados'
           ],
