@@ -321,6 +321,9 @@ async function initializeDatabase() {
     // Migração: Migrar usuários do config.js para a tabela
     await migrarUsuariosConfig(client);
 
+    // Migrações Driver (additive — não afeta dados existentes)
+    await migrateDriverTables(client);
+
     client.release();
     logger.info('✅ Banco de dados inicializado com sucesso');
   } catch (error: any) {
@@ -759,18 +762,24 @@ function calcularDataContabilizacao(dataLancamento, diaVencimento, diaFechamento
 // Funções para operações CRUD
 async function appendRowToDatabase(userId, values) {
   try {
+    // values[0..19] = colunas originais ($2..$21)
+    // values[20] = platform (opcional, nullable)
+    // values[21] = business_context (opcional, nullable)
+    const platform = values[20] !== undefined ? values[20] : null;
+    const businessContext = values[21] !== undefined ? values[21] : null;
     const query = `
       INSERT INTO lancamentos (
         user_id, data, tipo, descricao, valor, categoria, pagamento,
         parcelamento_id, parcela_atual, total_parcelas,
         recorrente, recorrente_fim, recorrente_id,
         cartao_nome, data_lancamento, data_contabilizacao,
-        mes_fatura, ano_fatura, dia_vencimento, status_fatura, data_vencimento
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        mes_fatura, ano_fatura, dia_vencimento, status_fatura, data_vencimento,
+        platform, business_context
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
       RETURNING id
     `;
-    
-    const result = await queryDatabase(query, [userId, ...values]);
+
+    const result = await queryDatabase(query, [userId, ...values.slice(0, 20), platform, businessContext]);
     const lancamentoId = result.rows[0].id;
     
     // Registrar log de auditoria
@@ -3054,6 +3063,82 @@ async function getTotalCategoriaNoMes(userId: string, categoria: string): Promis
     [userId, categoria, inicio, fim]
   );
   return parseFloat(result.rows[0]?.total || '0');
+}
+
+// ===== DRIVER MIGRATION =====
+
+async function migrateDriverTables(client: any): Promise<void> {
+  try {
+    logger.info('[DB] Aplicando migrações driver...');
+
+    // Colunas opcionais em lancamentos (nullable — não afeta dados existentes)
+    await client.query(`
+      ALTER TABLE lancamentos
+        ADD COLUMN IF NOT EXISTS platform VARCHAR(30),
+        ADD COLUMN IF NOT EXISTS business_context VARCHAR(20)
+    `);
+
+    // Índice para queries por plataforma
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_lancamentos_platform ON lancamentos (user_id, platform)
+        WHERE platform IS NOT NULL;
+    `);
+
+    // Perfis de motorista/entregador
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS driver_profiles (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR(50) NOT NULL UNIQUE,
+        tipo VARCHAR(20) CHECK (tipo IN ('MOTORISTA_APP', 'DELIVERY', 'AMBOS')),
+        veiculo VARCHAR(100),
+        consumo_medio_km_l DECIMAL(5,2),
+        combustivel_preferido VARCHAR(20),
+        custo_combustivel_litro DECIMAL(6,2),
+        criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Metas financeiras (diária/semanal/mensal)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS financial_goals (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR(50) NOT NULL,
+        tipo_meta VARCHAR(10) NOT NULL CHECK (tipo_meta IN ('DIARIA', 'SEMANAL', 'MENSAL')),
+        valor DECIMAL(10,2) NOT NULL,
+        ativa BOOLEAN DEFAULT TRUE,
+        criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, tipo_meta)
+      )
+    `);
+
+    // Custos fixos mensais/anuais
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS fixed_costs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id VARCHAR(50) NOT NULL,
+        description VARCHAR(100) NOT NULL,
+        category VARCHAR(50) NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        recurrence VARCHAR(10) NOT NULL CHECK (recurrence IN ('MONTHLY', 'YEARLY')),
+        active BOOLEAN DEFAULT TRUE,
+        criado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_driver_profiles_user ON driver_profiles (user_id);
+      CREATE INDEX IF NOT EXISTS idx_financial_goals_user ON financial_goals (user_id, ativa);
+      CREATE INDEX IF NOT EXISTS idx_fixed_costs_user ON fixed_costs (user_id, active);
+    `);
+
+    logger.info('[DB] Migrações driver aplicadas com sucesso');
+  } catch (err: any) {
+    logger.error({ err: err?.message || err }, '[DB] Erro nas migrações driver');
+    // Não re-throw — migrações driver não devem impedir boot do bot
+  }
 }
 
 export {

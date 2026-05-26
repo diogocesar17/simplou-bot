@@ -41,6 +41,11 @@ import desfazerCommand, { desfazerConfirmarCommand } from './commands/desfazer';
 import orcamentoCommand from './commands/orcamento';
 import trialCommand from './commands/trial';
 import quantoGasteiCommand from './commands/quantoGastei';
+import { driverResumoCommand } from './commands/driverResumo';
+import { metaCommand } from './commands/meta';
+import { driverPerfilCommand } from './commands/driverPerfil';
+import { custoFixoCommand } from './commands/custoFixo';
+import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery } from './utils/driverParser';
 
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
@@ -515,6 +520,51 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
   ) {
     await quantoGasteiCommand(sock, userId, texto); return;
   }
+
+  // ─── Rotas driver (novas — não interferem no fluxo existente) ───────────
+
+  // Resumos de lucro driver: "lucro hoje", "como foi meu dia", "quanto sobrou"
+  if (isDriverResumoQuery(textoLower)) {
+    await driverResumoCommand(sock, userId, textoLower); return;
+  }
+
+  // Atalhos explícitos de resumo driver
+  if (
+    ['lucro hoje', 'lucro do dia', 'como foi meu dia', 'quanto sobrou hoje', 'quanto lucrei hoje'].includes(textoLower) ||
+    textoLower.startsWith('lucro da semana') || textoLower.startsWith('lucro do mes') ||
+    textoLower.startsWith('resumo motorista') || textoLower === 'lucro'
+  ) {
+    await driverResumoCommand(sock, userId, textoLower); return;
+  }
+
+  // Metas financeiras: "minha meta diária é 250", "meta mensal 6000", "ver metas"
+  if (
+    textoLower === 'meta' || textoLower === 'metas' ||
+    textoLower.startsWith('meta ') || textoLower.startsWith('minha meta') ||
+    textoLower.startsWith('definir meta') || textoLower.startsWith('remover meta') ||
+    textoLower.startsWith('quero ganhar') || textoLower.startsWith('quero lucrar') ||
+    textoLower.startsWith('quero fazer') || isMetaQuery(textoLower)
+  ) {
+    await metaCommand(sock, userId, texto); return;
+  }
+
+  // Custos fixos: "meu seguro custa 250 por mês", "custos fixos"
+  if (
+    textoLower === 'custos fixos' || textoLower === 'custo fixo' || textoLower === 'ver custos fixos' ||
+    textoLower.startsWith('cadastrar custo fixo') || isCustoFixoQuery(textoLower)
+  ) {
+    await custoFixoCommand(sock, userId, texto); return;
+  }
+
+  // Perfil driver: "sou motorista de app", "trabalho com delivery"
+  if (
+    textoLower === 'perfil driver' || textoLower === 'ver perfil driver' ||
+    isDriverPerfilQuery(textoLower)
+  ) {
+    await driverPerfilCommand(sock, userId, texto); return;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Se não reconheceu nenhum comando, tenta registrar lançamento
   await lancamentoCommand(sock, userId, texto);
