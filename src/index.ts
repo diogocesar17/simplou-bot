@@ -74,17 +74,20 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     const saudacao = nomeContato ? `Olá, ${nomeContato}!` : 'Olá!';
     await sock.sendMessage(userId, {
       text:
-        `👋 *${saudacao} Bem-vindo ao Simplou!*\n\n` +
-        'Sou seu assistente financeiro pelo WhatsApp. Com uma mensagem simples, você:\n\n' +
-        '✅ Registra gastos e receitas\n' +
-        '📊 Acompanha resumos do mês\n' +
-        '⏰ Cria lembretes de contas a pagar\n' +
-        '💳 Controla faturas de cartão\n\n' +
-        '🚀 *Para começar agora:*\n' +
-        '• _gastei 50 no mercado_ → registra um gasto\n' +
-        '• _recebi 1500 salário_ → registra uma receita\n' +
-        '• _resumo_ → vê quanto gastou este mês\n\n' +
-        '💡 *Dica:* Escreva naturalmente — não precisa decorar comandos. Se quiser ver tudo que posso fazer, digite *ajuda*.'
+        `👋 *${saudacao} Bem-vindo ao Simplou Driver!*\n\n` +
+        '🚗 Sou seu assistente financeiro no WhatsApp, feito para *motoristas de app e entregadores*.\n\n' +
+        'Uber, 99, iFood, Rappi, Loggi — registro tudo por mensagem simples:\n\n' +
+        '💰 *Receitas*\n' +
+        '• _ganhei 280 no uber_ → registra corrida\n' +
+        '• _recebi 90 no ifood_ → registra entrega\n\n' +
+        '⛽ *Custos operacionais*\n' +
+        '• _abasteci 150 de gasolina_ → registra combustível\n' +
+        '• _paguei 12 de pedágio_ → registra pedágio\n\n' +
+        '📊 *Acompanhe seu lucro*\n' +
+        '• _lucro hoje_ → quanto você lucrou no dia\n' +
+        '• _resumo da semana_ → balanço da semana\n\n' +
+        '🎯 *Dica:* Digite _meta diária 300_ para definir uma meta de ganhos e acompanhar o progresso a cada lançamento.\n\n' +
+        'Escreva naturalmente — não precisa decorar comandos. Digite *ajuda* para ver tudo que posso fazer.'
     });
     return;
   }
@@ -327,8 +330,9 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
         } else {
           corpo =
             '\n📝 Você ainda não tem lançamentos este mês.\n' +
-            '• _gastei 50 no mercado_ → registra um gasto\n' +
-            '• _recebi 1000 salário_ → registra uma receita\n\n' +
+            '• _ganhei 280 no uber_ → registra corrida\n' +
+            '• _abasteci 150 de gasolina_ → registra custo\n' +
+            '• _meta diária 300_ → define meta de ganhos\n\n' +
             'Digite *ajuda* para ver tudo que posso fazer.';
         }
       }
