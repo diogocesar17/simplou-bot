@@ -14,10 +14,12 @@ function formatarDateParaISO(data: Date): string {
 }
 // Comando de lançamento centralizado
 import { parseMessage } from '../utils/parseUtils';
+import { parseDriverMessage } from '../utils/driverParser';
 import * as lancamentosService from '../services/lancamentosService';
 import * as cartoesService from '../services/cartoesService';
 import * as geminiService from '../services/geminiService';
 import * as databaseService from '../infrastructure/databaseService';
+import * as driverService from '../services/driverService';
 import { formatarValor } from '../utils/formatUtils';
 import { converterDataParaISO } from '../utils/dataUtils';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
@@ -351,6 +353,21 @@ async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) 
   const isReceita = parsed.tipo && parsed.tipo.toLowerCase() === 'receita';
   const tipoTexto = isReceita ? 'Receita' : 'Gasto';
   const emoji = isReceita ? '💰' : '💸';
+
+  // Contexto driver: mostra lucro do dia após o lançamento
+  if (parsed.business_context === 'DRIVER') {
+    const lucro = await driverService.getLucroDia(userId);
+    const emojiLucro = lucro >= 0 ? '🟢' : '🔴';
+    const emojiRegistro = isReceita ? '✅' : '✅';
+    const tipo = isReceita ? 'Receita' : 'Custo';
+    let msg = `${emojiRegistro} *${tipo} registrado:*\n${parsed.categoria} — R$ ${formatarValor(parsed.valor)}`;
+    if (isReceita) {
+      msg += `\n\n${emojiLucro} Hoje você já lucrou aproximadamente R$ ${formatarValor(lucro)}`;
+    } else {
+      msg += `\n\n💡 Esse valor foi considerado no cálculo do seu lucro real.\n${emojiLucro} Lucro do dia: R$ ${formatarValor(lucro)}`;
+    }
+    return msg;
+  }
 
   // Mensagem específica para cartão de crédito (tolerante a acentos)
   const pagamentoSemAcentosMsg = removerAcentos((parsed.pagamento || '').toLowerCase());
@@ -933,7 +950,52 @@ async function lancamentoCommand(sock, userId, texto) {
     return;
   }
 
-  // 4. Parsear mensagem
+  // 4. Parsear mensagem — tenta driver parser primeiro (mais específico)
+  const driverParsed = parseDriverMessage(texto);
+  if (driverParsed) {
+    logger.info({ tipo: driverParsed.tipo, valor: driverParsed.valor, categoria: driverParsed.categoria, platform: driverParsed.platform }, '[LANCAMENTO] Driver parser detectou frase driver-específica');
+    // Converte para o formato esperado por processarLancamento
+    const parsedDriver = {
+      tipo: driverParsed.tipo,
+      valor: driverParsed.valor,
+      descricao: driverParsed.descricao,
+      categoria: driverParsed.categoria,
+      pagamento: driverParsed.pagamento,
+      data: driverParsed.data,
+      dataVencimento: null,
+      faltaFormaPagamento: driverParsed.faltaFormaPagamento,
+      faltaDataVencimento: false,
+      parcelamento: false,
+      recorrente: false,
+      numParcelas: 1,
+      recorrenteMeses: 0,
+      confiancaCategoria: 'alta' as const,
+      platform: driverParsed.platform,
+      business_context: driverParsed.business_context,
+    };
+
+    if (parsedDriver.faltaFormaPagamento && parsedDriver.tipo === 'gasto') {
+      await definirEstado(userId, 'aguardando_forma_pagamento', parsedDriver as any);
+      await sock.sendInteractiveMessage(userId, {
+        type: 'list',
+        header: '💳 Como pagou?',
+        body: 'Selecione a forma de pagamento:',
+        buttonLabel: 'Ver opções',
+        sections: [{ rows: [
+          { id: '1', title: '💠 Pix' },
+          { id: '2', title: '💵 Dinheiro' },
+          { id: '3', title: '💳 Cartão de crédito' },
+          { id: '4', title: '🏦 Débito' },
+          { id: '5', title: '📋 Boleto' },
+          { id: '6', title: '🔄 Transferência' },
+        ]}],
+      });
+      return;
+    }
+
+    return await processarLancamento(sock, userId, parsedDriver);
+  }
+
   let parsed = parseMessage(texto);
   const parsedNormal = parsed;
   logger.info({ valor: parsed?.valor ?? 'n/a', categoria: parsed?.categoria ?? 'n/a', pagamento: parsed?.pagamento ?? 'n/a' }, '[LANCAMENTO] Parse normal resumo');
@@ -1217,11 +1279,13 @@ async function processarLancamento(sock, userId, parsed) {
     valor: parsed.valor,
     categoria: parsed.categoria,
     pagamento: parsed.pagamento,
-    data_vencimento: converterDataParaISO(parsed.dataVencimento)
+    data_vencimento: converterDataParaISO(parsed.dataVencimento),
+    platform: parsed.platform || null,
+    business_context: parsed.business_context || null,
   };
 
   const novoId = await lancamentosService.salvarLancamento(userId, dados);
-  logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'simples' }, '[LANCAMENTO] Salvo');
+  logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, platform: parsed.platform || null, origem: 'simples' }, '[LANCAMENTO] Salvo');
   const msgSimples = await gerarMensagemSucesso(userId, parsed);
   await enviarConfirmacaoInterativa(sock, userId, novoId, parsed, msgSimples);
 

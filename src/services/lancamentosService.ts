@@ -23,6 +23,9 @@ interface DadosLancamento {
   dia_vencimento?: number | null;
   status_fatura?: string | null;
   data_vencimento?: string | null;
+  // Campos driver (nullable — não quebra usuários existentes)
+  platform?: string | null;
+  business_context?: string | null;
 }
 
 interface ResumoFinanceiro {
@@ -103,7 +106,9 @@ export async function salvarLancamento(userId: string, dados: DadosLancamento): 
     dados.ano_fatura || null,      // $18
     dados.dia_vencimento || null,  // $19
     dados.status_fatura || null,   // $20
-    dados.data_vencimento || null  // $21
+    dados.data_vencimento || null, // $21
+    dados.platform || null,        // $22 (driver)
+    dados.business_context || null // $23 (driver)
   ];
   
   return await databaseService.appendRowToDatabase(userId, values);
