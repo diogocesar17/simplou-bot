@@ -9,8 +9,8 @@ const TIPO_LABELS: Record<string, string> = {
 };
 
 const BOTOES_TIPO_TRABALHO = [
-  { id: '1', title: '🚗 Motorista de app' },
-  { id: '2', title: '🛵 Entregador/Delivery' },
+  { id: '1', title: '🚗 Motorista App' },
+  { id: '2', title: '🛵 Entregador' },
   { id: '3', title: '⚡ Os dois' },
 ];
 
