@@ -87,3 +87,4 @@ test-*.js
 # Arquivos de planejamento e roadmap (opcional, remova se quiser versionar)
 PLANO-RELATORIO-MENSAL.txt
 ROADMAP-*.md
+.claude/
