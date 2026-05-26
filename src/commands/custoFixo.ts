@@ -265,7 +265,8 @@ export async function custoFixoCommand(sock: any, userId: string, texto: string)
     // Sem estado ativo — comandos de texto
 
     // Ver lista
-    if (['custos fixos', 'custo fixo', 'ver custos fixos', 'meus custos fixos'].includes(norm)) {
+    if (['custos fixos', 'custo fixo', 'ver custos fixos', 'meus custos fixos',
+         'gastos fixos', 'gasto fixo', 'ver gastos fixos', 'meus gastos fixos'].includes(norm)) {
       return await listarCustosFixosInterativos(sock, userId);
     }
 

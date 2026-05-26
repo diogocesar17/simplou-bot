@@ -193,8 +193,7 @@ export function isCustoFixoQuery(texto: string): boolean {
   return (
     /\b(meu|minha)\s+seguro\s+(custa|e)\b/.test(norm) ||
     /\bpago\s+\d+.*\bpor\s+mes\b/.test(norm) ||
-    /\b(custo|gasto)\s+fixo\b/.test(norm) ||
-    /\bcustos?\s+fixos?\b/.test(norm) ||
+    /\b(custo|gasto)s?\s+fixos?\b/.test(norm) ||
     /\b(meu|minha)\s+financiamento\s+(custa|e|eh)\b/.test(norm) ||
     /\bcadastrar\s+custo\s+fixo\b/.test(norm)
   );
