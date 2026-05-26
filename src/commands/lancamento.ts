@@ -26,6 +26,11 @@ import { definirEstado, obterEstado, limparEstado } from '../configs/stateManage
 import { formatarMensagem } from '../utils/formatMessages';
 import { logger } from '../infrastructure/logger';
 
+const DRIVER_CATEGORIAS = new Set([
+  'Uber', '99Pop', 'iFood', 'Rappi', 'Loggi', 'Entrega Particular', 'Corrida Particular',
+  'Ganhos', 'Combustível', 'Pedágio', 'Estacionamento', 'Lavagem', 'IPVA', 'Multa', 'Manutenção',
+]);
+
 // Função para gerar ID único
 function gerarIdUnico() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -431,16 +436,29 @@ async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) 
   const emoji = isReceita ? '💰' : '💸';
 
   // Contexto driver: mostra lucro do dia após o lançamento
-  if (parsed.business_context === 'DRIVER') {
-    const lucro = await driverService.getLucroDia(userId);
+  const isDriver = parsed.business_context === 'DRIVER' || DRIVER_CATEGORIAS.has(parsed.categoria);
+  if (isDriver) {
+    const [lucro, metaDiaria] = await Promise.all([
+      driverService.getLucroDia(userId),
+      driverService.getGoal(userId, 'DIARIA'),
+    ]);
     const emojiLucro = lucro >= 0 ? '🟢' : '🔴';
-    const emojiRegistro = isReceita ? '✅' : '✅';
     const tipo = isReceita ? 'Receita' : 'Custo';
-    let msg = `${emojiRegistro} *${tipo} registrado:*\n${parsed.categoria} — R$ ${formatarValor(parsed.valor)}`;
-    if (isReceita) {
-      msg += `\n\n${emojiLucro} Hoje você já lucrou aproximadamente R$ ${formatarValor(lucro)}`;
+    let msg = `✅ *${tipo} registrado:*\n${parsed.categoria} — R$ ${formatarValor(parsed.valor)}`;
+    if (metaDiaria && lucro >= metaDiaria.valor) {
+      msg += `\n\n🎯 *Meta diária atingida!* Você lucrou R$ ${formatarValor(lucro)} hoje. Parabéns! 🏆`;
+    } else if (isReceita) {
+      msg += `\n\n${emojiLucro} Hoje você lucrou R$ ${formatarValor(lucro)}`;
+      if (metaDiaria) {
+        const faltam = metaDiaria.valor - lucro;
+        if (faltam > 0) msg += `\n💡 Faltam R$ ${formatarValor(faltam)} para sua meta diária`;
+      }
     } else {
-      msg += `\n\n💡 Esse valor foi considerado no cálculo do seu lucro real.\n${emojiLucro} Lucro do dia: R$ ${formatarValor(lucro)}`;
+      msg += `\n\n${emojiLucro} Lucro do dia: R$ ${formatarValor(lucro)}`;
+      if (metaDiaria) {
+        const faltam = metaDiaria.valor - lucro;
+        if (faltam > 0) msg += `\n💡 Faltam R$ ${formatarValor(faltam)} para sua meta diária`;
+      }
     }
     return msg;
   }

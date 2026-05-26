@@ -82,10 +82,50 @@ async function removerMeta(
   }
 }
 
+async function quantoFaltaMeta(sock: any, userId: string, norm: string): Promise<void> {
+  const tipo = detectarTipoMeta(norm) || 'DIARIA';
+  const meta = await driverService.getGoal(userId, tipo);
+  if (!meta) {
+    await sock.sendMessage(userId, {
+      text: `⚠️ Você não tem uma meta ${labelMeta(tipo)} definida.\n\nPara definir:\n• "meta diária 250"\n• "meta mensal 6000"`,
+    });
+    return;
+  }
+  let lucroAtual: number;
+  if (tipo === 'DIARIA') {
+    lucroAtual = await driverService.getLucroDia(userId);
+  } else if (tipo === 'SEMANAL') {
+    const resumo = await driverService.getResumoSemana(userId);
+    lucroAtual = resumo.lucro;
+  } else {
+    const resumo = await driverService.getResumoMes(userId);
+    lucroAtual = resumo.lucro;
+  }
+  const faltam = meta.valor - lucroAtual;
+  if (faltam <= 0) {
+    await sock.sendMessage(userId, {
+      text: `🎯 *Meta ${labelMeta(tipo)} atingida!*\n\nVocê lucrou R$ ${formatarValor(lucroAtual)} — meta era R$ ${formatarValor(meta.valor)}. Parabéns! 🏆`,
+    });
+  } else {
+    const pct = Math.round((lucroAtual / meta.valor) * 100);
+    await sock.sendMessage(userId, {
+      text:
+        `🎯 *Meta ${labelMeta(tipo)}: R$ ${formatarValor(meta.valor)}*\n\n` +
+        `Lucro atual: R$ ${formatarValor(lucroAtual)}\n` +
+        `Faltam: R$ ${formatarValor(faltam)} (${pct}% concluído)`,
+    });
+  }
+}
+
 export async function metaCommand(sock: any, userId: string, texto: string): Promise<void> {
   const norm = normalizar(texto);
 
   try {
+    // Quanto falta para a meta?
+    if (/quanto falta|falta (para|pra)/.test(norm)) {
+      return await quantoFaltaMeta(sock, userId, norm);
+    }
+
     // Mostrar metas
     if (/\b(ver|qual|quais|minhas)\s+metas?\b/.test(norm) || norm === 'meta' || norm === 'metas') {
       return await mostrarMetas(sock, userId);

@@ -46,6 +46,7 @@ import { metaCommand } from './commands/meta';
 import { driverPerfilCommand } from './commands/driverPerfil';
 import { custoFixoCommand } from './commands/custoFixo';
 import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery } from './utils/driverParser';
+import * as driverService from './services/driverService';
 
 // Imports dos serviços e configurações
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
@@ -300,21 +301,36 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     const nomeUsuario = usuario.nome && usuario.nome !== 'Usuário' ? `, ${usuario.nome}` : '';
     let corpo = '';
     try {
-      const resumo = await lancamentosService.getResumoDoMesAtual(userId);
-      if (resumo.totalLancamentos > 0) {
-        const emoji = resumo.saldo >= 0 ? '🟢' : '🔴';
-        corpo =
-          '\n📊 *Este mês até agora:*\n' +
-          `• Gastos: R$ ${formatarValor(resumo.totalDespesas)}\n` +
-          `• Receitas: R$ ${formatarValor(resumo.totalReceitas)}\n` +
-          `• ${emoji} Saldo: R$ ${formatarValor(resumo.saldo)}\n\n` +
-          'Digite *resumo* para ver mais detalhes ou *ajuda* para todos os comandos.';
+      const driverProfile = await driverService.getDriverProfile(userId);
+      if (driverProfile) {
+        const [lucro, metaDiaria] = await Promise.all([
+          driverService.getLucroDia(userId),
+          driverService.getGoal(userId, 'DIARIA'),
+        ]);
+        const emojiLucro = lucro >= 0 ? '🟢' : '🔴';
+        corpo = `\n${emojiLucro} *Lucro de hoje: R$ ${formatarValor(lucro)}*`;
+        if (metaDiaria) {
+          const pct = Math.min(100, Math.round((lucro / metaDiaria.valor) * 100));
+          corpo += `\n🎯 Meta diária: R$ ${formatarValor(metaDiaria.valor)} (${pct}%)`;
+        }
+        corpo += '\n\nDigite *lucro hoje* para detalhes ou *ajuda* para todos os comandos.';
       } else {
-        corpo =
-          '\n📝 Você ainda não tem lançamentos este mês.\n' +
-          '• _gastei 50 no mercado_ → registra um gasto\n' +
-          '• _recebi 1000 salário_ → registra uma receita\n\n' +
-          'Digite *ajuda* para ver tudo que posso fazer.';
+        const resumo = await lancamentosService.getResumoDoMesAtual(userId);
+        if (resumo.totalLancamentos > 0) {
+          const emoji = resumo.saldo >= 0 ? '🟢' : '🔴';
+          corpo =
+            '\n📊 *Este mês até agora:*\n' +
+            `• Gastos: R$ ${formatarValor(resumo.totalDespesas)}\n` +
+            `• Receitas: R$ ${formatarValor(resumo.totalReceitas)}\n` +
+            `• ${emoji} Saldo: R$ ${formatarValor(resumo.saldo)}\n\n` +
+            'Digite *resumo* para ver mais detalhes ou *ajuda* para todos os comandos.';
+        } else {
+          corpo =
+            '\n📝 Você ainda não tem lançamentos este mês.\n' +
+            '• _gastei 50 no mercado_ → registra um gasto\n' +
+            '• _recebi 1000 salário_ → registra uma receita\n\n' +
+            'Digite *ajuda* para ver tudo que posso fazer.';
+        }
       }
     } catch (_) {
       corpo = '\nDigite *resumo* para ver seu mês ou *ajuda* para todos os comandos.';
@@ -331,8 +347,16 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     return;
   }
 
-  // Roteamento para o comando de resumo
+  // Roteamento para o comando de resumo (driver-aware)
   if (textoLower.startsWith('resumo')) {
+    const RESUMOS_SIMPLES = ['resumo', 'resumo hoje', 'resumo do dia', 'resumo da semana', 'resumo do mes', 'resumo do mês', 'resumo mensal'];
+    if (RESUMOS_SIMPLES.includes(textoLower)) {
+      const driverProfile = await driverService.getDriverProfile(userId);
+      if (driverProfile) {
+        await driverResumoCommand(sock, userId, textoLower);
+        return;
+      }
+    }
     await resumoCommand(sock, userId, texto);
     return;
   }
@@ -537,13 +561,16 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     await driverResumoCommand(sock, userId, textoLower); return;
   }
 
-  // Metas financeiras: "minha meta diária é 250", "meta mensal 6000", "ver metas"
+  // Metas financeiras: "minha meta diária é 250", "meta mensal 6000", "ver metas", "quanto falta para a meta"
   if (
     textoLower === 'meta' || textoLower === 'metas' ||
     textoLower.startsWith('meta ') || textoLower.startsWith('minha meta') ||
     textoLower.startsWith('definir meta') || textoLower.startsWith('remover meta') ||
     textoLower.startsWith('quero ganhar') || textoLower.startsWith('quero lucrar') ||
-    textoLower.startsWith('quero fazer') || isMetaQuery(textoLower)
+    textoLower.startsWith('quero fazer') ||
+    /quanto falta (para|pra) (a\s+)?(minha\s+)?meta/.test(textoLower) ||
+    /falta (para|pra) (a\s+)?(minha\s+)?meta/.test(textoLower) ||
+    isMetaQuery(textoLower)
   ) {
     await metaCommand(sock, userId, texto); return;
   }
