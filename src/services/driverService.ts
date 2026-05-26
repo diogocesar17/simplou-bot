@@ -37,6 +37,8 @@ export interface DriverResumo {
   receitas: number;
   despesas: number;
   lucro: number;
+  custosFixosRateados: number;
+  lucroReal: number;
   porPlataforma: { plataforma: string; total: number }[];
   porCategoriaDespesa: { categoria: string; total: number }[];
   meta?: FinancialGoal | null;
@@ -191,6 +193,13 @@ function inicioFimMes(): { inicio: Date; fim: Date } {
   return { inicio, fim };
 }
 
+async function getTotalFixoMensal(userId: string): Promise<number> {
+  const costs = await getFixedCosts(userId);
+  return costs.reduce((sum, fc) => {
+    return sum + (fc.recurrence === 'MONTHLY' ? fc.amount : fc.amount / 12);
+  }, 0);
+}
+
 async function queryResumo(
   userId: string,
   inicio: Date,
@@ -239,10 +248,17 @@ async function queryResumo(
 
   const meta = await getGoal(userId, metaTipo);
 
+  const totalFixoMensal = await getTotalFixoMensal(userId);
+  const diasPeriodo = Math.round((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+  const custosFixosRateados = (totalFixoMensal / 30) * diasPeriodo;
+  const lucro = receitas - despesas;
+
   return {
     receitas,
     despesas,
-    lucro: receitas - despesas,
+    lucro,
+    custosFixosRateados,
+    lucroReal: lucro - custosFixosRateados,
     totalLancamentos,
     porPlataforma: porPlataformaRes.rows.map((r: any) => ({
       plataforma: r.plataforma || 'Outros',
@@ -285,7 +301,9 @@ export async function getLucroDia(userId: string): Promise<number> {
     if (row.tipo === 'receita') receitas = parseFloat(row.total);
     else despesas = parseFloat(row.total);
   }
-  return receitas - despesas;
+  const totalFixoMensal = await getTotalFixoMensal(userId);
+  const custoFixoDiario = totalFixoMensal / 30;
+  return receitas - despesas - custoFixoDiario;
 }
 
 // Gasto total de uma categoria num período

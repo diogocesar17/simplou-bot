@@ -21,7 +21,7 @@ function barraProgresso(atual: number, meta: number): string {
 function formatarMeta(resumo: driverService.DriverResumo, referencia: string): string {
   if (!resumo.meta) return '';
   const valor = resumo.meta.valor;
-  const lucro = resumo.lucro;
+  const lucro = resumo.lucroReal;
   const pct = valor > 0 ? Math.round((lucro / valor) * 100) : 0;
   const falta = valor - lucro;
   const barra = barraProgresso(Math.max(lucro, 0), valor);
@@ -40,14 +40,17 @@ function montarMensagem(
   resumo: driverService.DriverResumo,
   tipoMeta: string,
 ): string {
-  const { receitas, despesas, lucro, porPlataforma, porCategoriaDespesa, totalLancamentos } = resumo;
+  const { receitas, despesas, lucro, lucroReal, custosFixosRateados, porPlataforma, porCategoriaDespesa, totalLancamentos } = resumo;
 
-  const emojiLucro = lucro >= 0 ? '🟢' : '🔴';
+  const emojiLucro = lucroReal >= 0 ? '🟢' : '🔴';
 
   let msg = `🚗 *${titulo}*\n\n`;
   msg += `💰 Receitas: R$ ${formatarValor(receitas)}\n`;
-  msg += `💸 Custos: R$ ${formatarValor(despesas)}\n`;
-  msg += `${emojiLucro} Lucro líquido: R$ ${formatarValor(lucro)}\n`;
+  msg += `💸 Custos registrados: R$ ${formatarValor(despesas)}\n`;
+  if (custosFixosRateados > 0) {
+    msg += `🏠 Custos fixos (rateio): R$ ${formatarValor(custosFixosRateados)}\n`;
+  }
+  msg += `${emojiLucro} *Lucro real: R$ ${formatarValor(lucroReal)}*\n`;
 
   msg += formatarMeta(resumo, tipoMeta);
 
