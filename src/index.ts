@@ -7,8 +7,6 @@ import resumoCommand from './commands/resumo';
 import resumoDetalhadoCommand from './commands/resumoDetalhado';
 import historicoCommand, { historicoMaisCommand } from './commands/historico';
 import faturaCommand from './commands/fatura';
-import categoriaCommand from './commands/categoria';
-import valorAltoCommand from './commands/valorAlto';
 import parceladosCommand from './commands/parcelados';
 import recorrentesCommand from './commands/recorrentes';
 import vencimentosCommand from './commands/vencimentos';
@@ -430,17 +428,6 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     return;
   }
 
-  // Roteamento para o comando de categoria
-  if (/^categoria\s+.+/i.test(textoLower)) {
-    await categoriaCommand(sock, userId, texto);
-    return;
-  }
-
-  // Roteamento para o comando de valor alto
-  if (/^valor alto/i.test(textoLower)) {
-    await valorAltoCommand(sock, userId, texto);
-    return;
-  }
 
   // Roteamento para o comando de parcelados
   if (["parcelados", "parcelado"].includes(textoLower)) {
