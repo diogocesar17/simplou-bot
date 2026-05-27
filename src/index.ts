@@ -260,8 +260,13 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
 
     // Roteamento para estados de histórico interativo
     if (estado.etapa.includes('selecao_historico') || estado.etapa.includes('acao_historico')) {
-      await historicoCommand(sock, userId, texto);
-      return;
+      const ehSelecao = /^\d+$/.test(texto.trim()) || ['fechar', 'mais', 'cancelar', '0', '1', '2'].includes(textoLower);
+      if (ehSelecao) {
+        await historicoCommand(sock, userId, texto);
+        return;
+      }
+      // Input não é uma seleção — limpa o estado e processa como comando normal
+      await limparEstado(userId);
     }
 
     // Roteamento para estados do wizard de metas
