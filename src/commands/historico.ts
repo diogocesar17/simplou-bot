@@ -8,6 +8,26 @@ import { ERROR_MESSAGES } from '../utils/errorMessages';
 
 const ITENS_POR_PAGINA = 10;
 
+const ALIAS_CATEGORIAS: Record<string, string> = {
+  '99': '99Pop',
+  '99pop': '99Pop',
+  'uber': 'Uber',
+  'ifood': 'iFood',
+  'i food': 'iFood',
+  'rappi': 'Rappi',
+  'loggi': 'Loggi',
+  'combustivel': 'Combustível',
+  'combustível': 'Combustível',
+  'manutencao': 'Manutenção',
+  'manutenção': 'Manutenção',
+  'pedagio': 'Pedágio',
+  'pedágio': 'Pedágio',
+  'lavagem': 'Lavagem',
+  'estacionamento': 'Estacionamento',
+  'multa': 'Multa',
+  'ipva': 'IPVA',
+};
+
 function formatarItemLancamento(l: any, idx: number, usarCriadoEm: boolean): string {
   const dataParaExibir: Date | string = usarCriadoEm ? (l.criado_em || l.data) : l.data;
 
@@ -233,9 +253,14 @@ async function historicoCommand(sock, userId, texto) {
   if (!filtroTipo) {
     const textoRestante = restoParts.join(' ').toLowerCase().trim();
     if (textoRestante && !mesAno) {
-      const categorias = await databaseService.getCategorias(userId);
-      const catMatch = categorias.find(c => textoRestante === c.toLowerCase() || textoRestante.includes(c.toLowerCase()));
-      if (catMatch) filtroCategoria = catMatch;
+      const alias = ALIAS_CATEGORIAS[textoRestante];
+      if (alias) {
+        filtroCategoria = alias;
+      } else {
+        const categorias = await databaseService.getCategorias(userId);
+        const catMatch = categorias.find(c => textoRestante === c.toLowerCase() || textoRestante.includes(c.toLowerCase()));
+        if (catMatch) filtroCategoria = catMatch;
+      }
     }
   }
 
