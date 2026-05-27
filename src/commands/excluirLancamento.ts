@@ -292,36 +292,40 @@ async function excluirLancamentoCommand(sock, userId, texto) {
     return;
   }
   
+  const MSG_COMO_EXCLUIR =
+    '🗑️ *Como excluir um lançamento:*\n\n' +
+    '1️⃣ Digite *historico* para ver seus lançamentos\n' +
+    '2️⃣ Veja o número do item na lista\n' +
+    '3️⃣ Digite *excluir* + o número\n\n' +
+    '📋 *Exemplos:*\n' +
+    '• _excluir 1_ — exclui o 1º da lista\n' +
+    '• _excluir 3_ — exclui o 3º da lista\n\n' +
+    '💡 Abra o histórico antes: os números mudam a cada consulta.';
+
   // Se não está aguardando confirmação, validar formato do comando
   const match = texto.toLowerCase().match(/^excluir\s+(\d+)$/i);
   logger.debug?.({ match }, '[EXCLUIR_LANCAMENTO] match');
   if (!match) {
-  logger.info('[EXCLUIR_LANCAMENTO] match inválido');
-    await sock.sendMessage(userId, { 
-      text: ERROR_MESSAGES.FORMATO_INVALIDO('Comando excluir', 'excluir 3', 'excluir 1, excluir 2, excluir 5') 
-    });
+    logger.info('[EXCLUIR_LANCAMENTO] match inválido');
+    await sock.sendMessage(userId, { text: MSG_COMO_EXCLUIR });
     return;
   }
-  
+
   const idx = parseInt(match[1], 10) - 1;
-  
+
   // Verificar se há um histórico exibido no estado
   if (!estado || estado.etapa !== 'historico_exibido') {
-  logger.info('[EXCLUIR_LANCAMENTO] estado inválido');
-    await sock.sendMessage(userId, { 
-      text: ERROR_MESSAGES.ESTADO_INVALIDO('excluir lançamento')
-    });
+    logger.info('[EXCLUIR_LANCAMENTO] estado inválido');
+    await sock.sendMessage(userId, { text: MSG_COMO_EXCLUIR });
     return;
   }
-  
+
   // Verificar se o estado não expirou (mais de 10 minutos)
   const agora = Date.now();
   const tempoExpiracao = 10 * 60 * 1000; // 10 minutos
   if (agora - (estado.dadosParciais as any).timestamp > tempoExpiracao) {
     await limparEstado(userId);
-    await sock.sendMessage(userId, {
-      text: ERROR_MESSAGES.ESTADO_INVALIDO('excluir lançamento')
-    });
+    await sock.sendMessage(userId, { text: MSG_COMO_EXCLUIR });
     return;
   }
 
