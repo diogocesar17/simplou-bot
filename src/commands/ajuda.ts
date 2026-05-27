@@ -46,7 +46,8 @@ async function ajudaCommand(sock, userId) {
             'historico uber — só corridas Uber',
             'historico ifood — só entregas iFood',
             'historico combustível — só abastecimentos',
-            'quanto gastei em manutenção — total por tipo de custo',
+            'quanto gastei em combustível — total de abastecimentos no mês',
+            'quanto gastei em manutenção — total de manutenções no mês',
             'relatorio — exportar CSV do mês'
           ],
           emoji: '📊'

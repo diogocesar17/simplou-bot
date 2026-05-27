@@ -72,12 +72,13 @@ export async function ajudaResumoCommand(sock, userId) {
           emoji: '💡'
         },
         {
-          titulo: 'Histórico detalhado',
+          titulo: 'Histórico por plataforma e custo',
           itens: [
             'historico — últimos 10 lançamentos',
-            'historico gastos — só gastos',
-            'historico receitas — só receitas',
-            'historico alimentação — por categoria',
+            'historico uber — só corridas Uber',
+            'historico ifood — só entregas iFood',
+            'historico combustível — só abastecimentos',
+            'historico manutenção — revisões e reparos',
             'historico 05/2025 — mês específico',
             'mais — ver os próximos 10'
           ],
@@ -144,12 +145,23 @@ export async function ajudaLembreteCommand(sock, userId) {
       emojiTitulo: '⏰',
       secoes: [
         {
+          titulo: 'Exemplos para motoristas',
+          itens: [
+            'Troca de óleo — a cada 5.000 km ou 3 meses',
+            'Vencimento do IPVA — aviso com 7 dias de antecedência',
+            'Renovação da CNH — aviso com 30 dias antes',
+            'Revisão do veículo — manutenção preventiva semestral',
+            'Vencimento do seguro auto — renovação anual'
+          ],
+          emoji: '🚗'
+        },
+        {
           titulo: 'Criar lembrete',
           itens: [
-            'lembrete — iniciar assistente de lembrete',
-            'Informe: título, valor, data de vencimento',
+            'lembrete — iniciar o assistente',
+            'Informe: título, valor (opcional), data de vencimento',
             'Escolha: aviso com 1, 3 ou 7 dias de antecedência',
-            'Pode ser recorrente (mensal, semanal, anual)'
+            'Pode ser recorrente (mensal, anual)'
           ],
           emoji: '➕'
         },
@@ -161,15 +173,6 @@ export async function ajudaLembreteCommand(sock, userId) {
             'Você pode editar, pausar ou excluir pela lista'
           ],
           emoji: '📋'
-        },
-        {
-          titulo: 'Como funciona',
-          itens: [
-            'Você recebe um aviso automático antes do vencimento',
-            'O lembrete se repete automaticamente se for recorrente',
-            'Pode vincular a um valor para lançar automaticamente'
-          ],
-          emoji: '💡'
         }
       ],
       dicas: [
