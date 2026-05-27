@@ -28,15 +28,6 @@ export async function ajudaLancamentosCommand(sock, userId) {
           emoji: '⛽'
         },
         {
-          titulo: 'Outros gastos (parcelado e recorrente)',
-          itens: [
-            'paguei 1200 celular em 12x no crédito',
-            'paguei 100 seguro todo mês',
-            'financiamento 800 por 36 meses'
-          ],
-          emoji: '📦'
-        },
-        {
           titulo: 'Após registrar',
           itens: [
             'editar [número] — editar um lançamento da lista',
@@ -198,11 +189,11 @@ export async function ajudaPremiumCommand(sock, userId) {
         {
           titulo: 'O que está incluído no gratuito',
           itens: [
-            'Registro ilimitado de gastos e receitas',
-            'Resumos mensais com categorias',
-            'Histórico e paginação',
-            'Controle de parcelamentos e recorrências',
-            'Cartões de crédito e faturas',
+            'Registro ilimitado de corridas, entregas e custos',
+            'Resumo de lucro: dia, semana e mês',
+            'Histórico por plataforma e tipo de custo',
+            'Custos fixos mensais e anuais',
+            'Metas de ganhos diária, semanal e mensal',
             'Até 5 lembretes ativos'
           ],
           emoji: '✅'

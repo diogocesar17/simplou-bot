@@ -44,10 +44,10 @@ async function ajudaCommand(sock, userId) {
           itens: [
             'historico — últimos lançamentos',
             'historico uber — só corridas Uber',
+            'historico ifood — só entregas iFood',
             'historico combustível — só abastecimentos',
-            'parcelados — parcelas ativas',
-            'relatorio — exportar CSV do mês',
-            'vencimentos — próximos vencimentos'
+            'quanto gastei em manutenção — total por tipo de custo',
+            'relatorio — exportar CSV do mês'
           ],
           emoji: '📊'
         },
@@ -74,7 +74,7 @@ async function ajudaCommand(sock, userId) {
         }
       ],
       dicas: [
-        { texto: 'Ajuda por área', comando: 'ajuda lancamentos · ajuda resumo · ajuda cartao · ajuda lembrete · ajuda premium' },
+        { texto: 'Ajuda por área', comando: 'ajuda lancamentos · ajuda resumo · ajuda lembrete · ajuda premium' },
         { texto: 'Cancelar qualquer operação', comando: 'cancelar' }
       ],
       ajuda: 'Plataformas: Uber, 99, iFood, Rappi, Loggi. Custos: Combustível, Pedágio, Manutenção, Lavagem, IPVA, Multa. Pagamentos: pix, crédito, débito, dinheiro'
