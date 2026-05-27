@@ -250,7 +250,8 @@ async function queryResumo(
 
   const totalFixoMensal = await getTotalFixoMensal(userId);
   const diasPeriodo = Math.round((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
-  const custosFixosRateados = (totalFixoMensal / 30) * diasPeriodo;
+  const diasNoMes = new Date(inicio.getFullYear(), inicio.getMonth() + 1, 0).getDate();
+  const custosFixosRateados = (totalFixoMensal / diasNoMes) * diasPeriodo;
   const lucro = receitas - despesas;
 
   return {
