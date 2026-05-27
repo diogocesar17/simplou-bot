@@ -287,6 +287,12 @@ export async function getResumoMes(userId: string): Promise<DriverResumo> {
   return queryResumo(userId, inicio, fim, 'MENSAL');
 }
 
+export async function getResumoPorMesAno(userId: string, mes: number, ano: number): Promise<DriverResumo> {
+  const inicio = new Date(ano, mes - 1, 1);
+  const fim = new Date(ano, mes, 1);
+  return queryResumo(userId, inicio, fim, 'MENSAL');
+}
+
 export async function getLucroDia(userId: string): Promise<number> {
   const { inicio, fim } = inicioFimDia();
   const res = await (db as any).queryDatabase(

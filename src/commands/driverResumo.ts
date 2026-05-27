@@ -111,6 +111,19 @@ export async function driverResumoMesCommand(sock: any, userId: string): Promise
   }
 }
 
+export async function driverResumoMesEspecificoCommand(sock: any, userId: string, mes: number, ano: number): Promise<void> {
+  try {
+    const resumo = await driverService.getResumoPorMesAno(userId, mes, ano);
+    const nomeMes = new Date(ano, mes - 1, 1).toLocaleString('pt-BR', { month: 'long' });
+    const titulo = `Resumo de ${nomeMes}/${ano}`;
+    const msg = montarMensagem(titulo, resumo, 'mensal');
+    await sock.sendMessage(userId, { text: msg });
+  } catch (err) {
+    logger.error({ err }, '[DRIVER_RESUMO] Erro no resumo do mês específico');
+    await sock.sendMessage(userId, { text: '❌ Erro ao gerar resumo. Tente novamente.' });
+  }
+}
+
 // Roteador interno — decide qual período pelo texto da mensagem
 export async function driverResumoCommand(sock: any, userId: string, texto: string): Promise<void> {
   const norm = texto.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');

@@ -41,7 +41,7 @@ import desfazerCommand, { desfazerConfirmarCommand } from './commands/desfazer';
 import orcamentoCommand from './commands/orcamento';
 import trialCommand from './commands/trial';
 import quantoGasteiCommand from './commands/quantoGastei';
-import { driverResumoCommand } from './commands/driverResumo';
+import { driverResumoCommand, driverResumoMesEspecificoCommand } from './commands/driverResumo';
 import { metaCommand } from './commands/meta';
 import { driverPerfilCommand } from './commands/driverPerfil';
 import { custoFixoCommand } from './commands/custoFixo';
@@ -50,6 +50,7 @@ import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery
 import * as driverService from './services/driverService';
 
 // Imports dos serviços e configurações
+import { parseMesAno } from './utils/dataUtils';
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
 import { formatarCancelamento } from './utils/formatMessages';
 import { formatarValor } from './utils/formatUtils';
@@ -393,6 +394,19 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
       if (driverProfile) {
         await driverResumoCommand(sock, userId, textoLower);
         return;
+      }
+    }
+    // Resumo de mês específico para motoristas: "resumo 03/2026"
+    const periodoTexto = texto.replace(/^resumo\s*/i, '').trim();
+    const periodoAnual = periodoTexto.match(/^(?:anual\s*)?(\d{4})$/);
+    if (!periodoAnual && periodoTexto) {
+      const parsedData = parseMesAno(periodoTexto);
+      if (parsedData) {
+        const driverProfile = await driverService.getDriverProfile(userId);
+        if (driverProfile) {
+          await driverResumoMesEspecificoCommand(sock, userId, parsedData.mes, parsedData.ano);
+          return;
+        }
       }
     }
     await resumoCommand(sock, userId, texto);
