@@ -313,6 +313,38 @@ export async function getLucroDia(userId: string): Promise<number> {
   return receitas - despesas - custoFixoDiario;
 }
 
+export async function buildDriverContext(userId: string): Promise<string | undefined> {
+  const [profile, fixedCosts, goals] = await Promise.all([
+    getDriverProfile(userId),
+    getFixedCosts(userId),
+    getGoals(userId),
+  ]);
+  if (!profile) return undefined;
+
+  const tipos: Record<string, string> = {
+    MOTORISTA_APP: 'Motorista de app (Uber, 99)',
+    DELIVERY: 'Entregador/delivery (iFood, Rappi, Loggi)',
+    AMBOS: 'Motorista e entregador',
+  };
+
+  const totalFixo = fixedCosts.reduce((s, fc) =>
+    s + (fc.recurrence === 'MONTHLY' ? fc.amount : fc.amount / 12), 0);
+
+  const linhas: string[] = [
+    `- Tipo: ${tipos[profile.tipo || ''] || 'Motorista/entregador'}`,
+  ];
+  if (profile.veiculo) linhas.push(`- Veículo: ${profile.veiculo}`);
+  if (profile.consumo_medio_km_l) linhas.push(`- Consumo médio: ${profile.consumo_medio_km_l} km/L`);
+  if (profile.combustivel_preferido) linhas.push(`- Combustível: ${profile.combustivel_preferido}`);
+  if (totalFixo > 0) {
+    linhas.push(`- Custos fixos mensais: R$ ${totalFixo.toFixed(2)} (${fixedCosts.map(f => f.description).join(', ')})`);
+  }
+  const metaMensal = goals.find(g => g.tipo_meta === 'MENSAL');
+  if (metaMensal) linhas.push(`- Meta mensal de ganhos: R$ ${metaMensal.valor.toFixed(2)}`);
+
+  return linhas.join('\n');
+}
+
 // Gasto total de uma categoria num período
 export async function getGastoPorCategoria(
   userId: string,

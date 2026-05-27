@@ -1,5 +1,6 @@
 import * as geminiService from '../services/geminiService';
 import * as lancamentosService from '../services/lancamentosService';
+import * as driverService from '../services/driverService';
 import { isPremium, MSG_UPGRADE } from '../services/planoService';
 
 async function analisarCommand(sock, userId) {
@@ -8,16 +9,17 @@ async function analisarCommand(sock, userId) {
     await sock.sendMessage(userId, { text: MSG_UPGRADE });
     return;
   }
-  // Buscar dados dos últimos 3 meses (como no fluxo original)
-  const dados = await lancamentosService.buscarDadosParaAnalise(userId, 3);
+  const [dados, driverContext] = await Promise.all([
+    lancamentosService.buscarDadosParaAnalise(userId, 3),
+    driverService.buildDriverContext(userId),
+  ]);
   if (!dados || dados.length === 0) {
     await sock.sendMessage(userId, { text: '❌ Não há dados suficientes para análise. Registre lançamentos de pelo menos 2 meses primeiro.' });
     return;
   }
-  await sock.sendMessage(userId, { text: '🔍 Analisando seus padrões de gastos... Isso pode levar alguns segundos.' });
+  await sock.sendMessage(userId, { text: '🔍 Analisando seus padrões de ganhos e custos... Isso pode levar alguns segundos.' });
 
-  // Gerar análise usando IA real
-  const analise = await geminiService.analisarPadroesGastos(userId, dados);
+  const analise = await geminiService.analisarPadroesGastos(userId, dados, driverContext);
   if (!analise) {
     await sock.sendMessage(userId, {
       text:
@@ -29,4 +31,4 @@ async function analisarCommand(sock, userId) {
   await sock.sendMessage(userId, { text: analise });
 }
 
-export default analisarCommand; 
+export default analisarCommand;

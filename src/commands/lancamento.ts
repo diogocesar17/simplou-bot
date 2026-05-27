@@ -254,7 +254,7 @@ Anteontem: ${new Date(Date.now() - 2*86400000).toLocaleDateString('pt-BR')}
     };
 
     const analiseGemini = await withTimeout(
-      geminiService.analisarTransacaoComGemini(texto, userId),
+      geminiService.gerarJSONComGemini(prompt),
       TIMEOUT_MS
     ) as any;
     if (analiseGemini) {
@@ -288,7 +288,7 @@ Anteontem: ${new Date(Date.now() - 2*86400000).toLocaleDateString('pt-BR')}
       if (s.includes('transferencia') || s.includes('transferencia bancaria') || s.includes('transferencia bancária') || s.includes('ted') || s.includes('doc') || s.includes('transfer')) return 'transferencia';
       return null;
     };
-    const pagamentoNormalizado = normalizar(analiseGemini.formaPagamento);
+    const pagamentoNormalizado = normalizar(analiseGemini.pagamento ?? analiseGemini.formaPagamento);
 
     const resultado = {
       tipo: analiseGemini.tipo,

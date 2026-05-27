@@ -140,8 +140,11 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
 
     // Pergunta inteligente (Gemini) via stateManager
     if (estado.etapa === 'pergunta_inteligente') {
-      const dados = await lancamentosService.buscarDadosParaAnalise(userId, 3);
-      const resposta = await geminiService.responderPerguntaFinanceira(userId, texto, dados);
+      const [dados, driverContext] = await Promise.all([
+        lancamentosService.buscarDadosParaAnalise(userId, 3),
+        driverService.buildDriverContext(userId),
+      ]);
+      const resposta = await geminiService.responderPerguntaFinanceira(userId, texto, dados, driverContext);
       if (!resposta) {
         await sock.sendMessage(userId, {
           text:

@@ -134,26 +134,29 @@ Regras importantes:
 // Função para analisar padrões de gastos
 export async function analisarPadroesGastos(
   userId: string,
-  dados: any
+  dados: any,
+  driverContext?: string,
 ): Promise<string | null> {
   const model = getTextModel();
   if (!model) return null;
 
   try {
     const prompt = `
-Analise os dados de gastos do usuário e forneça insights inteligentes:
+Você é um assistente financeiro especializado em motoristas e entregadores de aplicativo.
+${driverContext ? `\nPERFIL DO USUÁRIO:\n${driverContext}\n` : ''}
+Analise os dados de ganhos e custos operacionais do motorista e forneça insights relevantes para o nicho:
 
-Dados dos últimos 3 meses:
+Dados dos últimos 3 meses (colunas: id, data, tipo, descricao, valor, categoria, pagamento):
 ${JSON.stringify(dados, null, 2)}
 
 Forneça uma análise em português brasileiro com:
-1. Principais categorias de gastos
-2. Tendências identificadas
-3. Possíveis oportunidades de economia
-4. Alertas sobre gastos excessivos
-5. Sugestões práticas
+1. 🚗 Ganhos por plataforma (Uber, iFood, 99, etc.) — qual gera mais receita
+2. ⛽ Principais custos operacionais (combustível, manutenção, pedágio) e seu impacto no lucro
+3. 📈 Tendência de lucro real nos últimos meses
+4. ⚠️ Alertas sobre custos que estão consumindo muita margem
+5. 💡 Sugestões práticas para aumentar rentabilidade como motorista/entregador
 
-Formato a resposta de forma clara e objetiva, usando emojis para melhor visualização.
+Use linguagem direta, emojis e valores em reais. Máximo 25 linhas.
 `;
 
     const t0 = Date.now();
@@ -170,25 +173,28 @@ Formato a resposta de forma clara e objetiva, usando emojis para melhor visualiz
 // Função para gerar sugestões de economia
 export async function gerarSugestoesEconomia(
   userId: string,
-  dados: any
+  dados: any,
+  driverContext?: string,
 ): Promise<string | null> {
   const model = getTextModel();
   if (!model) return null;
 
   try {
     const prompt = `
-Com base nos dados de gastos do usuário, gere sugestões práticas de economia:
+Você é um consultor financeiro especializado em motoristas e entregadores de aplicativo.
+${driverContext ? `\nPERFIL DO USUÁRIO:\n${driverContext}\n` : ''}
+Com base nos ganhos e custos operacionais do motorista, gere sugestões práticas para aumentar sua rentabilidade:
 
-Dados dos gastos:
+Dados (colunas: id, data, tipo, descricao, valor, categoria, pagamento):
 ${JSON.stringify(dados, null, 2)}
 
-Forneça:
-1. 3-5 sugestões específicas de economia
-2. Estimativa de economia mensal para cada sugestão
-3. Dicas práticas para implementar
-4. Alertas sobre gastos desnecessários
+Forneça exatamente:
+1. 🏆 3 a 5 sugestões concretas para aumentar o lucro líquido (ex: horários mais rentáveis, reduzir custo de combustível, manutenção preventiva)
+2. 💰 Estimativa de ganho/economia mensal para cada sugestão
+3. ✅ Como implementar cada sugestão na prática
+4. ⚠️ Um alerta sobre o custo operacional que mais impacta a margem atual
 
-Formato a resposta de forma motivacional e prática, usando emojis.
+Use linguagem direta e motivacional. Valores em reais. Máximo 25 linhas.
 `;
 
     const t0 = Date.now();
@@ -205,26 +211,29 @@ Formato a resposta de forma motivacional e prática, usando emojis.
 // Função para prever gastos futuros
 export async function preverGastosFuturos(
   userId: string,
-  dados: any
+  dados: any,
+  driverContext?: string,
 ): Promise<string | null> {
   const model = getTextModel();
   if (!model) return null;
 
   try {
     const prompt = `
-Analise o histórico de gastos e faça previsões para os próximos meses:
+Você é um analista financeiro especializado em motoristas e entregadores de aplicativo.
+${driverContext ? `\nPERFIL DO USUÁRIO:\n${driverContext}\n` : ''}
+Analise o histórico de ganhos e custos do motorista e faça projeções para os próximos meses:
 
-Histórico dos últimos 6 meses:
+Histórico dos últimos 6 meses (colunas: id, data, tipo, descricao, valor, categoria, pagamento):
 ${JSON.stringify(dados, null, 2)}
 
 Forneça:
-1. Previsão de gastos para os próximos 3 meses
-2. Gastos sazonais esperados (IPVA, IPTU, etc.)
-3. Tendências identificadas
-4. Alertas sobre períodos de alto gasto
-5. Recomendações para planejamento
+1. 📈 Previsão de ganhos para os próximos 3 meses por plataforma (com base na tendência)
+2. ⛽ Projeção de custos operacionais (combustível, manutenção) para os próximos 3 meses
+3. 🎯 Lucro real projetado mês a mês
+4. 📅 Alertas sobre custos sazonais do veículo (revisão, troca de óleo, pneus) baseados no padrão histórico
+5. 💡 Recomendação de quanto reservar por mês para manutenção e emergências
 
-Formato a resposta de forma clara e objetiva.
+Valores em reais, linguagem clara. Máximo 25 linhas.
 `;
 
     const t0 = Date.now();
@@ -242,21 +251,24 @@ Formato a resposta de forma clara e objetiva.
 export async function responderPerguntaFinanceira(
   userId: string,
   pergunta: string,
-  contexto: any = null
+  contexto: any = null,
+  driverContext?: string,
 ): Promise<string | null> {
   const model = getTextModel();
   if (!model) return null;
 
   try {
-    let prompt = `Responda à seguinte pergunta sobre finanças pessoais de forma clara e objetiva:
+    let prompt = `Você é um assistente financeiro especializado em motoristas e entregadores de aplicativo no Brasil.
+${driverContext ? `\nPERFIL DO USUÁRIO:\n${driverContext}\n` : ''}
+Responda à seguinte pergunta de forma clara e objetiva, sempre considerando a realidade de quem trabalha com Uber, iFood, 99, Rappi ou delivery:
 
 Pergunta: "${pergunta}"`;
 
     if (contexto) {
-      prompt += `\n\nContexto adicional: ${JSON.stringify(contexto, null, 2)}`;
+      prompt += `\n\nHistórico financeiro do usuário (colunas: id, data, tipo, descricao, valor, categoria, pagamento):\n${JSON.stringify(contexto, null, 2)}`;
     }
 
-    prompt += `\n\nForneça uma resposta prática e útil, usando linguagem simples e emojis quando apropriado.`;
+    prompt += `\n\nResponda de forma prática e útil para um motorista/entregador, usando linguagem simples e emojis. Máximo 20 linhas.`;
 
     const t0 = Date.now();
     const result = await model.generateContent(prompt);
