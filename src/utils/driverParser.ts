@@ -22,7 +22,7 @@ export interface DriverParsedResult {
 // Plataformas de receita: nome → keywords (sem acento, lowercase)
 const PLATAFORMAS_RECEITA: Record<string, string[]> = {
   'Uber': ['uber'],
-  '99Pop': ['99pop', '99 pop'],
+  '99Pop': ['99pop', '99 pop', '99'],
   'iFood': ['ifood', 'i food'],
   'Rappi': ['rappi'],
   'Loggi': ['loggi'],
@@ -130,7 +130,7 @@ export function parseDriverMessage(texto: string): DriverParsedResult | null {
 
   if (temVerboReceita) {
     for (const [platformName, keywords] of Object.entries(PLATAFORMAS_RECEITA)) {
-      if (keywords.some(kw => norm.includes(kw))) {
+      if (keywords.some(kw => kw === '99' ? /\b99\b/.test(norm) : norm.includes(kw))) {
         const valor = extrairValor(norm);
         if (valor) {
           const platformKey = platformName.toUpperCase().replace(/[^A-Z0-9]/g, '');
