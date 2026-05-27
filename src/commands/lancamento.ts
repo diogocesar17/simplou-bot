@@ -290,11 +290,15 @@ Anteontem: ${new Date(Date.now() - 2*86400000).toLocaleDateString('pt-BR')}
     };
     const pagamentoNormalizado = normalizar(analiseGemini.pagamento ?? analiseGemini.formaPagamento);
 
+    const categoriaFinal = categoriaPorPalavrasChave || analiseGemini.categoria || 'Outros';
+    const PLATAFORMAS_RECEITA = new Set(['Uber', '99Pop', 'iFood', 'Rappi', 'Loggi', 'Entrega Particular', 'Corrida Particular', 'Ganhos']);
+    const tipoFinal = PLATAFORMAS_RECEITA.has(categoriaFinal) ? 'receita' : analiseGemini.tipo;
+
     const resultado = {
-      tipo: analiseGemini.tipo,
+      tipo: tipoFinal,
       valor: analiseGemini.valor,
       descricao: analiseGemini.descricao,
-      categoria: categoriaPorPalavrasChave || analiseGemini.categoria || 'Outros',
+      categoria: categoriaFinal,
       pagamento: pagamentoNormalizado || 'NÃO INFORMADO',
       data: new Date().toLocaleDateString('pt-BR'),
       faltaFormaPagamento: !pagamentoNormalizado,

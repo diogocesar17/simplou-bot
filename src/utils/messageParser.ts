@@ -285,7 +285,10 @@ function parseMessage(msg) {
 
   // Tipo
   const isIncome = /recebi|ganhei|entrou|salário|salario|pagamento|bonus|bônus|freela|freelance|venda|vendi/i.test(texto);
-  const tipo = isIncome ? 'receita' : 'gasto';
+  // "fiz/faturei/rodei" com plataforma de app = receita de motorista
+  const isDriverIncome = /\b(fiz|faturei|rodei)\b/i.test(texto) &&
+    /\b(uber|99|ifood|i food|rappi|loggi)\b/i.test(texto);
+  const tipo = (isIncome || isDriverIncome) ? 'receita' : 'gasto';
 
   // Valor
   // Novo: aceita formatos 10.631,80 ou 10631,80 ou 10631.80
