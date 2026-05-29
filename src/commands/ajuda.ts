@@ -76,7 +76,8 @@ async function ajudaCommand(sock, userId) {
       ],
       dicas: [
         { texto: 'Ajuda por área', comando: 'ajuda lancamentos · ajuda resumo · ajuda lembrete · ajuda premium' },
-        { texto: 'Cancelar qualquer operação', comando: 'cancelar' }
+        { texto: 'Cancelar qualquer operação', comando: 'cancelar' },
+        { texto: 'Suporte', comando: 'contato@simplou.com' }
       ],
       ajuda: 'Plataformas: Uber, 99, iFood, Rappi, Loggi. Custos: Combustível, Pedágio, Manutenção, Lavagem, IPVA, Multa. Pagamentos: pix, crédito, débito, dinheiro'
     })
