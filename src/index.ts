@@ -486,7 +486,15 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     return;
   }
 
+  if (["editar cartao", "editar cartão"].includes(textoLower)) {
+    await editarCartaoCommand(sock, userId, texto);
+    return;
+  }
 
+  if (["excluir cartao", "excluir cartão", "remover cartao", "remover cartão", "deletar cartao", "deletar cartão"].includes(textoLower)) {
+    await excluirCartaoCommand(sock, userId, texto);
+    return;
+  }
 
   // Fluxo padrão segue sem globais. Pergunta inteligente é tratada via stateManager.
 

@@ -1,6 +1,7 @@
 import * as cartoesService from '../services/cartoesService';
 import { formatarMensagem, formatarLista, gerarDicasContextuais } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
+import { logger } from '../infrastructure/logger';
 
 async function listarCartoesCommand(sock, userId) {
   const cartoes = await cartoesService.listarCartoesConfigurados(userId);
@@ -48,5 +49,4 @@ async function listarCartoesCommand(sock, userId) {
   }
 }
 
-export default listarCartoesCommand; 
-import { logger } from '../infrastructure/logger';
+export default listarCartoesCommand;

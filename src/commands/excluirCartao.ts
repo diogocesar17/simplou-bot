@@ -2,6 +2,7 @@ import * as cartoesService from '../services/cartoesService';
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import { formatarMensagem, formatarConfirmacao, gerarDicasContextuais, formatarCancelamento } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
+import { logger } from '../infrastructure/logger';
 
 
 // Fluxo 100% baseado em Redis (stateManager)
@@ -154,5 +155,4 @@ async function excluirCartaoCommand(sock, userId, texto) {
   });
 }
 
-export default excluirCartaoCommand; 
-import { logger } from '../infrastructure/logger';
+export default excluirCartaoCommand;
