@@ -118,56 +118,6 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
     }
   }
 
-  async markAsRead(messageId: string): Promise<void> {
-    try {
-      const response = await fetch(BASE_URL(), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          status: 'read',
-          message_id: messageId,
-        }),
-      });
-      if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`Meta markAsRead erro ${response.status}: ${err}`);
-      }
-    } catch (err: any) {
-      // Falha silenciosa — não bloquear o processamento da mensagem
-      console.warn('[MetaCloudAdapter] markAsRead falhou:', err?.message);
-    }
-  }
-
-  async sendTypingIndicator(to: string): Promise<void> {
-    try {
-      const phone = this.normalizePhone(to);
-      const response = await fetch(BASE_URL(), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: phone,
-          type: 'typing_on',
-        }),
-      });
-      if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`Meta sendTypingIndicator erro ${response.status}: ${err}`);
-      }
-    } catch (err: any) {
-      // Falha silenciosa — typing indicator é UX, não crítico
-      console.warn('[MetaCloudAdapter] sendTypingIndicator falhou:', err?.message);
-    }
-  }
-
   async downloadAudio(message: any): Promise<{ buffer: Buffer; mimeType: string }> {
     // Na Meta API, message.id é o media_id
     // 1. GET /{media_id} → obtém a URL temporária

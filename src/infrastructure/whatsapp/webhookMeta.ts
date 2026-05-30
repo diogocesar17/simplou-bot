@@ -34,7 +34,6 @@ export function parseMetaWebhookPayload(body: any): {
   tipo: 'text' | 'audio' | 'image' | 'document';
   rawMessage: any;
   nomeContato?: string;
-  messageId: string;
 } | null {
   try {
     const entry = body?.entry?.[0];
@@ -48,18 +47,17 @@ export function parseMetaWebhookPayload(body: any): {
     const userId = `${phone}@s.whatsapp.net`;
     const nomeContato = value?.contacts?.[0]?.profile?.name as string | undefined;
 
-    const messageId: string = message.id || '';
-
     if (message.type === 'interactive') {
       const reply = message.interactive?.button_reply ?? message.interactive?.list_reply;
       if (!reply?.id) return null;
-      return { userId, texto: reply.id, tipo: 'text', rawMessage: message, nomeContato, messageId };
+      // ID é o número da opção ("1", "2", ...) — handlers existentes não precisam mudar
+      return { userId, texto: reply.id, tipo: 'text', rawMessage: message, nomeContato };
     }
 
     const tipo = message.type as 'text' | 'audio' | 'image' | 'document';
     const texto = message?.text?.body || message?.caption || '';
 
-    return { userId, texto, tipo, rawMessage: message, nomeContato, messageId };
+    return { userId, texto, tipo, rawMessage: message, nomeContato };
   } catch (err) {
     logger.error({ err }, '[META WEBHOOK] Erro ao parsear payload');
     return null;
