@@ -17,7 +17,13 @@ export async function dispatchWhatsAppMessage(
   tipo: string,
   mediaRaw?: any,
   nomeContato?: string,
+  messageId?: string,
 ): Promise<void> {
+  // Marcar como lido e mostrar typing antes de qualquer processamento
+  if (messageId) {
+    await adapter.markAsRead(messageId).catch(() => {});
+  }
+  await adapter.sendTypingIndicator(userId).catch(() => {});
   if (tipo === 'audio') {
     const premium = await isPremium(userId)
     if (!premium) {

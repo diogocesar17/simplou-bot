@@ -1,6 +1,8 @@
 export interface IWhatsAppAdapter {
   sendMessage(to: string, content: WhatsAppMessageContent): Promise<void>;
   sendInteractiveMessage(to: string, interactive: WhatsAppInteractiveMessage): Promise<void>;
+  markAsRead(messageId: string): Promise<void>;
+  sendTypingIndicator(to: string): Promise<void>;
   downloadAudio(message: any): Promise<{ buffer: Buffer; mimeType: string }>;
   downloadImage(message: any): Promise<{ buffer: Buffer; mimeType: string }>;
   downloadDocument(message: any): Promise<{ buffer: Buffer; mimeType: string }>;
