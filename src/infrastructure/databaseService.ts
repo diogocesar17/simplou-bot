@@ -265,6 +265,22 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_lancamentos_user_tipo ON lancamentos (user_id, tipo);
     `);
 
+    // Tabela de fallbacks para IA — frases que o parser não reconheceu
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ia_fallback_log (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        frase TEXT NOT NULL,
+        categoria_ia VARCHAR(100),
+        tipo_ia VARCHAR(20),
+        valor_ia NUMERIC(10,2),
+        resolvido BOOLEAN DEFAULT false,
+        criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_ia_fallback_frase ON ia_fallback_log (frase);
+      CREATE INDEX IF NOT EXISTS idx_ia_fallback_criado ON ia_fallback_log (criado_em DESC);
+    `);
+
     // Adicionar Foreign Keys com ON DELETE CASCADE (idempotentes)
     await client.query(`
       DO $$ BEGIN
@@ -3065,6 +3081,45 @@ async function getTotalCategoriaNoMes(userId: string, categoria: string): Promis
   return parseFloat(result.rows[0]?.total || '0');
 }
 
+// ===== IA FALLBACK LOG =====
+
+async function registrarIAFallback(
+  userId: string,
+  frase: string,
+  categoriaIA: string | null,
+  tipoIA: string | null,
+  valorIA: number | null
+): Promise<void> {
+  try {
+    await queryDatabase(
+      `INSERT INTO ia_fallback_log (user_id, frase, categoria_ia, tipo_ia, valor_ia)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, frase.slice(0, 500), categoriaIA, tipoIA, valorIA]
+    );
+  } catch (err: any) {
+    // Falha silenciosa — log de fallback não deve quebrar o fluxo principal
+    fileLogger.warn('[IA_FALLBACK] Erro ao registrar fallback:', err?.message);
+  }
+}
+
+async function consultarIAFallbacks(limite = 30): Promise<any[]> {
+  const result = await queryDatabase(
+    `SELECT
+       frase,
+       COUNT(*)           AS total,
+       MAX(categoria_ia)  AS categoria_ia,
+       MAX(tipo_ia)       AS tipo_ia,
+       MAX(criado_em)     AS ultima_vez
+     FROM ia_fallback_log
+     WHERE resolvido = false
+     GROUP BY frase
+     ORDER BY total DESC, ultima_vez DESC
+     LIMIT $1`,
+    [limite]
+  );
+  return result.rows;
+}
+
 // ===== DRIVER MIGRATION =====
 
 async function migrateDriverTables(client: any): Promise<void> {
@@ -3210,5 +3265,7 @@ export {
   listarOrcamentos,
   excluirOrcamento,
   buscarOrcamento,
-  getTotalCategoriaNoMes
+  getTotalCategoriaNoMes,
+  registrarIAFallback,
+  consultarIAFallbacks
 };

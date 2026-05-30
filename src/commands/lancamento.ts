@@ -1111,7 +1111,16 @@ async function lancamentoCommand(sock, userId, texto) {
     });
     
     const parsedIA = await analisarLancamentoComIA(userId, texto);
-    
+
+    // Registrar fallback para análise posterior (reduzir dependência da IA)
+    databaseService.registrarIAFallback(
+      userId,
+      texto,
+      parsedIA?.categoria ?? null,
+      parsedIA?.tipo ?? null,
+      parsedIA?.valor ?? null
+    ).catch(() => {}); // fire-and-forget, sem bloquear o fluxo
+
     if (parsedIA && parsedIA.valor) {
   logger.info('[LANCAMENTO] ✅ IA fallback retornou um parsed válido.');
       

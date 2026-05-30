@@ -43,6 +43,7 @@ import { driverResumoCommand, driverResumoMesEspecificoCommand } from './command
 import { metaCommand } from './commands/meta';
 import { driverPerfilCommand } from './commands/driverPerfil';
 import { custoFixoCommand } from './commands/custoFixo';
+import iaFallbacksCommand from './commands/iaFallbacks';
 import { perguntarTipoTrabalho, handleOnboardingTipoTrabalho, handleOnboardingMetaDiaria } from './commands/onboarding';
 import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery } from './utils/driverParser';
 import * as driverService from './services/driverService';
@@ -521,6 +522,10 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
   }
   if (textoLower === 'backup') {
     await backupCommand(sock, userId);
+    return;
+  }
+  if (textoLower === 'ia fallbacks' || textoLower.startsWith('ia fallbacks ')) {
+    await iaFallbacksCommand(sock, userId, texto);
     return;
   }
   if (textoLower === 'logs') {
