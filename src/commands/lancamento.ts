@@ -26,6 +26,28 @@ import { definirEstado, obterEstado, limparEstado } from '../configs/stateManage
 import { formatarMensagem } from '../utils/formatMessages';
 import { logger } from '../infrastructure/logger';
 
+// Normaliza frase para uso como chave no parser_cache.
+// Substitui o valor monetário por X mas preserva números que são nomes de plataforma (ex: "99").
+function normalizarParaCache(texto: string): string {
+  let norm = texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+
+  // Protege o "99" quando precedido de preposição — é nome de plataforma, não valor
+  norm = norm.replace(/\b(no|na|do|da|pelo|pela|com|via|pelo app|no app)\s+99\b/g, '$1 __99__');
+
+  // Substitui valores monetários (decimais e inteiros >= 3 dígitos, ou qualquer decimal)
+  norm = norm.replace(/\d{1,3}(?:[.,]\d{3})*[.,]\d{1,2}/g, 'X'); // 1.800,50 ou 180,50
+  norm = norm.replace(/\b\d{3,}\b/g, 'X');                        // 100, 1800, …
+  norm = norm.replace(/\b\d{1,2}\b(?!\s*__)/g, 'X');              // 1-99, exceto __99__
+
+  // Restaura plataforma protegida
+  norm = norm.replace(/__99__/g, '99');
+
+  return norm.replace(/\s+/g, ' ').trim();
+}
+
 const DRIVER_CATEGORIAS = new Set([
   'Uber', '99Pop', 'iFood', 'Rappi', 'Loggi', 'Entrega Particular', 'Corrida Particular',
   'Ganhos', 'Combustível', 'Pedágio', 'Estacionamento', 'Lavagem', 'IPVA', 'Multa', 'Manutenção',
@@ -1102,14 +1124,38 @@ async function lancamentoCommand(sock, userId, texto) {
   const parsedNormal = parsed;
   logger.info({ valor: parsed?.valor ?? 'n/a', categoria: parsed?.categoria ?? 'n/a', pagamento: parsed?.pagamento ?? 'n/a' }, '[LANCAMENTO] Parse normal resumo');
   
-  // Se o parse normal falhou ou categoria é incerta, tentar com IA
+  // Se o parse normal falhou ou categoria é incerta, tentar cache e depois IA
   if (!parsed || !parsed.valor || parsed.categoria === 'Outros' || parsed.confiancaCategoria === 'nenhuma') {
+    // 1. Consultar cache de padrões confirmados antes de chamar a IA
+    if (parsed?.valor) {
+      const padrao = normalizarParaCache(texto);
+      const cacheHit = await databaseService.buscarParserCache(padrao);
+      if (cacheHit) {
+        logger.info({ padrao, categoria: cacheHit.categoria }, '[LANCAMENTO] Cache hit — IA não necessária');
+        const parsedFromCache = {
+          tipo: cacheHit.tipo,
+          categoria: cacheHit.categoria,
+          pagamento: cacheHit.pagamento ?? 'NÃO INFORMADO',
+          valor: parsed.valor,
+          descricao: texto,
+          data: parsed.data,
+          faltaFormaPagamento: !cacheHit.pagamento || cacheHit.pagamento === 'NÃO INFORMADO',
+          faltaDataVencimento: false,
+          parcelamento: false,
+          recorrente: false,
+          numParcelas: 1,
+          confiancaCategoria: 'alta' as const,
+        };
+        return await processarLancamento(sock, userId, parsedFromCache);
+      }
+    }
+
   logger.info('[LANCAMENTO] Parse normal falhou, tentando com IA...');
     // Aviso imediato ao usuário para reduzir latência percebida
-    await sock.sendMessage(userId, { 
-      text: '⌛ Estou analisando sua mensagem, só um instante.' 
+    await sock.sendMessage(userId, {
+      text: '⌛ Estou analisando sua mensagem, só um instante.'
     });
-    
+
     const parsedIA = await analisarLancamentoComIA(userId, texto);
 
     // Registrar fallback para análise posterior (reduzir dependência da IA)
@@ -1119,11 +1165,11 @@ async function lancamentoCommand(sock, userId, texto) {
       parsedIA?.categoria ?? null,
       parsedIA?.tipo ?? null,
       parsedIA?.valor ?? null
-    ).catch(() => {}); // fire-and-forget, sem bloquear o fluxo
+    ).catch(() => {});
 
     if (parsedIA && parsedIA.valor) {
   logger.info('[LANCAMENTO] ✅ IA fallback retornou um parsed válido.');
-      
+
       // Confirmar com o usuário se a IA entendeu corretamente
       const avisoConfianca = (parsedIA as any).confianca < 0.6
         ? '\n\n⚠️ _Não tenho certeza sobre este lançamento — revise os dados antes de confirmar._'
@@ -1145,8 +1191,8 @@ async function lancamentoCommand(sock, userId, texto) {
         ],
       });
 
-      // Aguardar confirmação
-      await definirEstado(userId, 'aguardando_confirmacao_ia', parsedIA);
+      // Salva texto original no estado para gravar no cache ao confirmar
+      await definirEstado(userId, 'aguardando_confirmacao_ia', { ...parsedIA, textoOriginal: texto });
       return;
     } else {
   logger.warn('[LANCAMENTO] ❌ IA falhou ou atingiu timeout. Comunicando usuário e seguindo padrão.');
@@ -1208,6 +1254,17 @@ async function lancamentoCommand(sock, userId, texto) {
 }
 
 async function processarLancamento(sock, userId, parsed) {
+  // Se veio de confirmação da IA e tem texto original, gravar padrão no cache
+  if (parsed.textoOriginal && parsed.categoria && parsed.tipo) {
+    const padrao = normalizarParaCache(parsed.textoOriginal);
+    databaseService.salvarParserCache(
+      padrao,
+      parsed.tipo,
+      parsed.categoria,
+      parsed.pagamento && parsed.pagamento !== 'NÃO INFORMADO' ? parsed.pagamento : null
+    ).catch(() => {});
+  }
+
   const tipoNormalizado = String(parsed?.tipo || 'gasto').toLowerCase();
   if (tipoNormalizado !== 'gasto' && tipoNormalizado !== 'receita') {
     parsed.tipo = 'gasto';

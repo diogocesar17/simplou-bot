@@ -281,6 +281,21 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_ia_fallback_criado ON ia_fallback_log (criado_em DESC);
     `);
 
+    // Cache de padrões confirmados — evita chamadas repetidas à IA
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS parser_cache (
+        id SERIAL PRIMARY KEY,
+        padrao TEXT NOT NULL UNIQUE,
+        tipo VARCHAR(20) NOT NULL,
+        categoria VARCHAR(100) NOT NULL,
+        pagamento VARCHAR(50),
+        usos INTEGER DEFAULT 1,
+        criado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_parser_cache_padrao ON parser_cache (padrao);
+    `);
+
     // Adicionar Foreign Keys com ON DELETE CASCADE (idempotentes)
     await client.query(`
       DO $$ BEGIN
@@ -3081,6 +3096,50 @@ async function getTotalCategoriaNoMes(userId: string, categoria: string): Promis
   return parseFloat(result.rows[0]?.total || '0');
 }
 
+// ===== PARSER CACHE =====
+
+async function buscarParserCache(padrao: string): Promise<{ tipo: string; categoria: string; pagamento: string | null } | null> {
+  try {
+    const result = await queryDatabase(
+      `SELECT tipo, categoria, pagamento FROM parser_cache WHERE padrao = $1`,
+      [padrao]
+    );
+    if (result.rows.length === 0) return null;
+    // Incrementa contador de uso
+    await queryDatabase(
+      `UPDATE parser_cache SET usos = usos + 1, atualizado_em = NOW() WHERE padrao = $1`,
+      [padrao]
+    );
+    return result.rows[0];
+  } catch (err: any) {
+    fileLogger.warn('[PARSER_CACHE] Erro ao buscar:', err?.message);
+    return null;
+  }
+}
+
+async function salvarParserCache(
+  padrao: string,
+  tipo: string,
+  categoria: string,
+  pagamento: string | null
+): Promise<void> {
+  try {
+    await queryDatabase(
+      `INSERT INTO parser_cache (padrao, tipo, categoria, pagamento)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (padrao) DO UPDATE SET
+         tipo = EXCLUDED.tipo,
+         categoria = EXCLUDED.categoria,
+         pagamento = EXCLUDED.pagamento,
+         usos = parser_cache.usos + 1,
+         atualizado_em = NOW()`,
+      [padrao, tipo, categoria, pagamento || null]
+    );
+  } catch (err: any) {
+    fileLogger.warn('[PARSER_CACHE] Erro ao salvar:', err?.message);
+  }
+}
+
 // ===== IA FALLBACK LOG =====
 
 async function registrarIAFallback(
@@ -3267,5 +3326,7 @@ export {
   buscarOrcamento,
   getTotalCategoriaNoMes,
   registrarIAFallback,
-  consultarIAFallbacks
+  consultarIAFallbacks,
+  buscarParserCache,
+  salvarParserCache
 };
