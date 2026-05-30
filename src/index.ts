@@ -107,6 +107,31 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
 
   logger.info(`Estado: ${estado?.etapa}`);
 
+  // Mensagem padrão do link da landing page — usuário já cadastrado voltando pelo CTA
+  const textoSemAcento = textoLower.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const isMensagemLanding =
+    textoSemAcento.includes('quero usar o simplou') ||
+    textoSemAcento.includes('quero usar simplou') ||
+    textoSemAcento === 'ola' ||
+    textoSemAcento === 'oi' ||
+    textoSemAcento === 'ola!' ||
+    textoSemAcento === 'oi!';
+  if (isMensagemLanding && !estado?.etapa) {
+    const nome = nomeContato ? `, ${nomeContato}` : '';
+    await sock.sendMessage(userId, {
+      text:
+        `👋 Olá${nome}! Bem-vindo ao *Simplou Driver*.\n\n` +
+        `🚗 Sou seu assistente financeiro no WhatsApp — feito para motoristas de app e entregadores.\n\n` +
+        `*Por onde quer começar?*\n\n` +
+        `💰 Registrar ganhos: _"fiz 280 no Uber"_, _"recebi 90 no iFood"_\n` +
+        `⛽ Registrar custos: _"abasteci 150 de gasolina"_, _"paguei pedágio 12"_\n` +
+        `📊 Ver lucro: _"lucro hoje"_, _"resumo da semana"_\n` +
+        `🎯 Criar meta: _"meta diária 300"_\n\n` +
+        `Digite *ajuda* para ver tudo que posso fazer.`
+    });
+    return;
+  }
+
   // Paginação do histórico: "mais" tem prioridade sobre qualquer outro estado
   if (estado?.etapa === 'historico_exibido' && textoLower === 'mais') {
     await historicoMaisCommand(sock, userId);
