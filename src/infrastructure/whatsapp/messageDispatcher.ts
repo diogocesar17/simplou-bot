@@ -2,7 +2,7 @@ import { IWhatsAppAdapter } from './IWhatsAppAdapter'
 import { handleMessage } from '../../index'
 import { isPremium, MSG_UPGRADE } from '../../services/planoService'
 import { definirEstado } from '../../configs/stateManager'
-import { formatarValor } from '../../utils/formatUtils'
+import { formatarValor, formatarComMoeda } from '../../utils/formatUtils'
 import { logger } from '../logger'
 
 const geminiService = require('../../services/geminiService')
@@ -46,7 +46,7 @@ export async function dispatchWhatsAppMessage(
         body:
           `🗣️ _${transcricao}_\n\n` +
           `📅 Data: ${analise.data}\n` +
-          `💰 Valor: R$ ${valorFmt}\n` +
+          `💰 Valor: ${formatarComMoeda(valorFmt)}\n` +
           `📂 Categoria: ${analise.categoria}\n` +
           `💳 Pagamento: ${analise.formaPagamento}\n` +
           `📝 Descrição: ${analise.descricao}`,
@@ -95,7 +95,7 @@ export async function dispatchWhatsAppMessage(
         header: '🤖 Análise do comprovante',
         body:
           `📅 Data: ${analise.data}\n` +
-          `💰 Valor: R$ ${valorFmt}\n` +
+          `💰 Valor: ${formatarComMoeda(valorFmt)}\n` +
           `📂 Categoria: ${analise.categoria}\n` +
           `💳 Pagamento: ${analise.formaPagamento}\n` +
           `📝 Descrição: ${analise.descricao}` +

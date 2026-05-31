@@ -1,6 +1,6 @@
 import * as usuariosService from '../services/usuariosService';
 import * as driverService from '../services/driverService';
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 
 async function perfilCommand(sock: any, userId: string) {
   const [usuario, driverProfile, metas] = await Promise.all([
@@ -40,7 +40,7 @@ async function perfilCommand(sock: any, userId: string) {
       msg += `Consumo: ${driverProfile.consumo_medio_km_l} km/L\n`;
     }
     if (driverProfile.combustivel_preferido && driverProfile.custo_combustivel_litro) {
-      msg += `Combustível: ${driverProfile.combustivel_preferido} a R$ ${formatarValor(driverProfile.custo_combustivel_litro)}/L\n`;
+      msg += `Combustível: ${driverProfile.combustivel_preferido} a ${formatarComMoeda(driverProfile.custo_combustivel_litro)}/L\n`;
     }
   } else {
     msg += `\n🚗 *Perfil Driver:* não configurado\n`;
@@ -52,7 +52,7 @@ async function perfilCommand(sock: any, userId: string) {
     msg += `\n🎯 *Metas ativas*\n`;
     const labelTipo: Record<string, string> = { DIARIA: 'Diária', SEMANAL: 'Semanal', MENSAL: 'Mensal' };
     for (const m of metas) {
-      msg += `• Meta ${labelTipo[m.tipo_meta] || m.tipo_meta}: R$ ${formatarValor(m.valor)}\n`;
+      msg += `• Meta ${labelTipo[m.tipo_meta] || m.tipo_meta}: ${formatarComMoeda(m.valor)}\n`;
     }
   } else {
     msg += `\n🎯 *Metas:* nenhuma definida\n`;

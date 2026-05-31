@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import * as cartoesService from '../services/cartoesService';
@@ -330,7 +330,7 @@ async function renderizarResumoFaturas(sock, userId, cartoes: any[], opts: { mon
 
     blocos.push(
       `${cartao.nome_cartao}\n` +
-      `${statusTexto}: R$ ${formatarValor(total)}\n` +
+      `${statusTexto}: ${formatarComMoeda(total)}\n` +
       `Fecha em: ${fechamentoTexto}\n` +
       `Vence em: ${vencimentoTexto}`
     );
@@ -380,7 +380,7 @@ async function renderizarProximaFaturaFechada(sock, userId, cartoes: any[]) {
   const msg =
     `💳 Fatura ${c.cartao.nome_cartao} - ${nomeMes}/${c.ref.ano}\n` +
     `Status: Fechada\n` +
-    `Total: R$ ${formatarValor(c.total)}\n` +
+    `Total: ${formatarComMoeda(c.total)}\n` +
     `Fecha em: ${c.fechamento ? formatarDiaMesAno(c.fechamento) : '--'}\n` +
     `Vence em: ${formatarDiaMesAno(c.vencimento)}`;
 
@@ -424,7 +424,7 @@ async function renderizarResumoFaturaCartao(sock, userId, cartao: any, month?: n
   const msg =
     `💳 Fatura ${cartao.nome_cartao} - ${nomeMes}/${ref.ano}\n` +
     `Status: ${statusTexto}\n` +
-    `Total: R$ ${formatarValor(total)}\n` +
+    `Total: ${formatarComMoeda(total)}\n` +
     `Fecha em: ${fechamento ? formatarDiaMesAno(fechamento) : '--'}\n` +
     `Vence em: ${formatarDiaMesAno(vencimento)}`;
 
@@ -479,12 +479,12 @@ async function renderizarDetalheFatura(sock, userId, cartao: any, month?: number
           ? new Date(dataLanc).toLocaleDateString('pt-BR')
           : String(dataLanc || '').trim());
     const desc = String(l.descricao || '').trim() || 'Compra';
-    return `- ${dataBR} - ${desc} - R$ ${formatarValor(l.valor)}`;
+    return `- ${dataBR} - ${desc} - ${formatarComMoeda(l.valor)}`;
   });
 
   const header =
     `💳 Detalhes da fatura ${cartao.nome_cartao} - ${nomeMes}/${ref.ano}\n\n` +
-    `Total: R$ ${formatarValor(total)}\n\n` +
+    `Total: ${formatarComMoeda(total)}\n\n` +
     `Compras:\n`;
 
   const MAX_ITENS_POR_MENSAGEM = 35;
@@ -535,7 +535,7 @@ async function renderizarFaturaLegacy(sock, userId, cartao: any, mes: number, an
           ? new Date(dataLanc).toLocaleDateString('pt-BR')
           : String(dataLanc || '').trim());
     total += parseFloat(l.valor);
-    return `${dataBR} - ${l.descricao} - R$ ${formatarValor(l.valor)}`;
+    return `${dataBR} - ${l.descricao} - ${formatarComMoeda(l.valor)}`;
   });
 
   await sock.sendMessage(userId, {
@@ -550,7 +550,7 @@ async function renderizarFaturaLegacy(sock, userId, cartao: any, mes: number, an
         },
         {
           titulo: 'Resumo',
-          itens: [`Total: R$ ${formatarValor(total)}`],
+          itens: [`Total: ${formatarComMoeda(total)}`],
           emoji: '💰'
         }
       ],
@@ -590,7 +590,7 @@ async function renderizarPrevisaoFaturas(sock, userId) {
       const dataVenc = r.data_vencimento
         ? new Date(r.data_vencimento).toLocaleDateString('pt-BR')
         : `${pad2(r.dia_vencimento || 0)}/${pad2(mes)}`;
-      msg += `- ${r.cartao_nome}: R$ ${formatarValor(r.total)} - vence em ${dataVenc}\n`;
+      msg += `- ${r.cartao_nome}: ${formatarComMoeda(r.total)} - vence em ${dataVenc}\n`;
     }
     msg += '\n';
   }

@@ -2,7 +2,7 @@ import * as usuariosService from '../services/usuariosService';
 import * as databaseService from '../infrastructure/databaseService';
 import { formatarMensagem } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 
 async function iaFallbacksCommand(sock, userId, texto: string) {
   const isAdmin = await usuariosService.verificarAdmin(userId);
@@ -33,7 +33,7 @@ async function iaFallbacksCommand(sock, userId, texto: string) {
     const frase = r.frase.length > 60 ? r.frase.slice(0, 57) + '...' : r.frase;
     const cat = r.categoria_ia || '?';
     const tipo = r.tipo_ia || '?';
-    const valor = r.valor_ia ? `R$ ${formatarValor(parseFloat(r.valor_ia))}` : '?';
+    const valor = r.valor_ia ? `${formatarComMoeda(parseFloat(r.valor_ia))}` : '?';
     return `${i + 1}. [${r.total}x] "${frase}"\n   → ${tipo} | ${cat} | ${valor}`;
   });
 

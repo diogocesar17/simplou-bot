@@ -1,5 +1,5 @@
 import * as databaseService from '../infrastructure/databaseService';
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 
 async function quantoGasteiCommand(sock: any, userId: string, texto: string) {
   const textoLower = texto.toLowerCase()
@@ -57,7 +57,7 @@ async function quantoGasteiCommand(sock: any, userId: string, texto: string) {
     const total = parseFloat(result.rows[0]?.total || '0');
     const qtd = parseInt(result.rows[0]?.qtd || '0');
     await sock.sendMessage(userId, {
-      text: `💸 *Gastos ${labelPeriodo}:* R$ ${formatarValor(total)}\n📦 ${qtd} lançamento${qtd !== 1 ? 's' : ''}\n\nPara ver por categoria: *quanto gastei em alimentação*`
+      text: `💸 *Gastos ${labelPeriodo}:* ${formatarComMoeda(total)}\n📦 ${qtd} lançamento${qtd !== 1 ? 's' : ''}\n\nPara ver por categoria: *quanto gastei em alimentação*`
     });
     return;
   }
@@ -83,9 +83,9 @@ async function quantoGasteiCommand(sock: any, userId: string, texto: string) {
   await sock.sendMessage(userId, {
     text:
       `💸 *${categoria.charAt(0).toUpperCase() + categoria.slice(1)} — ${labelPeriodo}*\n\n` +
-      `Total: R$ ${formatarValor(total)}\n` +
+      `Total: ${formatarComMoeda(total)}\n` +
       `Lançamentos: ${qtd}\n` +
-      `Média por lançamento: R$ ${formatarValor(media)}\n\n` +
+      `Média por lançamento: ${formatarComMoeda(media)}\n\n` +
       `_Para ver os detalhes: historico ${categoria}_`
   });
 }

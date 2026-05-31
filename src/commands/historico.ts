@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import * as databaseService from '../infrastructure/databaseService';
@@ -42,7 +42,7 @@ function formatarItemLancamento(l: any, idx: number, usarCriadoEm: boolean): str
   const emojiTipo = l.tipo === 'receita' ? '💰' : '💸';
 
   // Linha 1: N. emoji *R$ valor* — categoria
-  let item = `${idx + 1}. ${emojiTipo} *R$ ${formatarValor(l.valor)}* — ${l.categoria}`;
+  let item = `${idx + 1}. ${emojiTipo} *${formatarComMoeda(l.valor)}* — ${l.categoria}`;
 
   // Linha 2: data · pagamento [· contabilização]
   let linha2 = `   📅 ${dataBR} · 💳 ${l.pagamento}`;
@@ -54,7 +54,7 @@ function formatarItemLancamento(l: any, idx: number, usarCriadoEm: boolean): str
 
   // Linha 3 (opcional): parcelado ou recorrente
   if (l.tipoAgrupamento === 'parcelado') {
-    item += `\n   📦 Parcelado: ${l.total_parcelas}x de R$ ${formatarValor(l.grupo && l.grupo[0] ? l.grupo[0].valor : 0)}`;
+    item += `\n   📦 Parcelado: ${l.total_parcelas}x de ${formatarComMoeda(l.grupo && l.grupo[0] ? l.grupo[0].valor : 0)}`;
   } else if (l.tipoAgrupamento === 'recorrente') {
     item += `\n   🔁 Recorrente: ${l.grupo ? l.grupo.length : 0}x`;
   }
@@ -91,7 +91,7 @@ async function historicoCommand(sock, userId, texto) {
         type: 'list',
         header: '📝 Editar Lançamento',
         body:
-          `📅 ${dataExibir}  💰 R$ ${formatarValor(lancamento.valor)}\n` +
+          `📅 ${dataExibir}  💰 ${formatarComMoeda(lancamento.valor)}\n` +
           `📂 ${lancamento.categoria}  💳 ${lancamento.pagamento}\n` +
           `📝 ${lancamento.descricao}\n\nQual campo deseja editar?`,
         buttonLabel: 'Ver campos',
@@ -145,7 +145,7 @@ async function historicoCommand(sock, userId, texto) {
           header: 'Confirmar exclusão?',
           body:
             `📝 ${lancamento.descricao}\n` +
-            `💰 R$ ${lancamento.valor}\n` +
+            `💰 ${formatarComMoeda(lancamento.valor)}\n` +
             `📂 ${lancamento.categoria}`,
           footer: '⚠️ Esta ação não pode ser desfeita!',
           buttons: [
@@ -180,7 +180,7 @@ async function historicoCommand(sock, userId, texto) {
       }
       const rows = chunk.map((l: any, i: number) => {
         const tipoEmoji = l.tipo === 'receita' ? '💰' : '💸';
-        const title = `${tipoEmoji} R$ ${formatarValor(l.valor)} — ${l.categoria}`.slice(0, 24);
+        const title = `${tipoEmoji} ${formatarComMoeda(l.valor)} — ${l.categoria}`.slice(0, 24);
         const dataStr = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
         return { id: String(i + 1), title, description: `${dataStr} · ${l.pagamento}` };
       });
@@ -220,7 +220,7 @@ async function historicoCommand(sock, userId, texto) {
       type: 'button',
       header: `${tipoEmoji} ${l.descricao || l.categoria}`,
       body:
-        `📅 ${dataStr}  💰 R$ ${formatarValor(l.valor)}\n` +
+        `📅 ${dataStr}  💰 ${formatarComMoeda(l.valor)}\n` +
         `📂 ${l.categoria}  💳 ${l.pagamento}`,
       buttons: [
         { id: '1', title: '✏️ Editar' },
@@ -347,10 +347,10 @@ async function historicoCommand(sock, userId, texto) {
   const totalMovimentado = totalEntradas + totalSaidas;
   const saldo = totalEntradas - totalSaidas;
   const itensResumo = [
-    `Total: R$ ${formatarValor(totalMovimentado)}`,
-    `Entradas: R$ ${formatarValor(totalEntradas)}`,
-    `Saídas: R$ ${formatarValor(totalSaidas)}`,
-    `Saldo: R$ ${formatarValor(saldo)}`,
+    `Total: ${formatarComMoeda(totalMovimentado)}`,
+    `Entradas: ${formatarComMoeda(totalEntradas)}`,
+    `Saídas: ${formatarComMoeda(totalSaidas)}`,
+    `Saldo: ${formatarComMoeda(saldo)}`,
     `Lançamentos: ${listaParaExibir.length}${!mesAno && totalRegistros > listaParaExibir.length ? ` de ${totalRegistros}` : ''}`
   ];
 
@@ -416,7 +416,7 @@ async function historicoCommand(sock, userId, texto) {
   const listaInterativa = ultimos.slice(0, 9);
   const rowsInterativos = listaInterativa.map((l: any, i: number) => {
     const tipoEmoji = l.tipo === 'receita' ? '💰' : '💸';
-    const title = `${tipoEmoji} R$ ${formatarValor(l.valor)} — ${l.categoria}`.slice(0, 24);
+    const title = `${tipoEmoji} ${formatarComMoeda(l.valor)} — ${l.categoria}`.slice(0, 24);
     const dataStr = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     return { id: String(i + 1), title, description: `${dataStr} · ${l.pagamento}` };
   });

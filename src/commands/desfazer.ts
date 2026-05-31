@@ -1,6 +1,6 @@
 import * as lancamentosService from '../services/lancamentosService';
 import { obterEstado, limparEstado, definirEstado } from '../configs/stateManager';
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 
 async function desfazerCommand(sock, userId) {
   const estado = await obterEstado(userId);
@@ -36,7 +36,7 @@ async function desfazerCommand(sock, userId) {
   await sock.sendMessage(userId, {
     text:
       `⚠️ *Desfazer lançamento?*\n\n` +
-      `${emojiTipo} R$ ${formatarValor(lancamento.valor)} — ${lancamento.categoria}\n` +
+      `${emojiTipo} ${formatarComMoeda(lancamento.valor)} — ${lancamento.categoria}\n` +
       `💳 ${lancamento.pagamento} · 📅 ${new Date(lancamento.data).toLocaleDateString('pt-BR')}\n` +
       (lancamento.descricao ? `📝 ${lancamento.descricao}\n` : '') +
       `\nDigite *sim* para confirmar ou *não* para cancelar.`

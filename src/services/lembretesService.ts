@@ -1,3 +1,4 @@
+import { formatarComMoeda } from '../utils/formatUtils';
 import { pool, registrarLog } from '../infrastructure/databaseService';
 import { logger } from '../infrastructure/logger';
 import { buscarUsuario } from '../infrastructure/databaseService';
@@ -601,7 +602,7 @@ export async function buscarLembretesProximoVencimento(userId: string, dias: num
 // Função para formatar um lembrete para exibição
 export function formatarLembrete(lembrete: Lembrete): string {
   const dataVencimento = lembrete.data_vencimento.toLocaleDateString('pt-BR');
-  const valor = lembrete.valor ? ` - R$ ${lembrete.valor.toFixed(2)}` : '';
+  const valor = lembrete.valor ? ` - ${formatarComMoeda(lembrete.valor.toFixed(2))}` : '';
   const categoria = lembrete.categoria ? ` [${lembrete.categoria}]` : '';
   const recorrente = lembrete.recorrente ? ` 🔄 ${lembrete.tipo_recorrencia}` : '';
   const status = lembrete.ativo ? '✅' : '❌';

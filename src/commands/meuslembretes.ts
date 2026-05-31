@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import * as lembretesService from '../services/lembretesService';
 import { formatarMensagem } from '../utils/formatMessages';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
@@ -137,7 +137,7 @@ async function meusLembretesCommand(sock, userId, texto) {
     try {
       await lembretesService.atualizarLembrete(userId, lembreteId, { valor: novoValor });
       await limparEstado(userId);
-      await sock.sendMessage(userId, { text: `✅ Valor atualizado para R$ ${formatarValor(novoValor)}.` });
+      await sock.sendMessage(userId, { text: `✅ Valor atualizado para ${formatarComMoeda(novoValor)}.` });
     } catch (error) {
       logger.error({ err: (error as any)?.message || error }, '[MEUS_LEMBRETES] Erro ao atualizar valor');
       await limparEstado(userId);
@@ -335,7 +335,7 @@ async function meusLembretesCommand(sock, userId, texto) {
     
     // Mostrar detalhes do lembrete e opções
     const dataFormatada = new Date(lembreteSelecionado.data_vencimento).toLocaleDateString('pt-BR');
-    const valorTexto = lembreteSelecionado.valor ? ` - R$ ${formatarValor(lembreteSelecionado.valor)}` : '';
+    const valorTexto = lembreteSelecionado.valor ? ` - ${formatarComMoeda(lembreteSelecionado.valor)}` : '';
     const categoriaTexto = lembreteSelecionado.categoria ? ` [${lembreteSelecionado.categoria}]` : '';
     const recorrenteTexto = lembreteSelecionado.recorrente ? ` 🔄 ${lembreteSelecionado.tipo_recorrencia}` : '';
     const statusTexto = lembreteSelecionado.ativo ? '✅ Ativo' : '⏸️ Pausado';
@@ -410,7 +410,7 @@ async function meusLembretesCommand(sock, userId, texto) {
     
     const itensLista = lembretes.map((lembrete, index) => {
       const dataFormatada = new Date(lembrete.data_vencimento).toLocaleDateString('pt-BR');
-      const valorTexto = lembrete.valor ? ` - R$ ${formatarValor(lembrete.valor)}` : '';
+      const valorTexto = lembrete.valor ? ` - ${formatarComMoeda(lembrete.valor)}` : '';
       const categoriaTexto = lembrete.categoria ? ` [${lembrete.categoria}]` : '';
       const statusEmoji = lembrete.ativo ? '✅' : '⏸️';
       const recorrenteEmoji = lembrete.recorrente ? ' 🔄' : '';
@@ -434,7 +434,7 @@ async function meusLembretesCommand(sock, userId, texto) {
         rows: [
           ...visiveis.map((l: any, i: number) => {
             const data = new Date(l.data_vencimento).toLocaleDateString('pt-BR');
-            const valor = l.valor ? ` · R$ ${formatarValor(l.valor)}` : '';
+            const valor = l.valor ? ` · ${formatarComMoeda(l.valor)}` : '';
             const status = l.ativo ? '✅' : '⏸️';
             const title = `${status} ${l.titulo}`.slice(0, 24);
             return { id: String(i + 1), title, description: `📅 ${data}${valor}` };

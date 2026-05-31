@@ -1,3 +1,4 @@
+import { formatarComMoeda } from '../utils/formatUtils';
 import * as db from '../infrastructure/databaseService';
 import { logger } from '../infrastructure/logger';
 
@@ -337,10 +338,10 @@ export async function buildDriverContext(userId: string): Promise<string | undef
   if (profile.consumo_medio_km_l) linhas.push(`- Consumo médio: ${profile.consumo_medio_km_l} km/L`);
   if (profile.combustivel_preferido) linhas.push(`- Combustível: ${profile.combustivel_preferido}`);
   if (totalFixo > 0) {
-    linhas.push(`- Custos fixos mensais: R$ ${totalFixo.toFixed(2)} (${fixedCosts.map(f => f.description).join(', ')})`);
+    linhas.push(`- Custos fixos mensais: ${formatarComMoeda(totalFixo.toFixed(2))} (${fixedCosts.map(f => f.description).join(', ')})`);
   }
   const metaMensal = goals.find(g => g.tipo_meta === 'MENSAL');
-  if (metaMensal) linhas.push(`- Meta mensal de ganhos: R$ ${metaMensal.valor.toFixed(2)}`);
+  if (metaMensal) linhas.push(`- Meta mensal de ganhos: ${formatarComMoeda(metaMensal.valor.toFixed(2))}`);
 
   return linhas.join('\n');
 }

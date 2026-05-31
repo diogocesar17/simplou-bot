@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import * as driverService from '../services/driverService';
 import { logger } from '../infrastructure/logger';
 
@@ -27,10 +27,10 @@ function formatarMeta(resumo: driverService.DriverResumo, referencia: string): s
   const barra = barraProgresso(Math.max(lucro, 0), valor);
 
   if (lucro >= valor) {
-    return `\n🎯 Meta ${referencia}: *ATINGIDA!* R$ ${formatarValor(valor)}\n${barra} ${pct}%\n`;
+    return `\n🎯 Meta ${referencia}: *ATINGIDA!* ${formatarComMoeda(valor)}\n${barra} ${pct}%\n`;
   }
   if (falta > 0) {
-    return `\n🎯 Meta ${referencia}: R$ ${formatarValor(valor)}\n${barra} ${pct}%\nFalta: R$ ${formatarValor(falta)}\n`;
+    return `\n🎯 Meta ${referencia}: ${formatarComMoeda(valor)}\n${barra} ${pct}%\nFalta: ${formatarComMoeda(falta)}\n`;
   }
   return '';
 }
@@ -45,26 +45,26 @@ function montarMensagem(
   const emojiLucro = lucroReal >= 0 ? '🟢' : '🔴';
 
   let msg = `🚗 *${titulo}*\n\n`;
-  msg += `💰 Receitas: R$ ${formatarValor(receitas)}\n`;
-  msg += `💸 Custos registrados: R$ ${formatarValor(despesas)}\n`;
+  msg += `💰 Receitas: ${formatarComMoeda(receitas)}\n`;
+  msg += `💸 Custos registrados: ${formatarComMoeda(despesas)}\n`;
   if (custosFixosRateados > 0) {
-    msg += `🏠 Custos fixos (rateio): R$ ${formatarValor(custosFixosRateados)}\n`;
+    msg += `🏠 Custos fixos (rateio): ${formatarComMoeda(custosFixosRateados)}\n`;
   }
-  msg += `${emojiLucro} *Lucro real: R$ ${formatarValor(lucroReal)}*\n`;
+  msg += `${emojiLucro} *Lucro real: ${formatarComMoeda(lucroReal)}*\n`;
 
   msg += formatarMeta(resumo, tipoMeta);
 
   if (porPlataforma.length > 0) {
     msg += '\n📊 *Por plataforma:*\n';
     for (const p of porPlataforma) {
-      msg += `• ${p.plataforma}: R$ ${formatarValor(p.total)}\n`;
+      msg += `• ${p.plataforma}: ${formatarComMoeda(p.total)}\n`;
     }
   }
 
   if (porCategoriaDespesa.length > 0) {
     msg += '\n🔧 *Custos por tipo:*\n';
     for (const c of porCategoriaDespesa.slice(0, 5)) {
-      msg += `• ${c.categoria}: R$ ${formatarValor(c.total)}\n`;
+      msg += `• ${c.categoria}: ${formatarComMoeda(c.total)}\n`;
     }
   }
 

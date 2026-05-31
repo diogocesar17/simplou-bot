@@ -1,3 +1,4 @@
+import { formatarComMoeda } from '../utils/formatUtils';
 // Categorias principais fixas com palavras-chave expandidas
 const categoriasPrincipais = {
   'Alimentação': [
@@ -207,18 +208,18 @@ function validarValor(valor, categoria, tipo, texto) {
   
   // Validação de valor mínimo por categoria
   if (valor < limites.min) {
-    validacoes.push(`⚠️ Valor baixo para ${categoria}: R$ ${valor.toFixed(2)} (mínimo: R$ ${limites.min.toFixed(2)})`);
+    validacoes.push(`⚠️ Valor baixo para ${categoria}: ${formatarComMoeda(valor.toFixed(2))} (mínimo: ${formatarComMoeda(limites.min.toFixed(2))})`);
   }
   
   // Não bloquear lançamento por valor máximo de categoria.
   // Em vez de erro, apenas registrar alerta para revisão humana.
   if (valor > limites.max && tipo !== 'receita') {
-    validacoes.push(`🚨 Valor acima da faixa usual para ${categoria}: R$ ${valor.toFixed(2)} (referência: até R$ ${limites.max.toFixed(2)})`);
+    validacoes.push(`🚨 Valor acima da faixa usual para ${categoria}: ${formatarComMoeda(valor.toFixed(2))} (referência: até ${formatarComMoeda(limites.max.toFixed(2))})`);
   }
   
   // Alerta para valores altos
   if (valor > limites.alerta && tipo === 'gasto') {
-    validacoes.push(`🚨 Valor alto para ${categoria}: R$ ${valor.toFixed(2)} (limite de alerta: R$ ${limites.alerta.toFixed(2)})`);
+    validacoes.push(`🚨 Valor alto para ${categoria}: ${formatarComMoeda(valor.toFixed(2))} (limite de alerta: ${formatarComMoeda(limites.alerta.toFixed(2))})`);
   }
   
   // Validações específicas por categoria

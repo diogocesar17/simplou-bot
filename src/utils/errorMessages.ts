@@ -1,3 +1,4 @@
+import { getMoedaCtx } from '../configs/userContext';
 /**
  * Utilitário para padronizar mensagens de erro
  */
@@ -176,13 +177,13 @@ export const ERROR_MESSAGES = {
  */
 export const SUCCESS_MESSAGES = {
   LANCAMENTO_SALVO: (valor: string, categoria: string) => 
-    `✅ *Lançamento salvo com sucesso!*\n\n💰 Valor: R$ ${valor}\n📂 Categoria: ${categoria}\n\n💡 Use "histórico" para ver seus lançamentos`,
+    `✅ *Lançamento salvo com sucesso!*\n\n💰 Valor: ${getMoedaCtx()} ${valor}\n📂 Categoria: ${categoria}\n\n💡 Use "histórico" para ver seus lançamentos`,
 
   CARTAO_CONFIGURADO: (nome: string, vencimento: number, fechamento?: number) => 
     `✅ *Cartão configurado com sucesso!*\n\n💳 ${nome}\n📅 Vencimento: dia ${vencimento}${fechamento ? `\n📅 Fechamento: dia ${fechamento}` : ''}\n\n💡 Use "cartões" para ver todos os cartões`,
 
   LANCAMENTO_EXCLUIDO: (valor: string, categoria: string) => 
-    `✅ *Lançamento excluído com sucesso!*\n\n💰 Valor: R$ ${valor}\n📂 Categoria: ${categoria}\n\n💡 Use "histórico" para ver seus lançamentos`,
+    `✅ *Lançamento excluído com sucesso!*\n\n💰 Valor: ${getMoedaCtx()} ${valor}\n📂 Categoria: ${categoria}\n\n💡 Use "histórico" para ver seus lançamentos`,
 
   CARTAO_EXCLUIDO: (nome: string) => 
     `✅ *Cartão excluído com sucesso!*\n\n💳 ${nome}\n\n💡 Use "cartões" para ver seus cartões restantes`,

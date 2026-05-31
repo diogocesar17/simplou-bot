@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import * as driverService from '../services/driverService';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
 import { logger } from '../infrastructure/logger';
@@ -56,7 +56,7 @@ async function listarCustosFixosInterativos(sock: any, userId: string): Promise<
 
   const total = totalEfetivoMensal(custos);
   const bodyLines = custos
-    .map(c => `• ${c.description}: R$ ${formatarValor(c.amount)}${c.recurrence === 'MONTHLY' ? '/mês' : '/ano'}`)
+    .map(c => `• ${c.description}: ${formatarComMoeda(c.amount)}${c.recurrence === 'MONTHLY' ? '/mês' : '/ano'}`)
     .join('\n');
 
   const sections: any[] = custos.map(c => ({
@@ -64,7 +64,7 @@ async function listarCustosFixosInterativos(sock: any, userId: string): Promise<
     rows: [{
       id: `remover_${c.id}`,
       title: '🗑️ Remover',
-      description: `R$ ${formatarValor(c.amount)}${c.recurrence === 'MONTHLY' ? '/mês' : '/ano'}`,
+      description: `${formatarComMoeda(c.amount)}${c.recurrence === 'MONTHLY' ? '/mês' : '/ano'}`,
     }],
   }));
 
@@ -81,7 +81,7 @@ async function listarCustosFixosInterativos(sock: any, userId: string): Promise<
   await sock.sendInteractiveMessage(userId, {
     type: 'list',
     header: '📋 Seus custos fixos',
-    body: `${bodyLines}\n\n💸 Total efetivo mensal: R$ ${formatarValor(total)}`,
+    body: `${bodyLines}\n\n💸 Total efetivo mensal: ${formatarComMoeda(total)}`,
     buttonLabel: 'Gerenciar',
     sections,
   });
@@ -117,7 +117,7 @@ async function handleAcaoCustoFixo(sock: any, userId: string, texto: string): Pr
     await sock.sendInteractiveMessage(userId, {
       type: 'button',
       header: `🗑️ ${custo.description.substring(0, 50)}`,
-      body: `Remover R$ ${formatarValor(custo.amount)}${freq} dos seus custos fixos?`,
+      body: `Remover ${formatarComMoeda(custo.amount)}${freq} dos seus custos fixos?`,
       buttons: [
         { id: '1', title: '✅ Confirmar' },
         { id: '2', title: '❌ Cancelar' },
@@ -186,7 +186,7 @@ async function handleValor(sock: any, userId: string, texto: string, descricao: 
   await sock.sendInteractiveMessage(userId, {
     type: 'button',
     header: '📋 Novo custo fixo — 3/3',
-    body: `*${descricao}* — R$ ${formatarValor(valor)}\n\nCom que frequência é esse custo?`,
+    body: `*${descricao}* — ${formatarComMoeda(valor)}\n\nCom que frequência é esse custo?`,
     buttons: [
       { id: 'mensal', title: '📅 Mensal' },
       { id: 'anual', title: '📆 Anual' },
@@ -211,7 +211,7 @@ async function handleFrequencia(sock: any, userId: string, texto: string, descri
     await sock.sendInteractiveMessage(userId, {
       type: 'button',
       header: '📋 Novo custo fixo — 3/3',
-      body: `*${descricao}* — R$ ${formatarValor(valor)}\n\nCom que frequência é esse custo?`,
+      body: `*${descricao}* — ${formatarComMoeda(valor)}\n\nCom que frequência é esse custo?`,
       buttons: [
         { id: 'mensal', title: '📅 Mensal' },
         { id: 'anual', title: '📆 Anual' },
@@ -227,8 +227,8 @@ async function handleFrequencia(sock: any, userId: string, texto: string, descri
   const freqLabel = recurrence === 'MONTHLY' ? '/mês' : '/ano';
   const mensalEquiv = recurrence === 'YEARLY' ? valor / 12 : null;
 
-  let msg = `✅ *Custo fixo cadastrado!*\n\n📝 ${descricao}\n💸 R$ ${formatarValor(valor)}${freqLabel}`;
-  if (mensalEquiv) msg += `\n📊 Equivale a R$ ${formatarValor(mensalEquiv)}/mês`;
+  let msg = `✅ *Custo fixo cadastrado!*\n\n📝 ${descricao}\n💸 ${formatarComMoeda(valor)}${freqLabel}`;
+  if (mensalEquiv) msg += `\n📊 Equivale a ${formatarComMoeda(mensalEquiv)}/mês`;
   msg += `\n\nJá será descontado no cálculo do seu lucro real.\nPara ver todos: "custos fixos"`;
 
   await sock.sendMessage(userId, { text: msg });
@@ -285,7 +285,7 @@ export async function custoFixoCommand(sock: any, userId: string, texto: string)
         text:
           `✅ Custo fixo cadastrado:\n` +
           `📝 ${descricao} (${categoria})\n` +
-          `💸 R$ ${formatarValor(valor)}${freqLabel}\n\n` +
+          `💸 ${formatarComMoeda(valor)}${freqLabel}\n\n` +
           `Já será descontado no cálculo do lucro real.\nPara ver todos: "custos fixos"`,
       });
       return;

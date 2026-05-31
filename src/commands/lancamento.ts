@@ -20,7 +20,7 @@ import * as cartoesService from '../services/cartoesService';
 import * as geminiService from '../services/geminiService';
 import * as databaseService from '../infrastructure/databaseService';
 import * as driverService from '../services/driverService';
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import { converterDataParaISO } from '../utils/dataUtils';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
 import { formatarMensagem } from '../utils/formatMessages';
@@ -471,23 +471,23 @@ async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) 
     ]);
     const emojiLucro = lucroReal >= 0 ? '🟢' : '🔴';
     const tipo = isReceita ? 'Receita' : 'Custo';
-    let msg = `✅ *${tipo} registrado:*\n${parsed.categoria} — R$ ${formatarValor(parsed.valor)}`;
+    let msg = `✅ *${tipo} registrado:*\n${parsed.categoria} — ${formatarComMoeda(parsed.valor)}`;
     const temFixo = resumoDia.custosFixosRateados > 0;
     if (metaDiaria && lucroReal >= metaDiaria.valor) {
-      msg += `\n\n🎯 *Meta diária atingida!* Lucro real hoje: R$ ${formatarValor(lucroReal)}. Parabéns! 🏆`;
+      msg += `\n\n🎯 *Meta diária atingida!* Lucro real hoje: ${formatarComMoeda(lucroReal)}. Parabéns! 🏆`;
     } else if (isReceita) {
-      msg += `\n\n${emojiLucro} Lucro real hoje: R$ ${formatarValor(lucroReal)}`;
-      if (temFixo) msg += `\n📌 (já descontados R$ ${formatarValor(resumoDia.custosFixosRateados)} de custos fixos)`;
+      msg += `\n\n${emojiLucro} Lucro real hoje: ${formatarComMoeda(lucroReal)}`;
+      if (temFixo) msg += `\n📌 (já descontados ${formatarComMoeda(resumoDia.custosFixosRateados)} de custos fixos)`;
       if (metaDiaria) {
         const faltam = metaDiaria.valor - lucroReal;
-        if (faltam > 0) msg += `\n💡 Faltam R$ ${formatarValor(faltam)} para sua meta diária`;
+        if (faltam > 0) msg += `\n💡 Faltam ${formatarComMoeda(faltam)} para sua meta diária`;
       }
     } else {
-      msg += `\n\n${emojiLucro} Lucro real hoje: R$ ${formatarValor(lucroReal)}`;
-      if (temFixo) msg += `\n📌 (já descontados R$ ${formatarValor(resumoDia.custosFixosRateados)} de custos fixos)`;
+      msg += `\n\n${emojiLucro} Lucro real hoje: ${formatarComMoeda(lucroReal)}`;
+      if (temFixo) msg += `\n📌 (já descontados ${formatarComMoeda(resumoDia.custosFixosRateados)} de custos fixos)`;
       if (metaDiaria) {
         const faltam = metaDiaria.valor - lucroReal;
-        if (faltam > 0) msg += `\n💡 Faltam R$ ${formatarValor(faltam)} para sua meta diária`;
+        if (faltam > 0) msg += `\n💡 Faltam ${formatarComMoeda(faltam)} para sua meta diária`;
       }
     }
     return msg;
@@ -503,7 +503,7 @@ async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) 
 
     let mensagem = `💳 ${tipoTexto} registrado no cartão ${cartao.nome_cartao}!\n\n`;
     mensagem += `📅 Data: ${parsed.data}\n`;
-    mensagem += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+    mensagem += `💰 Valor: ${formatarComMoeda(parsed.valor)}\n`;
     mensagem += `📂 Categoria: ${parsed.categoria}\n`;
     mensagem += `💳 Pagamento: ${parsed.pagamento}\n`;
     mensagem += `📝 Descrição: ${parsed.descricao}\n`;
@@ -513,9 +513,9 @@ async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) 
     const nomesMes = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
     const nomeMes = nomesMes[agora.getMonth()];
     if (parsed.tipo?.toLowerCase() === 'gasto') {
-      mensagem += `\n\n📊 Seus gastos de ${nomeMes}: R$ ${formatarValor(resumoMes.totalDespesas)}`;
+      mensagem += `\n\n📊 Seus gastos de ${nomeMes}: ${formatarComMoeda(resumoMes.totalDespesas)}`;
     } else {
-      mensagem += `\n\n📊 Suas receitas de ${nomeMes}: R$ ${formatarValor(resumoMes.totalReceitas)}`;
+      mensagem += `\n\n📊 Suas receitas de ${nomeMes}: ${formatarComMoeda(resumoMes.totalReceitas)}`;
     }
     return mensagem;
   }
@@ -523,7 +523,7 @@ async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) 
   // Mensagem padrão
   let mensagem = `${emoji} ${tipoTexto} registrado com sucesso!\n\n`;
   mensagem += `📅 Data: ${parsed.data}\n`;
-  mensagem += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+  mensagem += `💰 Valor: ${formatarComMoeda(parsed.valor)}\n`;
   mensagem += `📂 Categoria: ${parsed.categoria}\n`;
 
   if (!isReceita) {
@@ -537,9 +537,9 @@ async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) 
   const nomesMes = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
   const nomeMes = nomesMes[agora.getMonth()];
   if (parsed.tipo?.toLowerCase() === 'gasto') {
-    mensagem += `\n\n📊 Seus gastos de ${nomeMes}: R$ ${formatarValor(resumoMes.totalDespesas)}`;
+    mensagem += `\n\n📊 Seus gastos de ${nomeMes}: ${formatarComMoeda(resumoMes.totalDespesas)}`;
   } else {
-    mensagem += `\n\n📊 Suas receitas de ${nomeMes}: R$ ${formatarValor(resumoMes.totalReceitas)}`;
+    mensagem += `\n\n📊 Suas receitas de ${nomeMes}: ${formatarComMoeda(resumoMes.totalReceitas)}`;
   }
 
   return mensagem;
@@ -590,7 +590,7 @@ async function lancamentoCommand(sock, userId, texto) {
         type: 'list',
         header: '📝 Editar Lançamento',
         body:
-          `📅 ${dataExibir}  💰 R$ ${formatarValor(lancamento.valor)}\n` +
+          `📅 ${dataExibir}  💰 ${formatarComMoeda(lancamento.valor)}\n` +
           `📂 ${lancamento.categoria}  💳 ${lancamento.pagamento}\n` +
           `📝 ${lancamento.descricao}\n\nQual campo deseja editar?`,
         buttonLabel: 'Ver campos',
@@ -635,7 +635,7 @@ async function lancamentoCommand(sock, userId, texto) {
             header: '🤖 Interpretação do áudio',
             body:
               `🗣️ _${String(parsed.transcricao || '').slice(0, 300)}_\n\n` +
-              `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+              `💰 Valor: ${formatarComMoeda(parsed.valor)}\n` +
               `📝 Descrição: ${parsed.descricao}\n` +
               `📂 Categoria: ${parsed.categoria}\n` +
               `💳 Pagamento: ${pagamentoView}\n` +
@@ -717,7 +717,7 @@ async function lancamentoCommand(sock, userId, texto) {
             type: 'button',
             header: '🤖 Análise do comprovante',
             body:
-              `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+              `💰 Valor: ${formatarComMoeda(parsed.valor)}\n` +
               `📝 Descrição: ${parsed.descricao}\n` +
               `📂 Categoria: ${parsed.categoria}\n` +
               `💳 Pagamento: ${pagamentoView}\n` +
@@ -798,7 +798,7 @@ async function lancamentoCommand(sock, userId, texto) {
           type: 'button',
           header: '🤖 Análise da IA',
           body:
-            `💰 Valor: R$ ${formatarValor(parsed.valor)}\n` +
+            `💰 Valor: ${formatarComMoeda(parsed.valor)}\n` +
             `📝 Descrição: ${parsed.descricao}\n` +
             `📂 Categoria: ${parsed.categoria}\n` +
             `💳 Pagamento: ${parsed.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsed.pagamento}\n` +
@@ -1007,8 +1007,8 @@ async function lancamentoCommand(sock, userId, texto) {
       const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed, cartaoEscolhido);
       await limparEstado(userId);
       let msg = `✅ Parcelamento registrado no cartão ${cartaoEscolhido.nome_cartao}!\n\n`;
-      msg += `💰 Valor total: R$ ${formatarValor(parsed.valor)}\n`;
-      msg += `📦 ${parsed.numParcelas}x de R$ ${formatarValor(parsed.valor / parsed.numParcelas)}\n`;
+      msg += `💰 Valor total: ${formatarComMoeda(parsed.valor)}\n`;
+      msg += `📦 ${parsed.numParcelas}x de ${formatarComMoeda(parsed.valor / parsed.numParcelas)}\n`;
       msg += `📂 Categoria: ${parsed.categoria}\n`;
       msg += `📝 Descrição: ${parsed.descricao}`;
       await sock.sendMessage(userId, { text: msg });
@@ -1019,7 +1019,7 @@ async function lancamentoCommand(sock, userId, texto) {
       const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed, cartaoEscolhido);
       await limparEstado(userId);
       let msg = `✅ Lançamento recorrente registrado no cartão ${cartaoEscolhido.nome_cartao}!\n\n`;
-      msg += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+      msg += `💰 Valor: ${formatarComMoeda(parsed.valor)}\n`;
       msg += `📅 ${parsed.recorrenteMeses} meses\n`;
       msg += `📂 Categoria: ${parsed.categoria}\n`;
       msg += `📝 Descrição: ${parsed.descricao}`;
@@ -1062,11 +1062,11 @@ async function lancamentoCommand(sock, userId, texto) {
         const pct = Math.round((totalMes / orcamento.limite) * 100);
         if (pct >= 100) {
           await sock.sendMessage(userId, {
-            text: `🔴 *Orçamento estourado!* ${parsed.categoria}: R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)} (${pct}%)`
+            text: `🔴 *Orçamento estourado!* ${parsed.categoria}: ${formatarComMoeda(totalMes)} de ${formatarComMoeda(orcamento.limite)} (${pct}%)`
           });
         } else if (pct >= 80) {
           await sock.sendMessage(userId, {
-            text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)})`
+            text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (${formatarComMoeda(totalMes)} de ${formatarComMoeda(orcamento.limite)})`
           });
         }
       }
@@ -1178,7 +1178,7 @@ async function lancamentoCommand(sock, userId, texto) {
         type: 'button',
         header: '🤖 Análise da IA',
         body:
-          `💰 Valor: R$ ${formatarValor(parsedIA.valor)}\n` +
+          `💰 Valor: ${formatarComMoeda(parsedIA.valor)}\n` +
           `📝 Descrição: ${parsedIA.descricao}\n` +
           `📂 Categoria: ${parsedIA.categoria}\n` +
           `💳 Pagamento: ${parsedIA.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsedIA.pagamento}\n` +
@@ -1303,11 +1303,11 @@ async function processarLancamento(sock, userId, parsed) {
           const pct = Math.round((totalMes / orcamento.limite) * 100);
           if (pct >= 100) {
             await sock.sendMessage(userId, {
-              text: `🔴 *Orçamento estourado!* ${parsed.categoria}: R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)} (${pct}%)`
+              text: `🔴 *Orçamento estourado!* ${parsed.categoria}: ${formatarComMoeda(totalMes)} de ${formatarComMoeda(orcamento.limite)} (${pct}%)`
             });
           } else if (pct >= 80) {
             await sock.sendMessage(userId, {
-              text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)})`
+              text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (${formatarComMoeda(totalMes)} de ${formatarComMoeda(orcamento.limite)})`
             });
           }
         }
@@ -1324,8 +1324,8 @@ async function processarLancamento(sock, userId, parsed) {
         const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed, cartao);
         logger.info({ userId, tipo: 'gasto', valor: parsed.valor, categoria: parsed.categoria, cartao: cartao.nome_cartao, parcelas: parsed.numParcelas, origem: 'parcelamento_cartao' }, '[LANCAMENTO] Salvo');
         let msg = `✅ Parcelamento registrado no cartão ${cartao.nome_cartao}!\n\n`;
-        msg += `💰 Valor total: R$ ${formatarValor(parsed.valor)}\n`;
-        msg += `📦 ${parsed.numParcelas}x de R$ ${formatarValor(parsed.valor / parsed.numParcelas)}\n`;
+        msg += `💰 Valor total: ${formatarComMoeda(parsed.valor)}\n`;
+        msg += `📦 ${parsed.numParcelas}x de ${formatarComMoeda(parsed.valor / parsed.numParcelas)}\n`;
         msg += `📂 Categoria: ${parsed.categoria}\n`;
         msg += `📝 Descrição: ${parsed.descricao}`;
         await sock.sendMessage(userId, { text: msg });
@@ -1337,7 +1337,7 @@ async function processarLancamento(sock, userId, parsed) {
         const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed, cartao);
         logger.info({ userId, tipo: 'gasto', valor: parsed.valor, categoria: parsed.categoria, cartao: cartao.nome_cartao, meses: parsed.recorrenteMeses, origem: 'recorrente_cartao' }, '[LANCAMENTO] Salvo');
         let msg = `✅ Lançamento recorrente registrado no cartão ${cartao.nome_cartao}!\n\n`;
-        msg += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+        msg += `💰 Valor: ${formatarComMoeda(parsed.valor)}\n`;
         msg += `📅 ${parsed.recorrenteMeses} meses\n`;
         msg += `📂 Categoria: ${parsed.categoria}\n`;
         msg += `📝 Descrição: ${parsed.descricao}`;
@@ -1378,11 +1378,11 @@ async function processarLancamento(sock, userId, parsed) {
           const pct = Math.round((totalMes / orcamento.limite) * 100);
           if (pct >= 100) {
             await sock.sendMessage(userId, {
-              text: `🔴 *Orçamento estourado!* ${parsed.categoria}: R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)} (${pct}%)`
+              text: `🔴 *Orçamento estourado!* ${parsed.categoria}: ${formatarComMoeda(totalMes)} de ${formatarComMoeda(orcamento.limite)} (${pct}%)`
             });
           } else if (pct >= 80) {
             await sock.sendMessage(userId, {
-              text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)})`
+              text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (${formatarComMoeda(totalMes)} de ${formatarComMoeda(orcamento.limite)})`
             });
           }
         }
@@ -1418,8 +1418,8 @@ async function processarLancamento(sock, userId, parsed) {
     const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed);
     logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, parcelas: parsed.numParcelas, origem: 'parcelamento' }, '[LANCAMENTO] Salvo');
     let msg = `✅ Parcelamento registrado!\n\n`;
-    msg += `💰 Valor total: R$ ${formatarValor(parsed.valor)}\n`;
-    msg += `📦 ${parsed.numParcelas}x de R$ ${formatarValor(parsed.valor / parsed.numParcelas)}\n`;
+    msg += `💰 Valor total: ${formatarComMoeda(parsed.valor)}\n`;
+    msg += `📦 ${parsed.numParcelas}x de ${formatarComMoeda(parsed.valor / parsed.numParcelas)}\n`;
     msg += `📂 Categoria: ${parsed.categoria}\n`;
     msg += `📝 Descrição: ${parsed.descricao}`;
     await sock.sendMessage(userId, { text: msg });
@@ -1431,7 +1431,7 @@ async function processarLancamento(sock, userId, parsed) {
     const { recorrenteId, lancamentosCriados } = await criarRecorrente(userId, parsed);
     logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, meses: parsed.recorrenteMeses, origem: 'recorrente' }, '[LANCAMENTO] Salvo');
     let msg = `✅ Lançamento recorrente registrado!\n\n`;
-    msg += `💰 Valor: R$ ${formatarValor(parsed.valor)}\n`;
+    msg += `💰 Valor: ${formatarComMoeda(parsed.valor)}\n`;
     msg += `📅 ${parsed.recorrenteMeses} meses\n`;
     msg += `📂 Categoria: ${parsed.categoria}\n`;
     msg += `📝 Descrição: ${parsed.descricao}`;
@@ -1465,11 +1465,11 @@ async function processarLancamento(sock, userId, parsed) {
       const pct = Math.round((totalMes / orcamento.limite) * 100);
       if (pct >= 100) {
         await sock.sendMessage(userId, {
-          text: `🔴 *Orçamento estourado!* ${parsed.categoria}: R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)} (${pct}%)`
+          text: `🔴 *Orçamento estourado!* ${parsed.categoria}: ${formatarComMoeda(totalMes)} de ${formatarComMoeda(orcamento.limite)} (${pct}%)`
         });
       } else if (pct >= 80) {
         await sock.sendMessage(userId, {
-          text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (R$ ${formatarValor(totalMes)} de R$ ${formatarValor(orcamento.limite)})`
+          text: `🟡 *Atenção!* Orçamento de ${parsed.categoria}: ${pct}% usado (${formatarComMoeda(totalMes)} de ${formatarComMoeda(orcamento.limite)})`
         });
       }
     }
@@ -1479,7 +1479,7 @@ async function processarLancamento(sock, userId, parsed) {
   const THRESHOLD_GASTO_ALTO = Number(process.env.THRESHOLD_GASTO_ALTO || 500);
   if (parsed.tipo === 'gasto' && parsed.valor > THRESHOLD_GASTO_ALTO) {
     await sock.sendMessage(userId, {
-      text: `⚠️ *Gasto alto registrado!*\n\nVocê acabou de registrar um gasto de R$ ${formatarValor(parsed.valor)}.\n\nDigite *resumo* para ver como está seu mês.`
+      text: `⚠️ *Gasto alto registrado!*\n\nVocê acabou de registrar um gasto de ${formatarComMoeda(parsed.valor)}.\n\nDigite *resumo* para ver como está seu mês.`
     });
   }
 }

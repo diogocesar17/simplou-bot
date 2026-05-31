@@ -1,5 +1,5 @@
 import * as lancamentosService from '../services/lancamentosService';
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import { definirEstado, obterEstado, limparEstado } from './../configs/stateManager';
 import { formatarMensagem, gerarDicasContextuais, formatarCancelamento, formatarMenuComCancelamento } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
@@ -419,7 +419,7 @@ async function editarLancamentoCommand(sock, userId, texto) {
     type: 'list',
     header: `📝 Editar Lançamento ${idx + 1}`,
     body:
-      `📅 ${dataExibir}  💰 R$ ${formatarValor(lancamento.valor)}\n` +
+      `📅 ${dataExibir}  💰 ${formatarComMoeda(lancamento.valor)}\n` +
       `📂 ${lancamento.categoria}  💳 ${lancamento.pagamento}\n` +
       `📝 ${lancamento.descricao}\n\nQual campo deseja editar?`,
     buttonLabel: 'Ver campos',

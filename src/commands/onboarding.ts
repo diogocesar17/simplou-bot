@@ -1,6 +1,6 @@
 import * as driverService from '../services/driverService';
 import { definirEstado, limparEstado } from '../configs/stateManager';
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 
 const TIPO_LABELS: Record<string, string> = {
   MOTORISTA_APP: 'Motorista de app (Uber, 99)',
@@ -108,7 +108,7 @@ export async function handleOnboardingMetaDiaria(sock: any, userId: string, text
   await limparEstado(userId);
   await sock.sendMessage(userId, {
     text:
-      `🎯 Meta diária definida: *R$ ${formatarValor(valor)}*\n\n` +
+      `🎯 Meta diária definida: *${formatarComMoeda(valor)}*\n\n` +
       '✅ Tudo pronto! A cada lançamento vou mostrar seu lucro acumulado e quanto falta para a meta.\n\n' +
       '🚀 *Vamos começar:*\n' +
       '• _ganhei 280 no uber_ → corrida\n' +

@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem } from '../utils/formatMessages';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
@@ -44,7 +44,7 @@ async function parceladosCommand(sock, userId, texto?) {
 
     const linhas = [
       `📝 ${parcelamento.descricao}`,
-      `💰 Total: R$ ${formatarValor(parcelamento.valor_total)} · ${parcelamento.total_parcelas}x de R$ ${formatarValor(parcelamento.valor_parcela)}`,
+      `💰 Total: ${formatarComMoeda(parcelamento.valor_total)} · ${parcelamento.total_parcelas}x de ${formatarComMoeda(parcelamento.valor_parcela)}`,
       `📅 ${formatarData(parcelamento.primeira_parcela)} a ${formatarData(parcelamento.ultima_parcela)}`,
       `📂 ${parcelamento.categoria} | 💳 ${parcelamento.pagamento}`,
       proximaFutura
@@ -102,7 +102,7 @@ async function parceladosCommand(sock, userId, texto?) {
         type: 'list',
         header: '📝 Editar Parcelamento',
         body:
-          `📅 ${formatarData(lancamento.data)}  💰 R$ ${formatarValor(lancamento.valor)}\n` +
+          `📅 ${formatarData(lancamento.data)}  💰 ${formatarComMoeda(lancamento.valor)}\n` +
           `📂 ${lancamento.categoria}  💳 ${lancamento.pagamento}\n` +
           `📝 ${lancamento.descricao}\n\nQual campo deseja editar?`,
         buttonLabel: 'Ver campos',
@@ -185,7 +185,7 @@ async function parceladosCommand(sock, userId, texto?) {
           ...visiveis.map((p: any, i: number) => ({
             id: String(i + 1),
             title: p.descricao.slice(0, 24),
-            description: `${p.total_parcelas}x · R$ ${formatarValor(p.valor_parcela)}/parcela`
+            description: `${p.total_parcelas}x · ${formatarComMoeda(p.valor_parcela)}/parcela`
           })),
           { id: '0', title: '↩️ Cancelar' }
         ]

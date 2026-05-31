@@ -1,3 +1,4 @@
+import { formatarComMoeda } from '../utils/formatUtils';
 import {
   buscarAlertasDoDia,
   gerarMensagemAlertas,
@@ -179,9 +180,9 @@ async function buscarAlertasVencimento(userId: string, eLembreteFinal: boolean =
         const valorFormatado = parseFloat(boleto.valor.toString()).toFixed(2);
         
         if (diffDays === 0) {
-          mensagem += `• 🔴 *VENCIMENTO HOJE*: ${boleto.descricao} - R$ ${valorFormatado}\n`;
+          mensagem += `• 🔴 *VENCIMENTO HOJE*: ${boleto.descricao} - ${formatarComMoeda(valorFormatado)}\n`;
         } else {
-          mensagem += `• 🟡 *VENCIMENTO EM ${diffDays} DIAS*: ${boleto.descricao} - R$ ${valorFormatado}\n`;
+          mensagem += `• 🟡 *VENCIMENTO EM ${diffDays} DIAS*: ${boleto.descricao} - ${formatarComMoeda(valorFormatado)}\n`;
         }
       });
     }
@@ -298,7 +299,7 @@ async function buscarAlertasLembretes(userId: string, eLembreteFinal: boolean = 
       
       if (lembrete.valor) {
         const valorFormatado = parseFloat(lembrete.valor.toString()).toFixed(2);
-        mensagem += ` - R$ ${valorFormatado}`;
+        mensagem += ` - ${formatarComMoeda(valorFormatado)}`;
       }
       
       if (lembrete.categoria) {
@@ -440,7 +441,7 @@ async function enviarResumoSemanal(adapter: IWhatsAppAdapter, userId: string): P
     await redisDedup.set(chaveDedup, '1', 'EX', 7 * 24 * 60 * 60); // TTL: 7 dias
 
     await adapter.sendMessage(userId, {
-      text: `📊 *Resumo da semana* — você gastou R$ ${formatarValorAlerta(total)} nos últimos 7 dias.`
+      text: `📊 *Resumo da semana* — você gastou ${formatarComMoeda(formatarValorAlerta(total))} nos últimos 7 dias.`
     });
 
     logger.info({ userId, semana, total }, '[ALERTAS] Resumo semanal enviado');

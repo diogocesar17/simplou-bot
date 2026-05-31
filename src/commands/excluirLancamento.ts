@@ -1,3 +1,4 @@
+import { formatarComMoeda } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { obterEstado, limparEstado, definirEstado } from '../configs/stateManager';
 import { formatarMensagem, formatarConfirmacao, gerarDicasContextuais } from '../utils/formatMessages';
@@ -87,7 +88,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
                   titulo: 'Detalhes do Parcelamento',
                   itens: [
                     `Descrição: ${lancamento.descricao}`,
-                    `Valor Total: R$ ${lancamento.valor}`,
+                    `Valor Total: ${formatarComMoeda(lancamento.valor)}`,
                     `Categoria: ${lancamento.categoria}`,
                     `Parcelas Excluídas: ${lancamentosExcluidos}`
                   ],
@@ -107,7 +108,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
                   titulo: 'Detalhes do Recorrente',
                   itens: [
                     `Descrição: ${lancamento.descricao}`,
-                    `Valor: R$ ${lancamento.valor}`,
+                    `Valor: ${formatarComMoeda(lancamento.valor)}`,
                     `Categoria: ${lancamento.categoria}`,
                     `Recorrências excluídas: ${lancamentosExcluidos}`
                   ],
@@ -127,7 +128,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
                   titulo: 'Detalhes do Lançamento',
                   itens: [
                     `Descrição: ${lancamento.descricao}`,
-                    `Valor: R$ ${lancamento.valor}`,
+                    `Valor: ${formatarComMoeda(lancamento.valor)}`,
                     `Categoria: ${lancamento.categoria}`
                   ],
                   emoji: '📝'
@@ -207,7 +208,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
     let body: string;
     if (escopoExclusao === 'apenas_atual') {
       header = 'Excluir esta parcela?';
-      body = `📝 ${lancamento.descricao}\n💰 R$ ${lancamento.valor}\n📂 ${lancamento.categoria}\n📅 ${dataExib}`;
+      body = `📝 ${lancamento.descricao}\n💰 ${formatarComMoeda(lancamento.valor)}\n📂 ${lancamento.categoria}\n📅 ${dataExib}`;
     } else if (escopoExclusao === 'atual_e_futuras') {
       header = 'Excluir parcelas futuras?';
       body = `📝 ${lancamento.descricao}\n📂 ${lancamento.categoria}\n📅 Parcela ${lancamento.parcela_atual}/${lancamento.total_parcelas}\n⚠️ Exclui esta e todas as futuras`;
@@ -270,7 +271,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
     const dataExib = lancamento.data instanceof Date ? lancamento.data.toLocaleDateString('pt-BR') : lancamento.data;
     const header = escopoExclusao === 'apenas_atual' ? 'Excluir esta recorrência?' : 'Excluir recorrências futuras?';
     const body = escopoExclusao === 'apenas_atual'
-      ? `📝 ${lancamento.descricao}\n💰 R$ ${lancamento.valor}\n📂 ${lancamento.categoria}\n📅 ${dataExib}`
+      ? `📝 ${lancamento.descricao}\n💰 ${formatarComMoeda(lancamento.valor)}\n📂 ${lancamento.categoria}\n📅 ${dataExib}`
       : `📝 ${lancamento.descricao}\n📂 ${lancamento.categoria}\n⚠️ Exclui esta e todas as futuras (passadas não afetadas)`;
 
     await definirEstado(userId, 'aguardando_confirmacao_exclusao_lancamento', {
@@ -394,7 +395,7 @@ async function excluirLancamentoCommand(sock, userId, texto) {
       header: 'Confirmar exclusão?',
       body:
         `📝 ${lancamento.descricao}\n` +
-        `💰 R$ ${lancamento.valor}\n` +
+        `💰 ${formatarComMoeda(lancamento.valor)}\n` +
         `📂 ${lancamento.categoria}\n` +
         `📅 ${formatarDataParaExibicao(lancamento.data)}`,
       footer: '⚠️ Esta ação não pode ser desfeita!',

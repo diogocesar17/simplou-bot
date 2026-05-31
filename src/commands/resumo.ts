@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import * as databaseService from '../infrastructure/databaseService';
@@ -19,7 +19,7 @@ async function resumoCommand(sock, userId, texto) {
       .filter((m: any) => m.lancamentos > 0)
       .map((m: any) => {
         const emoji = m.saldo >= 0 ? '🟢' : '🔴';
-        return `${nomesMeses[m.mes-1]}: ${emoji} R$ ${formatarValor(m.saldo)} (↓${formatarValor(m.despesas)} ↑${formatarValor(m.receitas)})`;
+        return `${nomesMeses[m.mes-1]}: ${emoji} ${formatarComMoeda(m.saldo)} (↓${formatarValor(m.despesas)} ↑${formatarValor(m.receitas)})`;
       });
     if (!itensMeses.length) itensMeses.push('Nenhum lançamento encontrado neste ano.');
     await sock.sendMessage(userId, {
@@ -35,9 +35,9 @@ async function resumoCommand(sock, userId, texto) {
           {
             titulo: 'Total do ano',
             itens: [
-              `Receitas: R$ ${formatarValor(resumoAno.totalReceitas)}`,
-              `Despesas: R$ ${formatarValor(resumoAno.totalDespesas)}`,
-              `${resumoAno.saldo >= 0 ? '🟢' : '🔴'} Saldo: R$ ${formatarValor(resumoAno.saldo)}`
+              `Receitas: ${formatarComMoeda(resumoAno.totalReceitas)}`,
+              `Despesas: ${formatarComMoeda(resumoAno.totalDespesas)}`,
+              `${resumoAno.saldo >= 0 ? '🟢' : '🔴'} Saldo: ${formatarComMoeda(resumoAno.saldo)}`
             ],
             emoji: '💰'
           }
@@ -63,9 +63,9 @@ async function resumoCommand(sock, userId, texto) {
           {
             titulo: 'Resumo Financeiro',
             itens: [
-              `Receitas: R$ ${formatarValor(resumo.totalReceitas)}`,
-              `Despesas: R$ ${formatarValor(resumo.totalDespesas)}`,
-              `${resumo.saldo >= 0 ? '🟢' : '🔴'} Saldo: R$ ${formatarValor(resumo.saldo)}`,
+              `Receitas: ${formatarComMoeda(resumo.totalReceitas)}`,
+              `Despesas: ${formatarComMoeda(resumo.totalDespesas)}`,
+              `${resumo.saldo >= 0 ? '🟢' : '🔴'} Saldo: ${formatarComMoeda(resumo.saldo)}`,
               `Lançamentos: ${resumo.totalLancamentos}`
             ],
             emoji: '💰'
@@ -92,9 +92,9 @@ async function resumoCommand(sock, userId, texto) {
     const resumoAnterior = await lancamentosService.getResumoPorMes(userId, mesAnteriorNum, anoAnteriorNum);
 
     const itensResumo = [
-      `Receitas: R$ ${formatarValor(resumo.totalReceitas)}`,
-      `Despesas: R$ ${formatarValor(resumo.totalDespesas)}`,
-      `${resumo.saldo >= 0 ? '🟢' : '🔴'} Saldo: R$ ${formatarValor(resumo.saldo)}`,
+      `Receitas: ${formatarComMoeda(resumo.totalReceitas)}`,
+      `Despesas: ${formatarComMoeda(resumo.totalDespesas)}`,
+      `${resumo.saldo >= 0 ? '🟢' : '🔴'} Saldo: ${formatarComMoeda(resumo.saldo)}`,
       `Lançamentos: ${resumo.totalLancamentos}`
     ];
 
@@ -134,7 +134,7 @@ async function resumoCommand(sock, userId, texto) {
         titulo: 'Top gastos',
         itens: top3.map((cat, idx) => {
           const pct = gastosCat.totalGeral > 0 ? Math.round((cat.total / gastosCat.totalGeral) * 100) : 0;
-          return `${idx + 1}. ${cat.nome}: R$ ${formatarValor(cat.total)} (${pct}%)`;
+          return `${idx + 1}. ${cat.nome}: ${formatarComMoeda(cat.total)} (${pct}%)`;
         }),
         emoji: '🏆'
       });
@@ -169,9 +169,9 @@ async function resumoCommand(sock, userId, texto) {
     {
       titulo: 'Resumo Financeiro',
       itens: [
-        `Receitas: R$ ${formatarValor(resumo.totalReceitas)}`,
-        `Despesas: R$ ${formatarValor(resumo.totalDespesas)}`,
-        `${resumo.saldo >= 0 ? '🟢' : '🔴'} Saldo: R$ ${formatarValor(resumo.saldo)}`,
+        `Receitas: ${formatarComMoeda(resumo.totalReceitas)}`,
+        `Despesas: ${formatarComMoeda(resumo.totalDespesas)}`,
+        `${resumo.saldo >= 0 ? '🟢' : '🔴'} Saldo: ${formatarComMoeda(resumo.saldo)}`,
         `Lançamentos: ${resumo.totalLancamentos}`
       ],
       emoji: '💰'
@@ -183,7 +183,7 @@ async function resumoCommand(sock, userId, texto) {
       titulo: 'Top gastos',
       itens: top3Esp.map((cat, idx) => {
         const pct = gastosCatEsp.totalGeral > 0 ? Math.round((cat.total / gastosCatEsp.totalGeral) * 100) : 0;
-        return `${idx + 1}. ${cat.nome}: R$ ${formatarValor(cat.total)} (${pct}%)`;
+        return `${idx + 1}. ${cat.nome}: ${formatarComMoeda(cat.total)} (${pct}%)`;
       }),
       emoji: '🏆'
     });

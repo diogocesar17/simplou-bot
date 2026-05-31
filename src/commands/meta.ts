@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import * as driverService from '../services/driverService';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
 import { logger } from '../infrastructure/logger';
@@ -56,7 +56,7 @@ async function mostrarMetasInterativas(sock: any, userId: string): Promise<void>
     sections.push({
       title: `Meta ${labelMeta(m.tipo_meta)}`,
       rows: [
-        { id: `alterar_${m.tipo_meta}`, title: '✏️ Alterar', description: `Atual: R$ ${formatarValor(m.valor)}` },
+        { id: `alterar_${m.tipo_meta}`, title: '✏️ Alterar', description: `Atual: ${formatarComMoeda(m.valor)}` },
         { id: `remover_${m.tipo_meta}`, title: '🗑️ Remover', description: `Desativar meta ${labelMeta(m.tipo_meta)}` },
       ],
     });
@@ -74,7 +74,7 @@ async function mostrarMetasInterativas(sock: any, userId: string): Promise<void>
   }
 
   const bodyLines = metas.length > 0
-    ? metas.map(m => `• Meta ${labelMeta(m.tipo_meta)}: R$ ${formatarValor(m.valor)}`).join('\n')
+    ? metas.map(m => `• Meta ${labelMeta(m.tipo_meta)}: ${formatarComMoeda(m.valor)}`).join('\n')
     : 'Nenhuma meta definida ainda.';
 
   await definirEstado(userId, 'aguardando_acao_meta', {});
@@ -131,7 +131,7 @@ async function handleMetaAcao(sock: any, userId: string, texto: string): Promise
     await sock.sendInteractiveMessage(userId, {
       type: 'button',
       header: `🗑️ Remover meta ${labelMeta(tipo)}`,
-      body: `Confirmar remoção da meta ${labelMeta(tipo)} de R$ ${formatarValor(meta.valor)}?`,
+      body: `Confirmar remoção da meta ${labelMeta(tipo)} de ${formatarComMoeda(meta.valor)}?`,
       buttons: [
         { id: '1', title: '✅ Confirmar' },
         { id: '2', title: '❌ Cancelar' },
@@ -164,7 +164,7 @@ async function handleNovoValorMeta(sock: any, userId: string, texto: string, tip
   await limparEstado(userId);
   await sock.sendMessage(userId, {
     text:
-      `✅ Meta ${labelMeta(tipo)} definida: *R$ ${formatarValor(valor)}*\n\n` +
+      `✅ Meta ${labelMeta(tipo)} definida: *${formatarComMoeda(valor)}*\n\n` +
       `A cada lançamento, vou comparar seu lucro com essa meta.\n` +
       `Para ver o progresso: _quanto falta para a meta_`,
   });
@@ -208,15 +208,15 @@ async function quantoFaltaMeta(sock: any, userId: string, norm: string): Promise
   const faltam = meta.valor - lucroAtual;
   if (faltam <= 0) {
     await sock.sendMessage(userId, {
-      text: `🎯 *Meta ${labelMeta(tipo)} atingida!*\n\nVocê lucrou R$ ${formatarValor(lucroAtual)} — meta era R$ ${formatarValor(meta.valor)}. Parabéns! 🏆`,
+      text: `🎯 *Meta ${labelMeta(tipo)} atingida!*\n\nVocê lucrou ${formatarComMoeda(lucroAtual)} — meta era ${formatarComMoeda(meta.valor)}. Parabéns! 🏆`,
     });
   } else {
     const pct = Math.round((lucroAtual / meta.valor) * 100);
     await sock.sendMessage(userId, {
       text:
-        `🎯 *Meta ${labelMeta(tipo)}: R$ ${formatarValor(meta.valor)}*\n\n` +
-        `Lucro atual: R$ ${formatarValor(lucroAtual)}\n` +
-        `Faltam: R$ ${formatarValor(faltam)} (${pct}% concluído)`,
+        `🎯 *Meta ${labelMeta(tipo)}: ${formatarComMoeda(meta.valor)}*\n\n` +
+        `Lucro atual: ${formatarComMoeda(lucroAtual)}\n` +
+        `Faltam: ${formatarComMoeda(faltam)} (${pct}% concluído)`,
     });
   }
 }
@@ -265,7 +265,7 @@ export async function metaCommand(sock: any, userId: string, texto: string): Pro
       await sock.sendInteractiveMessage(userId, {
         type: 'button',
         header: `🗑️ Remover meta ${labelMeta(tipo)}`,
-        body: `Confirmar remoção da meta ${labelMeta(tipo)} de R$ ${formatarValor(meta.valor)}?`,
+        body: `Confirmar remoção da meta ${labelMeta(tipo)} de ${formatarComMoeda(meta.valor)}?`,
         buttons: [
           { id: '1', title: '✅ Confirmar' },
           { id: '2', title: '❌ Cancelar' },
@@ -282,7 +282,7 @@ export async function metaCommand(sock: any, userId: string, texto: string): Pro
       await driverService.upsertGoal(userId, tipo, valor);
       await sock.sendMessage(userId, {
         text:
-          `✅ Meta ${labelMeta(tipo)} definida: *R$ ${formatarValor(valor)}*\n\n` +
+          `✅ Meta ${labelMeta(tipo)} definida: *${formatarComMoeda(valor)}*\n\n` +
           `A cada lançamento, vou comparar seu lucro com essa meta.\n` +
           `Para ver o progresso: _quanto falta para a meta_`,
       });

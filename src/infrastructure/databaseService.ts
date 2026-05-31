@@ -1,3 +1,4 @@
+import { formatarComMoeda } from '../utils/formatUtils';
 import { Pool } from 'pg';
 import { logger, fileLogger } from './logger';
 import { promises as fs } from 'fs';
@@ -294,6 +295,14 @@ async function initializeDatabase() {
         atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_parser_cache_padrao ON parser_cache (padrao);
+
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id TEXT NOT NULL,
+        chave TEXT NOT NULL,
+        valor TEXT NOT NULL,
+        atualizado_em TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        PRIMARY KEY (user_id, chave)
+      );
     `);
 
     // Adicionar Foreign Keys com ON DELETE CASCADE (idempotentes)
@@ -821,7 +830,7 @@ async function appendRowToDatabase(userId, values) {
     const descricao = values[2] || 'Lançamento';
     
     let acao = 'CRIAR_LANCAMENTO';
-    let detalhes = `Tipo: ${tipo}, Valor: R$ ${valor}, Categoria: ${categoria}, Pagamento: ${pagamento}`;
+    let detalhes = `Tipo: ${tipo}, Valor: ${formatarComMoeda(valor)}, Categoria: ${categoria}, Pagamento: ${pagamento}`;
     
     // Verificar se é parcelamento
     if (values[6]) { // parcelamento_id
@@ -1129,7 +1138,7 @@ async function listarLancamentos(userId, limite = 20, mes = null, ano = null) {
       } else {
         // Histórico geral: mostra o valor total do parcelamento
         valorParaMostrar = parseFloat(representante.valor) * parseInt(representante.total_parcelas);
-        descricaoParaMostrar = `${representante.descricao.replace(/\(1\/\d+\)/, '').trim()} (${representante.total_parcelas}x de R$ ${formatarValor(representante.valor)})`;
+        descricaoParaMostrar = `${representante.descricao.replace(/\(1\/\d+\)/, '').trim()} (${representante.total_parcelas}x de ${formatarComMoeda(representante.valor)})`;
       }
       
       lancamentosAgrupados.push({
@@ -1276,7 +1285,7 @@ async function atualizarLancamentoPorId(userId, id, novosDados) {
         mudancas.push(`Tipo: ${lancamentoAntes.tipo} → ${novosDados.tipo}`);
       }
       if (novosDados.valor !== undefined && novosDados.valor !== lancamentoAntes.valor) {
-        mudancas.push(`Valor: R$ ${lancamentoAntes.valor} → R$ ${novosDados.valor}`);
+        mudancas.push(`Valor: ${formatarComMoeda(lancamentoAntes.valor)} → ${formatarComMoeda(novosDados.valor)}`);
       }
       if (novosDados.categoria !== undefined && novosDados.categoria !== lancamentoAntes.categoria) {
         mudancas.push(`Categoria: ${lancamentoAntes.categoria} → ${novosDados.categoria}`);
@@ -1315,7 +1324,7 @@ async function excluirLancamentoPorId(userId, id) {
     const deleteResult = await queryDatabase(query, [userId, id]);
     
     // Registrar log de auditoria
-    const detalhes = `ID: ${id}, Tipo: ${lancamento.tipo}, Valor: R$ ${lancamento.valor}, Categoria: ${lancamento.categoria}, Descrição: ${lancamento.descricao}`;
+    const detalhes = `ID: ${id}, Tipo: ${lancamento.tipo}, Valor: ${formatarComMoeda(lancamento.valor)}, Categoria: ${lancamento.categoria}, Descrição: ${lancamento.descricao}`;
     await registrarLog(userId, 'EXCLUIR_LANCAMENTO', detalhes);
     
     return deleteResult.rowCount; // Retorna o número de lançamentos excluídos
@@ -1619,7 +1628,7 @@ async function excluirParcelamentoPorId(userId, parcelamentoId) {
     const deleteResult = await queryDatabase(deleteQuery, [userId, parcelamentoId]);
     
     // Registrar log de auditoria
-    const detalhes = `Parcelamento ID: ${parcelamentoId}, Parcelas: ${info.total_parcelas}, Valor Total: R$ ${info.valor_total}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
+    const detalhes = `Parcelamento ID: ${parcelamentoId}, Parcelas: ${info.total_parcelas}, Valor Total: ${formatarComMoeda(info.valor_total)}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
     await registrarLog(userId, 'EXCLUIR_PARCELAMENTO', detalhes);
     
     return deleteResult.rowCount;
@@ -1653,7 +1662,7 @@ async function excluirRecorrentePorId(userId, recorrenteId) {
     const deleteResult = await queryDatabase(deleteQuery, [userId, recorrenteId]);
     
     // Registrar log de auditoria
-    const detalhes = `Recorrente ID: ${recorrenteId}, Recorrências: ${info.total_recorrencias}, Valor: R$ ${info.valor}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
+    const detalhes = `Recorrente ID: ${recorrenteId}, Recorrências: ${info.total_recorrencias}, Valor: ${formatarComMoeda(info.valor)}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
     await registrarLog(userId, 'EXCLUIR_RECORRENTE', detalhes);
     
     return deleteResult.rowCount;
@@ -1698,7 +1707,7 @@ async function buscarLancamentosParaExclusao(userId, limite = 20) {
       lancamentosAgrupados.push({
         ...primeiraParcela,
         valor: valorTotal,
-        descricao: `${primeiraParcela.descricao.replace(/\(1\/\d+\)/, '').trim()} (${l.total_parcelas}x de R$ ${formatarValor(primeiraParcela.valor)})`,
+        descricao: `${primeiraParcela.descricao.replace(/\(1\/\d+\)/, '').trim()} (${l.total_parcelas}x de ${formatarComMoeda(primeiraParcela.valor)})`,
         agrupado: true,
         tipoAgrupamento: 'parcelado',
         grupo: grupo,
@@ -2008,9 +2017,9 @@ function formatarAlertaBoleto(boleto) {
   const valorFormatado = parseFloat(boleto.valor).toFixed(2);
   
   if (diffDays === 0) {
-    return `🔴 *VENCIMENTO HOJE*: ${boleto.descricao} - R$ ${valorFormatado}`;
+    return `🔴 *VENCIMENTO HOJE*: ${boleto.descricao} - ${formatarComMoeda(valorFormatado)}`;
   } else {
-    return `🟡 *VENCIMENTO EM ${diffDays} DIAS*: ${boleto.descricao} - R$ ${valorFormatado}`;
+    return `🟡 *VENCIMENTO EM ${diffDays} DIAS*: ${boleto.descricao} - ${formatarComMoeda(valorFormatado)}`;
   }
 }
 
@@ -3263,6 +3272,23 @@ async function migrateDriverTables(client: any): Promise<void> {
   }
 }
 
+async function getUserPreference(userId: string, chave: string): Promise<string | null> {
+  const result = await queryDatabase(
+    'SELECT valor FROM user_preferences WHERE user_id = $1 AND chave = $2',
+    [userId, chave]
+  );
+  return result.rows[0]?.valor ?? null;
+}
+
+async function setUserPreference(userId: string, chave: string, valor: string): Promise<void> {
+  await queryDatabase(
+    `INSERT INTO user_preferences (user_id, chave, valor, atualizado_em)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (user_id, chave) DO UPDATE SET valor = $3, atualizado_em = NOW()`,
+    [userId, chave, valor]
+  );
+}
+
 export {
   pool,
   initializeDatabase,
@@ -3336,5 +3362,7 @@ export {
   registrarIAFallback,
   consultarIAFallbacks,
   buscarParserCache,
-  salvarParserCache
+  salvarParserCache,
+  getUserPreference,
+  setUserPreference,
 };

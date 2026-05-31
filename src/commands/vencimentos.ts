@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
@@ -42,7 +42,7 @@ async function vencimentosCommand(sock, userId, texto) {
   if (vencimentos.cartoes && vencimentos.cartoes.length > 0) {
     const itensCartoes = vencimentos.cartoes.map((venc) => {
       const emoji = venc.dias_restantes <= 3 ? '🚨' : venc.dias_restantes <= 7 ? '⚠️' : '📅';
-      return `${emoji} ${venc.cartao_nome}: R$ ${formatarValor(venc.valor)} (${venc.dias_restantes} dias)\n   📝 ${venc.descricao} | 📂 ${venc.categoria}`;
+      return `${emoji} ${venc.cartao_nome}: ${formatarComMoeda(venc.valor)} (${venc.dias_restantes} dias)\n   📝 ${venc.descricao} | 📂 ${venc.categoria}`;
     });
     secoes.push({
       titulo: 'Faturas de Cartão',
@@ -55,7 +55,7 @@ async function vencimentosCommand(sock, userId, texto) {
   if (vencimentos.boletos && vencimentos.boletos.length > 0) {
     const itensBoletos = vencimentos.boletos.map((venc) => {
       const emoji = venc.dias_restantes <= 3 ? '🚨' : venc.dias_restantes <= 7 ? '⚠️' : '📅';
-      return `${emoji} R$ ${formatarValor(venc.valor)} (${venc.dias_restantes} dias)\n   📝 ${venc.descricao} | 📂 ${venc.categoria}`;
+      return `${emoji} ${formatarComMoeda(venc.valor)} (${venc.dias_restantes} dias)\n   📝 ${venc.descricao} | 📂 ${venc.categoria}`;
     });
     secoes.push({
       titulo: 'Boletos',

@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import * as lembretesService from '../services/lembretesService';
 import { formatarMensagem } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
@@ -166,7 +166,7 @@ async function lembreteCommand(sock, userId, texto) {
       await limparEstado(userId);
       
       const dataFormatada = lembrete.data_vencimento.toLocaleDateString('pt-BR');
-      const valorTexto = lembrete.valor ? ` - R$ ${formatarValor(lembrete.valor)}` : '';
+      const valorTexto = lembrete.valor ? ` - ${formatarComMoeda(lembrete.valor)}` : '';
       const categoriaTexto = lembrete.categoria ? ` [${lembrete.categoria}]` : '';
       const recorrenteTexto = lembrete.recorrente ? ` 🔄 ${lembrete.tipo_recorrencia}` : '';
       const descricaoTexto = lembrete.descricao ? `\n📝 ${lembrete.descricao}` : '';

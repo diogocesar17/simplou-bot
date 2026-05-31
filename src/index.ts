@@ -44,15 +44,18 @@ import { metaCommand } from './commands/meta';
 import { driverPerfilCommand } from './commands/driverPerfil';
 import { custoFixoCommand } from './commands/custoFixo';
 import iaFallbacksCommand from './commands/iaFallbacks';
+import moedaCommand from './commands/moeda';
 import { perguntarTipoTrabalho, handleOnboardingTipoTrabalho, handleOnboardingMetaDiaria } from './commands/onboarding';
 import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery } from './utils/driverParser';
 import * as driverService from './services/driverService';
+import { getMoeda } from './services/preferencesService';
+import { runWithUserContext } from './configs/userContext';
 
 // Imports dos serviços e configurações
 import { parseMesAno } from './utils/dataUtils';
 import { definirEstado, obterEstado, limparEstado } from './configs/stateManager';
 import { formatarCancelamento } from './utils/formatMessages';
-import { formatarValor } from './utils/formatUtils';
+import { formatarValor, formatarComMoeda } from './utils/formatUtils';
 import { logger, fileLogger } from './infrastructure/logger';
 import * as geminiService from './services/geminiService';
 import { initializeDatabase } from './infrastructure/databaseService';
@@ -63,6 +66,11 @@ import { verificarRateLimit } from './services/rateLimitService';
 
 // Exemplo de função de roteamento (simples)
 async function handleMessage(sock: any, userId: string, texto: string, nomeContato?: string): Promise<void> {
+  const { simbolo } = await getMoeda(userId);
+  return runWithUserContext({ simboloMoeda: simbolo }, () => _handleMessage(sock, userId, texto, nomeContato));
+}
+
+async function _handleMessage(sock: any, userId: string, texto: string, nomeContato?: string): Promise<void> {
   const textoLower = texto.toLowerCase().trim();
 
   const estado = await obterEstado(userId);
@@ -378,10 +386,10 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
           driverService.getGoal(userId, 'DIARIA'),
         ]);
         const emojiLucro = lucro >= 0 ? '🟢' : '🔴';
-        corpo = `\n${emojiLucro} *Lucro de hoje: R$ ${formatarValor(lucro)}*`;
+        corpo = `\n${emojiLucro} *Lucro de hoje: ${formatarComMoeda(lucro)}*`;
         if (metaDiaria) {
           const pct = Math.min(100, Math.round((lucro / metaDiaria.valor) * 100));
-          corpo += `\n🎯 Meta diária: R$ ${formatarValor(metaDiaria.valor)} (${pct}%)`;
+          corpo += `\n🎯 Meta diária: ${formatarComMoeda(metaDiaria.valor)} (${pct}%)`;
         }
         corpo += '\n\nDigite *lucro hoje* para detalhes ou *ajuda* para todos os comandos.';
       } else {
@@ -390,9 +398,9 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
           const emoji = resumo.saldo >= 0 ? '🟢' : '🔴';
           corpo =
             '\n📊 *Este mês até agora:*\n' +
-            `• Gastos: R$ ${formatarValor(resumo.totalDespesas)}\n` +
-            `• Receitas: R$ ${formatarValor(resumo.totalReceitas)}\n` +
-            `• ${emoji} Saldo: R$ ${formatarValor(resumo.saldo)}\n\n` +
+            `• Gastos: ${formatarComMoeda(resumo.totalDespesas)}\n` +
+            `• Receitas: ${formatarComMoeda(resumo.totalReceitas)}\n` +
+            `• ${emoji} Saldo: ${formatarComMoeda(resumo.saldo)}\n\n` +
             'Digite *resumo* para ver mais detalhes ou *ajuda* para todos os comandos.';
         } else {
           corpo =
@@ -600,6 +608,10 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
   }
   if (["ajuda inteligente", "ajuda financeira", "assistente", "perguntar", "pergunta", "pergunte"].includes(textoLower)) {
     await ajudaInteligenteCommand(sock, userId);
+    return;
+  }
+  if (textoLower === 'moeda' || textoLower.startsWith('moeda ')) {
+    await moedaCommand(sock, userId, texto);
     return;
   }
 

@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import * as driverService from '../services/driverService';
 import { logger } from '../infrastructure/logger';
 
@@ -47,7 +47,7 @@ async function mostrarPerfil(sock: any, userId: string): Promise<void> {
   if (perfil.consumo_medio_km_l) msg += `Consumo médio: ${perfil.consumo_medio_km_l} km/L\n`;
   if (perfil.combustivel_preferido) msg += `Combustível: ${perfil.combustivel_preferido}\n`;
   if (perfil.custo_combustivel_litro) {
-    msg += `Preço do litro: R$ ${formatarValor(perfil.custo_combustivel_litro)}\n`;
+    msg += `Preço do litro: ${formatarComMoeda(perfil.custo_combustivel_litro)}\n`;
   }
   msg += '\nPara atualizar, envie qualquer informação novamente.';
   await sock.sendMessage(userId, { text: msg });
@@ -115,7 +115,7 @@ export async function driverPerfilCommand(sock: any, userId: string, texto: stri
           custo_combustivel_litro: valor,
         });
         await sock.sendMessage(userId, {
-          text: `✅ Preço salvo: ${tipo} a R$ ${formatarValor(valor)}/L`,
+          text: `✅ Preço salvo: ${tipo} a ${formatarComMoeda(valor)}/L`,
         });
         return;
       }

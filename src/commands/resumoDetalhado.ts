@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import { parseMesAno, getNomeMes } from '../utils/dataUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem } from '../utils/formatMessages';
@@ -76,11 +76,11 @@ async function resumoDetalhadoCommand(sock, userId, texto) {
     const totalLancamentos = todos.length;
 
     msg += `📊 *Estatísticas Gerais:*\n`;
-    msg += `💰 Total de Entradas: R$ ${formatarValor(totalEntradas)}\n`;
-    msg += `💸 Total de Saídas: R$ ${formatarValor(totalSaidas)}\n`;
+    msg += `💰 Total de Entradas: ${formatarComMoeda(totalEntradas)}\n`;
+    msg += `💸 Total de Saídas: ${formatarComMoeda(totalSaidas)}\n`;
     msg += saldo >= 0
-        ? `🟢 Saldo: R$ ${formatarValor(saldo)}\n`
-        : `🔴 Saldo Negativo: R$ ${formatarValor(saldo)}\n`;
+        ? `🟢 Saldo: ${formatarComMoeda(saldo)}\n`
+        : `🔴 Saldo Negativo: ${formatarComMoeda(saldo)}\n`;
     msg += `📝 Total de Lançamentos: ${totalLancamentos}\n\n`;
 
     // Top categorias de gastos
@@ -88,7 +88,7 @@ async function resumoDetalhadoCommand(sock, userId, texto) {
         msg += `🏆 *Top Categorias de Gastos:*\n`;
         categoriasOrdenadas.slice(0, 5).forEach(([categoria, dados], idx) => {
             const percentual = ((dados.total / totalSaidas) * 100).toFixed(1);
-            msg += `${idx + 1}. ${categoria}: R$ ${formatarValor(dados.total)} (${percentual}%)\n`;
+            msg += `${idx + 1}. ${categoria}: ${formatarComMoeda(dados.total)} (${percentual}%)\n`;
         });
         msg += '\n';
     }
@@ -110,8 +110,8 @@ async function resumoDetalhadoCommand(sock, userId, texto) {
                 
                 msg += `📊 *Comparação com ${getNomeMes(mesAnterior - 1)}/${anoAnterior}:*\n`;
                 msg += `${emoji} Gastos ${textoVariacao} ${Math.abs(variacao).toFixed(1)}%\n`;
-                msg += `💸 Mês anterior: R$ ${formatarValor(totalSaidasAnterior)}\n`;
-                msg += `💸 Mês atual: R$ ${formatarValor(totalSaidas)}\n\n`;
+                msg += `💸 Mês anterior: ${formatarComMoeda(totalSaidasAnterior)}\n`;
+                msg += `💸 Mês atual: ${formatarComMoeda(totalSaidas)}\n\n`;
             }
         }
     }
@@ -126,7 +126,7 @@ async function resumoDetalhadoCommand(sock, userId, texto) {
                 ? new Date(l.data).toLocaleDateString('pt-BR')
                 : l.data);
         
-        let linha = `📅 ${dataBR} | 💰 R$ ${formatarValor(l.valor)} | 📂 ${l.categoria} | 💳 ${l.pagamento}`;
+        let linha = `📅 ${dataBR} | 💰 ${formatarComMoeda(l.valor)} | 📂 ${l.categoria} | 💳 ${l.pagamento}`;
         
         // Adicionar informações especiais
         if (l.tipoAgrupamento === 'parcelado') {

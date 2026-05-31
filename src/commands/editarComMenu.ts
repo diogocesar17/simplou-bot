@@ -4,7 +4,7 @@ import editarCartaoCommand from './editarCartao';
 import { formatarCancelamento, formatarMenuComCancelamento, formatarMensagem } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 import * as lancamentosService from '../services/lancamentosService';
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 
 async function editarComMenuCommand(sock, userId, texto) {
   const textoLower = texto.toLowerCase().trim();
@@ -38,7 +38,7 @@ async function editarComMenuCommand(sock, userId, texto) {
       type: 'list',
       header: '📝 Editar Lançamento',
       body:
-        `📅 ${dataExibir}  💰 R$ ${formatarValor(l.valor)}\n` +
+        `📅 ${dataExibir}  💰 ${formatarComMoeda(l.valor)}\n` +
         `📂 ${l.categoria}  💳 ${l.pagamento}\n` +
         `📝 ${l.descricao}\n\nQual campo deseja editar?`,
       buttonLabel: 'Ver campos',
@@ -83,7 +83,7 @@ async function editarComMenuCommand(sock, userId, texto) {
         await definirEstado(userId, 'aguardando_selecao_lancamento_edicao', { lancamentos });
         const rows = lancamentos.map((l: any, i: number) => {
           const tipoEmoji = l.tipo === 'receita' ? '💰' : '💸';
-          const title = `${tipoEmoji} R$ ${formatarValor(l.valor)} — ${l.categoria}`.slice(0, 24);
+          const title = `${tipoEmoji} ${formatarComMoeda(l.valor)} — ${l.categoria}`.slice(0, 24);
           const dataStr = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
           return {
             id: String(i + 1),
@@ -141,7 +141,7 @@ async function editarComMenuCommand(sock, userId, texto) {
     await definirEstado(userId, 'aguardando_selecao_lancamento_edicao', { lancamentos });
     const rows = lancamentos.map((l: any, i: number) => {
       const tipoEmoji = l.tipo === 'receita' ? '💰' : '💸';
-      const title = `${tipoEmoji} R$ ${formatarValor(l.valor)} — ${l.categoria}`.slice(0, 24);
+      const title = `${tipoEmoji} ${formatarComMoeda(l.valor)} — ${l.categoria}`.slice(0, 24);
       const dataStr = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       return { id: String(i + 1), title, description: `${dataStr} · ${l.pagamento}` };
     });
@@ -233,7 +233,7 @@ async function editarComMenuCommand(sock, userId, texto) {
         type: 'list',
         header: `📝 Editar Recorrente ${idx + 1}`,
         body:
-          `📅 ${dataExibir}  💰 R$ ${lancamento.valor}\n` +
+          `📅 ${dataExibir}  💰 ${formatarComMoeda(lancamento.valor)}\n` +
           `📂 ${lancamento.categoria}  💳 ${lancamento.pagamento}\n` +
           `📝 ${lancamento.descricao}\n\nQual campo deseja editar?`,
         buttonLabel: 'Ver campos',

@@ -1,5 +1,5 @@
 import * as databaseService from '../infrastructure/databaseService';
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import { formatarMensagem } from '../utils/formatMessages';
 
 async function orcamentoCommand(sock, userId, texto) {
@@ -26,7 +26,7 @@ async function orcamentoCommand(sock, userId, texto) {
       const total = await databaseService.getTotalCategoriaNoMes(userId, o.categoria);
       const pct = Math.round((total / o.limite) * 100);
       const emoji = pct >= 100 ? '🔴' : pct >= 80 ? '🟡' : '🟢';
-      return `${emoji} ${o.categoria}: R$ ${formatarValor(total)} / R$ ${formatarValor(o.limite)} (${pct}%)`;
+      return `${emoji} ${o.categoria}: ${formatarComMoeda(total)} / ${formatarComMoeda(o.limite)} (${pct}%)`;
     }));
     await sock.sendMessage(userId, {
       text: formatarMensagem({
@@ -60,7 +60,7 @@ async function orcamentoCommand(sock, userId, texto) {
   const categoriaNome = categoria.charAt(0).toUpperCase() + categoria.slice(1);
   await databaseService.salvarOrcamento(userId, categoriaNome, limite);
   await sock.sendMessage(userId, {
-    text: `✅ Orçamento de *${categoriaNome}* definido em *R$ ${formatarValor(limite)}/mês*.\n\nDigite *meus orcamentos* para ver todos.`
+    text: `✅ Orçamento de *${categoriaNome}* definido em *${formatarComMoeda(limite)}/mês*.\n\nDigite *meus orcamentos* para ver todos.`
   });
 }
 

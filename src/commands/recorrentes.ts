@@ -1,4 +1,4 @@
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import * as lancamentosService from '../services/lancamentosService';
 import { formatarMensagem } from '../utils/formatMessages';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
@@ -44,7 +44,7 @@ async function recorrentesCommand(sock, userId, texto?) {
 
     const linhas = [
       `📝 ${recorrente.descricao}`,
-      `💰 R$ ${formatarValor(recorrente.valor)}/mês · ${recorrente.total_recorrencias} meses registrados`,
+      `💰 ${formatarComMoeda(recorrente.valor)}/mês · ${recorrente.total_recorrencias} meses registrados`,
       `📅 ${formatarData(recorrente.primeira_recorrencia)} a ${formatarData(recorrente.ultima_recorrencia)}`,
       `📂 ${recorrente.categoria} | 💳 ${recorrente.pagamento}`,
       ...(recorrente.recorrente_fim ? [`🛑 Fim previsto: ${formatarData(recorrente.recorrente_fim)}`] : []),
@@ -101,7 +101,7 @@ async function recorrentesCommand(sock, userId, texto?) {
         type: 'list',
         header: '📝 Editar Recorrente',
         body:
-          `📅 ${formatarData(lancamento.data)}  💰 R$ ${formatarValor(lancamento.valor)}\n` +
+          `📅 ${formatarData(lancamento.data)}  💰 ${formatarComMoeda(lancamento.valor)}\n` +
           `📂 ${lancamento.categoria}  💳 ${lancamento.pagamento}\n` +
           `📝 ${lancamento.descricao}\n\nQual campo deseja editar?`,
         buttonLabel: 'Ver campos',
@@ -186,7 +186,7 @@ async function recorrentesCommand(sock, userId, texto?) {
           ...visiveis.map((r: any, i: number) => ({
             id: String(i + 1),
             title: r.descricao.slice(0, 24),
-            description: `R$ ${formatarValor(r.valor)}/mês`
+            description: `${formatarComMoeda(r.valor)}/mês`
           })),
           { id: '0', title: '↩️ Cancelar' }
         ]

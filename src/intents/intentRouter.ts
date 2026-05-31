@@ -4,7 +4,7 @@ import { classifyIntentWithGemini } from './geminiIntentClassifier';
 import { logger } from '../infrastructure/logger';
 import * as cartoesService from '../services/cartoesService';
 import * as lancamentosService from '../services/lancamentosService';
-import { formatarValor } from '../utils/formatUtils';
+import { formatarValor, formatarComMoeda } from '../utils/formatUtils';
 import { getNomeMes } from '../utils/dataUtils';
 
 function pad2(n: number): string {
@@ -134,7 +134,7 @@ export async function handleInvoiceSummary(userId: string, parsedIntent: ParsedI
     return (
       `💳 Fatura ${selecao.cartao.nome_cartao} - ${obterNomeMes(ref.mes)}/${ref.ano}\n` +
       `Status: ${status === 'OPEN' ? 'Aberta' : 'Fechada'}\n` +
-      `Total: R$ ${formatarValor(total)}\n` +
+      `Total: ${formatarComMoeda(total)}\n` +
       `Fecha em: ${fechamento ? formatarDiaMesAno(fechamento) : '--'}\n` +
       `Vence em: ${formatarDiaMesAno(vencimento)}`
     );
@@ -165,7 +165,7 @@ export async function handleInvoiceSummary(userId: string, parsedIntent: ParsedI
 
     blocos.push(
       `${cartao.nome_cartao}\n` +
-      `${labelValor}: R$ ${formatarValor(total)}\n` +
+      `${labelValor}: ${formatarComMoeda(total)}\n` +
       `Fecha em: ${fechamentoTexto}\n` +
       `Vence em: ${vencTexto}`
     );
@@ -218,12 +218,12 @@ export async function handleInvoiceDetail(userId: string, parsedIntent: ParsedIn
           ? new Date(dataLanc).toLocaleDateString('pt-BR')
           : String(dataLanc || '').trim());
     const desc = String(l.descricao || '').trim() || 'Compra';
-    return `- ${dataBR} - ${desc} - R$ ${formatarValor(l.valor)}`;
+    return `- ${dataBR} - ${desc} - ${formatarComMoeda(l.valor)}`;
   });
 
   const header =
     `💳 Detalhes da fatura ${selecao.cartao.nome_cartao} - ${obterNomeMes(ref.mes)}/${ref.ano}\n\n` +
-    `Total: R$ ${formatarValor(total)}\n\n` +
+    `Total: ${formatarComMoeda(total)}\n\n` +
     `Compras:\n`;
 
   return `${header}${compras.join('\n')}`;
@@ -255,7 +255,7 @@ export async function handleCardPaymentForecast(userId: string, parsedIntent: Pa
       const dataVenc = r.data_vencimento
         ? new Date(r.data_vencimento).toLocaleDateString('pt-BR')
         : `${pad2(r.dia_vencimento || 0)}/${pad2(mes)}`;
-      msg += `- ${r.cartao_nome}: R$ ${formatarValor(r.total)} - vence em ${dataVenc}\n`;
+      msg += `- ${r.cartao_nome}: ${formatarComMoeda(r.total)} - vence em ${dataVenc}\n`;
     }
     msg += '\n';
   }
