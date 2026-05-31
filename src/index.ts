@@ -2,7 +2,7 @@
 
 // Imports dos comandos
 import ajudaCommand from './commands/ajuda';
-import { ajudaLancamentosCommand, ajudaResumoCommand, ajudaCartaoCommand, ajudaLembreteCommand, ajudaPremiumCommand } from './commands/ajudaContextual';
+import { ajudaLancamentosCommand, ajudaResumoCommand, ajudaCartaoCommand, ajudaLembreteCommand, ajudaPremiumCommand, ajudaCustosFixosCommand } from './commands/ajudaContextual';
 import resumoCommand from './commands/resumo';
 import resumoDetalhadoCommand from './commands/resumoDetalhado';
 import historicoCommand, { historicoMaisCommand } from './commands/historico';
@@ -365,6 +365,9 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   }
   if (textoLower === 'ajuda premium' || textoLower === 'ajuda planos' || textoLower === 'ajuda plano') {
     await ajudaPremiumCommand(sock, userId); return;
+  }
+  if (['ajuda custos fixos', 'ajuda custo fixo', 'ajuda custos', 'ajuda fixos', 'ajuda financiamento', 'ajuda recorrentes'].includes(textoLower)) {
+    await ajudaCustosFixosCommand(sock, userId); return;
   }
 
   // Roteamento para o comando de ajuda

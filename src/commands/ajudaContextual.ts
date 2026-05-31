@@ -183,6 +183,64 @@ export async function ajudaLembreteCommand(sock, userId) {
   });
 }
 
+export async function ajudaCustosFixosCommand(sock, userId) {
+  await sock.sendMessage(userId, {
+    text: formatarMensagem({
+      titulo: 'Custos fixos e recorrentes',
+      emojiTitulo: '🏠',
+      secoes: [
+        {
+          titulo: 'O que são custos fixos',
+          itens: [
+            'São despesas que você paga todo mês (ou todo ano)',
+            'Financiamento da moto ou carro — parcela mensal',
+            'Seguro do veículo — pode ser mensal ou anual',
+            'Aluguel, internet, plano de celular — mensais',
+            'IPVA, licenciamento — anuais (divididos por 12 automaticamente)',
+            'Eles são descontados do lucro real todos os dias que você trabalhar'
+          ],
+          emoji: '💡'
+        },
+        {
+          titulo: 'Cadastrar por mensagem direta',
+          itens: [
+            'financiamento da moto 380 por mês',
+            'seguro auto 1200 por ano',
+            'aluguel 800 por mês',
+            'meu celular custa 60 por mês',
+            'ipva 900 por ano',
+            'internet 100 por mês'
+          ],
+          emoji: '💬'
+        },
+        {
+          titulo: 'Gerenciar via menu',
+          itens: [
+            'custos fixos — abrir lista completa',
+            'Na lista você pode adicionar ou remover cada custo',
+            'Custos anuais aparecem com o equivalente mensal'
+          ],
+          emoji: '📋'
+        },
+        {
+          titulo: 'Como impacta o lucro real',
+          itens: [
+            'O total mensal é dividido pelos dias que você trabalhou',
+            'Ex: R$ 380/mês de financiamento ÷ 22 dias = R$ 17,27/dia descontado',
+            'Aparece como "custos fixos rateados" no resumo do dia',
+            'Assim você vê quanto realmente sobrou — não só quanto faturou'
+          ],
+          emoji: '📊'
+        }
+      ],
+      dicas: [
+        { texto: 'Ver custos fixos', comando: 'custos fixos' },
+        { texto: 'Lucro real do dia', comando: 'lucro hoje' }
+      ]
+    })
+  });
+}
+
 export async function ajudaPremiumCommand(sock, userId) {
   await sock.sendMessage(userId, {
     text: formatarMensagem({

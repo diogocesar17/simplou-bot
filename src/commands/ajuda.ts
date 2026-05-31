@@ -28,6 +28,19 @@ async function ajudaCommand(sock, userId) {
           emoji: '⛽'
         },
         {
+          titulo: 'Custos fixos e recorrentes',
+          itens: [
+            'custos fixos — ver e gerenciar custos fixos',
+            'financiamento da moto 380 por mês — cadastra parcela mensal',
+            'seguro auto 1200 por ano — dividido por 12 automaticamente',
+            'aluguel 800 por mês — qualquer despesa recorrente',
+            'meu celular custa 60 por mês — plano de celular/internet',
+            'ipva 900 por ano — descontado R$ 75/mês no lucro real',
+            'Esses custos são descontados automaticamente do lucro real'
+          ],
+          emoji: '🏠'
+        },
+        {
           titulo: 'Acompanhar lucro e metas',
           itens: [
             'lucro hoje — balanço do dia (receitas − custos)',
@@ -58,8 +71,9 @@ async function ajudaCommand(sock, userId) {
             'sou motorista de app — configura perfil',
             'trabalho com delivery — configura perfil',
             'meu carro faz 10 km por litro — consumo médio',
-            'custos fixos — ver/cadastrar custos mensais fixos',
-            'perfil driver — ver perfil configurado'
+            'perfil driver — ver perfil configurado',
+            'desfazer — apaga o último lançamento registrado',
+            'orcamento — definir limite de gasto por categoria'
           ],
           emoji: '⚙️'
         },
@@ -75,11 +89,12 @@ async function ajudaCommand(sock, userId) {
         }
       ],
       dicas: [
-        { texto: 'Ajuda por área', comando: 'ajuda lancamentos · ajuda resumo · ajuda lembrete · ajuda premium' },
+        { texto: 'Ajuda por área', comando: 'ajuda lancamentos · ajuda resumo · ajuda custos fixos · ajuda lembrete · ajuda premium' },
         { texto: 'Cancelar qualquer operação', comando: 'cancelar' },
+        { texto: 'Desfazer último lançamento', comando: 'desfazer' },
         { texto: 'Suporte', comando: 'contato@simplou.com' }
       ],
-      ajuda: 'Plataformas: Uber, 99, iFood, Rappi, Loggi. Custos: Combustível, Pedágio, Manutenção, Lavagem, IPVA, Multa. Pagamentos: pix, crédito, débito, dinheiro'
+      ajuda: 'Plataformas: Uber, 99, iFood, Rappi, Loggi. Custos: Combustível, Pedágio, Manutenção, Lavagem, IPVA, Multa. Custos fixos: Financiamento, Seguro, Aluguel, Celular. Pagamentos: pix, crédito, débito, dinheiro'
     })
   });
 }
