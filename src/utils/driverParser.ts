@@ -21,11 +21,23 @@ export interface DriverParsedResult {
 
 // Plataformas de receita: nome → keywords (sem acento, lowercase)
 const PLATAFORMAS_RECEITA: Record<string, string[]> = {
+  // Brasil
   'Uber': ['uber'],
   '99Pop': ['99pop', '99 pop', '99'],
   'iFood': ['ifood', 'i food'],
   'Rappi': ['rappi'],
   'Loggi': ['loggi'],
+  // Europa
+  'Uber Eats': ['uber eats', 'ubereats'],
+  'Glovo': ['glovo'],
+  'Deliveroo': ['deliveroo'],
+  'Bolt Food': ['bolt food', 'bolt'],
+  'Stuart': ['stuart'],
+  'Just Eat': ['just eat', 'justeat'],
+  'Getir': ['getir'],
+  'Gorillas': ['gorillas'],
+  'Flink': ['flink'],
+  // Genérico
   'Entrega Particular': ['entrega particular'],
   'Corrida Particular': ['corrida particular'],
 };
@@ -43,10 +55,10 @@ const DESPESAS_DRIVER: Record<string, string[]> = {
 };
 
 // Verbos que indicam receita de plataforma
-const VERBOS_RECEITA_PLATAFORMA = ['ganhei', 'fiz', 'recebi', 'faturei', 'corrida'];
+const VERBOS_RECEITA_PLATAFORMA = ['ganhei', 'fiz', 'recebi', 'faturei', 'corrida', 'entregue', 'entrega', 'completei', 'pedido', 'trabalhei'];
 
 // Verbos/frases que indicam ganho genérico (sem plataforma específica)
-const VERBOS_RECEITA_GENERICA = ['faturei', 'rodei'];
+const VERBOS_RECEITA_GENERICA = ['faturei', 'rodei', 'trabalhei'];
 
 function removerAcentos(t: string): string {
   return t.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -81,6 +93,12 @@ function extrairPagamento(norm: string): { pagamento: string; falta: boolean } {
   if (/\bdinheiro\b/.test(norm)) return { pagamento: 'dinheiro', falta: false };
   if (/\bcredito\b/.test(norm)) return { pagamento: 'credito', falta: false };
   if (/\bdebito\b/.test(norm)) return { pagamento: 'debito', falta: false };
+  // Métodos europeus
+  if (/\bmbway\b|\bmb way\b/.test(norm)) return { pagamento: 'mbway', falta: false };
+  if (/\bmultibanco\b/.test(norm)) return { pagamento: 'multibanco', falta: false };
+  if (/\bbizum\b/.test(norm)) return { pagamento: 'bizum', falta: false };
+  if (/\bsepa\b/.test(norm)) return { pagamento: 'sepa', falta: false };
+  if (/\btransferencia\b|\btransferência\b/.test(norm)) return { pagamento: 'transferencia', falta: false };
   return { pagamento: 'NÃO INFORMADO', falta: true };
 }
 

@@ -9,6 +9,7 @@ import { ERROR_MESSAGES } from '../utils/errorMessages';
 const ITENS_POR_PAGINA = 10;
 
 const ALIAS_CATEGORIAS: Record<string, string> = {
+  // Brasil
   '99': '99Pop',
   '99pop': '99Pop',
   'uber': 'Uber',
@@ -16,6 +17,20 @@ const ALIAS_CATEGORIAS: Record<string, string> = {
   'i food': 'iFood',
   'rappi': 'Rappi',
   'loggi': 'Loggi',
+  // Europa
+  'uber eats': 'Uber Eats',
+  'ubereats': 'Uber Eats',
+  'glovo': 'Glovo',
+  'deliveroo': 'Deliveroo',
+  'bolt food': 'Bolt Food',
+  'bolt': 'Bolt Food',
+  'stuart': 'Stuart',
+  'just eat': 'Just Eat',
+  'justeat': 'Just Eat',
+  'getir': 'Getir',
+  'gorillas': 'Gorillas',
+  'flink': 'Flink',
+  // Custos operacionais
   'combustivel': 'Combustível',
   'combustível': 'Combustível',
   'manutencao': 'Manutenção',
