@@ -35,9 +35,18 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
         text: { preview_url: false, body: content.text },
       };
     } else if (content.document && content.mimetype) {
-      // TODO: fazer upload do documento via Media API antes de enviar
-      // https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media
-      throw new Error('MetaCloudAdapter: envio de documento ainda não implementado — aguardando migração completa');
+      const mediaId = await this._uploadMedia(content.document, content.mimetype);
+      body = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: phone,
+        type: 'document',
+        document: {
+          id: mediaId,
+          ...(content.fileName ? { filename: content.fileName } : {}),
+          ...(content.caption ? { caption: content.caption } : {}),
+        },
+      };
     } else {
       throw new Error('MetaCloudAdapter: tipo de conteúdo não suportado');
     }
@@ -131,6 +140,26 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
 
   async downloadDocument(message: any): Promise<{ buffer: Buffer; mimeType: string }> {
     return this._downloadMedia(message?.id, message?.mime_type || 'application/pdf');
+  }
+
+  private async _uploadMedia(buffer: Buffer, mimeType: string): Promise<string> {
+    const uploadUrl = `https://graph.facebook.com/${process.env.META_API_VERSION || 'v19.0'}/${process.env.META_PHONE_NUMBER_ID}/media`;
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('type', mimeType);
+    form.append('file', new Blob([buffer], { type: mimeType }), 'file');
+
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.token}` },
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Meta Media upload erro ${res.status}: ${err}`);
+    }
+    const { id } = await res.json() as { id: string };
+    return id;
   }
 
   private async _downloadMedia(mediaId: string, mimeType: string): Promise<{ buffer: Buffer; mimeType: string }> {
