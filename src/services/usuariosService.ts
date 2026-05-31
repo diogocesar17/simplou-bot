@@ -16,8 +16,8 @@ export async function buscarUsuario(userId: string): Promise<any> {
   return await databaseService.buscarUsuario(userId);
 }
 
-export async function promoverParaPremium(userId: string, diasExpiracao: null | undefined = null, promovidoPor: string): Promise<any> {
-  return await databaseService.promoverParaPremium(userId, diasExpiracao, promovidoPor);
+export async function promoverParaPremium(userId: string, diasExpiracao: number | null | undefined = null, promovidoPor: string): Promise<any> {
+  return await (databaseService as any).promoverParaPremium(userId, diasExpiracao ?? null, promovidoPor);
 }
 
 export async function removerUsuario(userId: string, removidoPor: string): Promise<any> {

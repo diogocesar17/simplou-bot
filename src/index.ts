@@ -29,6 +29,7 @@ import previsaoCommand from './commands/previsao';
 import ajudaInteligenteCommand from './commands/ajudaInteligente';
 import lancamentoCommand from './commands/lancamento';
 import listarUsuariosCommand from './commands/listarUsuarios';
+import { promoverUsuarioCommand } from './commands/promoverUsuario';
 import removerUsuarioCommand from './commands/removerUsuario';
 import alertasCommand from './commands/alertas';
 import relatorioCommand from './commands/relatorio';
@@ -542,6 +543,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   }
   if (textoLower.startsWith('remover usuario ')) {
     await removerUsuarioCommand(sock, userId, texto);
+    return;
+  }
+  if (textoLower.startsWith('promover ')) {
+    await promoverUsuarioCommand(sock, userId, texto);
     return;
   }
   if (textoLower === 'status') {
