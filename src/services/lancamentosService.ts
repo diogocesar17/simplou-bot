@@ -175,16 +175,16 @@ export async function atualizarCampoLancamento(
 }
 
 // Funções para análise
-export async function buscarDadosParaAnalise(userId: string, meses: number = 6): Promise<any> {
-  return await databaseService.getDatabaseData(userId);
+export async function buscarDadosParaAnalise(userId: string, meses: number = 3): Promise<any> {
+  return await databaseService.getDatabaseData(userId, meses);
 }
 
-export async function buscarDadosParaSugestoes(userId: string, _meses?: number): Promise<any> {
-  return await databaseService.getDatabaseData(userId);
+export async function buscarDadosParaSugestoes(userId: string, meses: number = 2): Promise<any> {
+  return await databaseService.getDatabaseData(userId, meses);
 }
 
-export async function buscarDadosParaPrevisao(userId: string, _meses?: number): Promise<any> {
-  return await databaseService.getDatabaseData(userId);
+export async function buscarDadosParaPrevisao(userId: string, meses: number = 6): Promise<any> {
+  return await databaseService.getDatabaseData(userId, meses);
 }
 
 // Funções para cartões

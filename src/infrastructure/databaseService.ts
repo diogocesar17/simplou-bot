@@ -850,14 +850,22 @@ async function appendRowToDatabase(userId, values) {
   }
 }
 
-async function getDatabaseData(userId) {
-  const query = `
-    SELECT id, data, tipo, descricao, valor, categoria, pagamento
-    FROM lancamentos 
-    WHERE user_id = $1 
-    ORDER BY data DESC, criado_em DESC
-  `;
-  
+async function getDatabaseData(userId, meses?: number) {
+  const query = meses
+    ? `
+      SELECT id, data, tipo, descricao, valor, categoria, pagamento
+      FROM lancamentos
+      WHERE user_id = $1
+        AND data >= CURRENT_DATE - INTERVAL '${Math.floor(meses)} months'
+      ORDER BY data DESC, criado_em DESC
+    `
+    : `
+      SELECT id, data, tipo, descricao, valor, categoria, pagamento
+      FROM lancamentos
+      WHERE user_id = $1
+      ORDER BY data DESC, criado_em DESC
+    `;
+
   const result = await queryDatabase(query, [userId]);
   return result.rows.map(row => [
     row.id,

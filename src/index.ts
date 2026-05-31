@@ -598,7 +598,7 @@ async function handleMessage(sock: any, userId: string, texto: string, nomeConta
     await previsaoCommand(sock, userId);
     return;
   }
-  if (["ajuda inteligente", "ajuda financeira"].includes(textoLower)) {
+  if (["ajuda inteligente", "ajuda financeira", "assistente", "perguntar", "pergunta", "pergunte"].includes(textoLower)) {
     await ajudaInteligenteCommand(sock, userId);
     return;
   }
