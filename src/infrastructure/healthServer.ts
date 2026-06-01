@@ -49,6 +49,18 @@ export function startHealthServer(port?: number): void {
         const raw = await readBody(req)
         const body = JSON.parse(raw)
 
+        // Log do payload completo da Meta para inspeção
+        logger.info({ payload: JSON.stringify(body, null, 2) }, '[META WEBHOOK] Payload bruto recebido')
+        const value = body?.entry?.[0]?.changes?.[0]?.value
+        if (value) {
+          logger.info({
+            contacts: value.contacts,
+            metadata: value.metadata,
+            messageType: value.messages?.[0]?.type,
+            from: value.messages?.[0]?.from,
+          }, '[META WEBHOOK] Dados do usuário/contato')
+        }
+
         // Responde 200 imediatamente — Meta rejeita webhooks com resposta lenta
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ status: 'ok' }))
