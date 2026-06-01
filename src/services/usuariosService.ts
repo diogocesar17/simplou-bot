@@ -90,6 +90,10 @@ export async function processarComandoUsuarios(): Promise<any> {
   }
 }
 
+export async function atualizarNomeUsuario(userId: string, nome: string): Promise<void> {
+  return await databaseService.atualizarNomeUsuario(userId, nome);
+}
+
 export async function ativarTrialPremium(userId: string): Promise<{ sucesso: boolean; motivo?: string }> {
   const usuario = await databaseService.buscarUsuario(userId);
   if (!usuario) return { sucesso: false, motivo: 'Usuário não encontrado.' };

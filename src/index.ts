@@ -46,7 +46,7 @@ import { driverPerfilCommand } from './commands/driverPerfil';
 import { custoFixoCommand } from './commands/custoFixo';
 import iaFallbacksCommand from './commands/iaFallbacks';
 import moedaCommand from './commands/moeda';
-import { perguntarTipoTrabalho, handleOnboardingTipoTrabalho, handleOnboardingMetaDiaria } from './commands/onboarding';
+import { perguntarNome, handleOnboardingNome, handleOnboardingTipoTrabalho, handleOnboardingMoeda, handleOnboardingMetaDiaria } from './commands/onboarding';
 import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery } from './utils/driverParser';
 import * as driverService from './services/driverService';
 import { getMoeda } from './services/preferencesService';
@@ -79,12 +79,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   // Onboarding: cadastrar e dar boas-vindas a novos usuários
   const usuario = await buscarUsuario(userId);
   if (!usuario) {
-    const nome = nomeContato || 'Usuário';
-    await cadastrarUsuario(userId, { nome });
-    const saudacao = nomeContato ? `Olá, ${nomeContato}!` : 'Olá!';
+    await cadastrarUsuario(userId, { nome: nomeContato || 'Usuário' });
     await sock.sendMessage(userId, {
       text:
-        `👋 *${saudacao} Bem-vindo ao Simplou Driver!*\n\n` +
+        '👋 *Bem-vindo ao Simplou Driver!*\n\n' +
         '🚗 Sou seu assistente financeiro no WhatsApp, feito para *motoristas de app e entregadores*.\n\n' +
         'Uber, 99, iFood, Rappi, Loggi — registro tudo por mensagem simples:\n\n' +
         '💰 *Receitas*\n' +
@@ -93,15 +91,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
         '⛽ *Custos operacionais*\n' +
         '• _abasteci 150 de gasolina_ → registra combustível\n' +
         '• _paguei 12 de pedágio_ → registra pedágio\n\n' +
-        '📊 *Acompanhe seu lucro*\n' +
-        '• _lucro hoje_ → quanto você lucrou no dia\n' +
-        '• _resumo da semana_ → balanço da semana\n\n' +
-        '🎯 *Dica:* Digite _meta diária 300_ para definir uma meta de ganhos e acompanhar o progresso a cada lançamento.\n\n' +
         'Escreva naturalmente — não precisa decorar comandos. Digite *ajuda* para ver tudo que posso fazer.'
     });
-    // Iniciar wizard de onboarding com botões interativos
-    await definirEstado(userId, 'onboarding_tipo_trabalho', {});
-    await perguntarTipoTrabalho(sock, userId);
+    await definirEstado(userId, 'onboarding_nome', { nomeProfile: nomeContato });
+    await perguntarNome(sock, userId, nomeContato);
     return;
   }
 
@@ -152,7 +145,8 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     // Salvaguarda global de cancelamento em estados ativos
     // Exceção: "0" é válido como dias_antecedencia no wizard de lembrete (G-03)
     const isAntecedenciaStep = estado.etapa === 'aguardando_antecedencia_lembrete';
-    if ((textoLower === '0' && !isAntecedenciaStep) || textoLower === 'cancelar') {
+    const isOnboardingStep = estado.etapa.startsWith('onboarding_');
+    if (!isOnboardingStep && ((textoLower === '0' && !isAntecedenciaStep) || textoLower === 'cancelar')) {
       await limparEstado(userId);
       await sock.sendMessage(userId, {
         text: formatarCancelamento('Operação', [
@@ -164,8 +158,16 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
       return;
     }
     // Wizard de onboarding driver
+    if (estado.etapa === 'onboarding_nome') {
+      await handleOnboardingNome(sock, userId, texto);
+      return;
+    }
     if (estado.etapa === 'onboarding_tipo_trabalho') {
       await handleOnboardingTipoTrabalho(sock, userId, textoLower);
+      return;
+    }
+    if (estado.etapa === 'onboarding_moeda') {
+      await handleOnboardingMoeda(sock, userId, texto);
       return;
     }
     if (estado.etapa === 'onboarding_meta_diaria') {

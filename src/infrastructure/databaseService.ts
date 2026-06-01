@@ -3365,4 +3365,12 @@ export {
   salvarParserCache,
   getUserPreference,
   setUserPreference,
+  atualizarNomeUsuario,
 };
+
+async function atualizarNomeUsuario(userId: string, nome: string): Promise<void> {
+  await queryDatabase(
+    `UPDATE usuarios SET nome = $2, atualizado_em = CURRENT_TIMESTAMP WHERE user_id = $1`,
+    [userId, nome]
+  );
+}
