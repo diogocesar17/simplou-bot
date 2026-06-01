@@ -147,10 +147,12 @@ export async function handleOnboardingMoeda(sock: any, userId: string, texto: st
 // ─── Step 4: Meta diária ──────────────────────────────────────────────────────
 
 async function perguntarMetaDiaria(sock: any, userId: string, tipoLabel?: string): Promise<void> {
-  const intro = tipoLabel ? `✅ ${tipoLabel}\n\n` : '';
+  if (tipoLabel) {
+    await sock.sendMessage(userId, { text: `✅ ${tipoLabel}` });
+  }
   await sock.sendInteractiveMessage(userId, {
     type: 'button',
-    header: `${intro}🎯 Quer definir uma meta diária de ganhos?`,
+    header: '🎯 Quer definir uma meta diária de ganhos?',
     body:
       'A cada corrida ou entrega registrada, vou mostrar quanto você já lucrou e quanto falta para bater a meta.\n\n' +
       'Se sim, responda com o valor desejado (ex: _300_ para ganhar 300/dia).',
