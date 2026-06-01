@@ -1,5 +1,6 @@
 import http from 'http'
 import { logger } from './logger'
+import { captureException } from './sentry'
 import { getPoolStats } from './databaseService'
 import { handleMetaWebhookVerification, parseMetaWebhookPayload } from './whatsapp/webhookMeta'
 import { MetaCloudAdapter } from './whatsapp/MetaCloudAdapter'
@@ -74,9 +75,11 @@ export function startHealthServer(port?: number): void {
         const mediaRaw = rawMessage.audio ?? rawMessage.image ?? rawMessage.document
         const adapter = new MetaCloudAdapter()
         dispatchWhatsAppMessage(adapter, userId, texto, tipo, mediaRaw, nomeContato).catch((err) => {
+          captureException(err)
           logger.error({ err: (err as any)?.message || err }, '[META WEBHOOK] Erro ao despachar mensagem')
         })
       } catch (err) {
+        captureException(err)
         logger.error({ err: (err as any)?.message || err }, '[META WEBHOOK] Erro ao processar payload')
         if (!res.headersSent) {
           res.writeHead(400, { 'Content-Type': 'application/json' })

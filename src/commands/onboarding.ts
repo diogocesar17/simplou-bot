@@ -177,6 +177,9 @@ export async function handleOnboardingMetaDiaria(sock: any, userId: string, text
         '• _lucro hoje_ → ver seu lucro do dia\n\n' +
         'Digite *ajuda* para ver tudo que posso fazer.',
     });
+    await sock.sendMessage(userId, {
+      text: '📋 Ao usar o Simplou você concorda com nossa Política de Privacidade e Termos de Uso: simplou.com/privacidade',
+    });
     return;
   }
 
@@ -213,5 +216,8 @@ export async function handleOnboardingMetaDiaria(sock: any, userId: string, text
       '• _abasteci 150 de gasolina_ → custo\n' +
       '• _lucro hoje_ → ver seu lucro do dia\n\n' +
       'Digite *ajuda* para ver todos os comandos.',
+  });
+  await sock.sendMessage(userId, {
+    text: '📋 Ao usar o Simplou você concorda com nossa Política de Privacidade e Termos de Uso: simplou.com/privacidade',
   });
 }

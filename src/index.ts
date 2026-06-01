@@ -1,5 +1,8 @@
 // Controle de fluxo agora é totalmente baseado em Redis (stateManager)
 
+import { initSentry, captureException } from './infrastructure/sentry';
+initSentry();
+
 // Imports dos comandos
 import ajudaCommand from './commands/ajuda';
 import { ajudaLancamentosCommand, ajudaResumoCommand, ajudaCartaoCommand, ajudaLembreteCommand, ajudaPremiumCommand, ajudaCustosFixosCommand } from './commands/ajudaContextual';
@@ -355,6 +358,7 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     const handled = await routeIntent(sock, userId, texto);
     if (handled) return;
   } catch (e: any) {
+    captureException(e);
     logger.warn({ err: e?.message || e }, '[INTENT] erro no roteamento');
   }
 
@@ -719,12 +723,14 @@ async function startBotInit(): Promise<void> {
     // Banco (garante tabelas)
     await initializeDatabase();
   } catch (e: any) {
+    captureException(e);
     console.error('[INIT] Erro ao inicializar banco:', e?.message || e);
   }
   try {
     // Gemini
     geminiService.initializeGemini();
   } catch (e: any) {
+    captureException(e);
     console.error('[INIT] Erro ao inicializar Gemini:', e?.message || e);
   }
 }
