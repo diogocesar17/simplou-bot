@@ -47,6 +47,7 @@ import { custoFixoCommand } from './commands/custoFixo';
 import iaFallbacksCommand from './commands/iaFallbacks';
 import moedaCommand from './commands/moeda';
 import { perguntarNome, handleOnboardingNome, handleOnboardingTipoTrabalho, handleOnboardingMoeda, handleOnboardingMetaDiaria } from './commands/onboarding';
+import { excluirContaCommand, handleConfirmacaoExclusaoConta } from './commands/excluirConta';
 import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery } from './utils/driverParser';
 import * as driverService from './services/driverService';
 import { getMoeda } from './services/preferencesService';
@@ -158,6 +159,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
       return;
     }
     // Wizard de onboarding driver
+    if (estado.etapa === 'confirmando_exclusao_conta') {
+      await handleConfirmacaoExclusaoConta(sock, userId, texto);
+      return;
+    }
     if (estado.etapa === 'onboarding_nome') {
       await handleOnboardingNome(sock, userId, texto);
       return;
@@ -539,6 +544,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   // Fluxo padrão segue sem globais. Pergunta inteligente é tratada via stateManager.
 
   // Roteamento para comandos administrativos
+  if (['excluir minha conta', 'excluir conta', 'apagar minha conta', 'apagar conta', 'deletar conta', 'deletar minha conta'].includes(textoLower)) {
+    await excluirContaCommand(sock, userId);
+    return;
+  }
   if (textoLower === 'usuarios' || textoLower === 'usuários') {
     await listarUsuariosCommand(sock, userId, texto);
     return;
