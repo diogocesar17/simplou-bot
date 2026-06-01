@@ -51,6 +51,7 @@ import iaFallbacksCommand from './commands/iaFallbacks';
 import moedaCommand from './commands/moeda';
 import { perguntarNome, handleOnboardingNome, handleOnboardingTipoTrabalho, handleOnboardingMoeda, handleOnboardingMetaDiaria } from './commands/onboarding';
 import { excluirContaCommand, handleConfirmacaoExclusaoConta } from './commands/excluirConta';
+import { exportarDadosCommand } from './commands/exportarDados';
 import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery } from './utils/driverParser';
 import * as driverService from './services/driverService';
 import { getMoeda } from './services/preferencesService';
@@ -566,6 +567,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   }
   if (textoLower === 'status') {
     await statusCommand(sock, userId);
+    return;
+  }
+  if (textoSemAcento.includes('exportar') && (textoSemAcento.includes('meus dados') || textoSemAcento.includes('dados'))) {
+    await exportarDadosCommand(sock, userId);
     return;
   }
   if (textoLower === 'limpar') {
