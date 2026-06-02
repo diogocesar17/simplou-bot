@@ -34,7 +34,6 @@ export function startHealthServer(port?: number): void {
         'Content-Length': Buffer.byteLength(payload),
       })
       res.end(payload)
-      logger.debug({ pool }, '[HEALTH] health check')
       return
     }
 
