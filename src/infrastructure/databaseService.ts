@@ -796,7 +796,7 @@ function calcularDataContabilizacao(dataLancamento, diaVencimento, diaFechamento
 }
 
 // Funções para operações CRUD
-async function appendRowToDatabase(userId, values) {
+async function appendRowToDatabase(userId, values, mensagemOriginal?: string) {
   try {
     // values[0..19] = colunas originais ($2..$21)
     // values[20] = platform (opcional, nullable)
@@ -817,37 +817,43 @@ async function appendRowToDatabase(userId, values) {
 
     const result = await queryDatabase(query, [userId, ...values.slice(0, 20), platform, businessContext]);
     const lancamentoId = result.rows[0].id;
-    
+
     // Registrar log de auditoria
     const tipo = values[1] || 'gasto';
     const valor = values[3] || 0;
     const categoria = values[4] || 'Outros';
     const pagamento = values[5] || 'NÃO INFORMADO';
     const descricao = values[2] || 'Lançamento';
-    
+
     let acao = 'CRIAR_LANCAMENTO';
-    let detalhes = `Tipo: ${tipo}, Valor: ${formatarComMoeda(valor)}, Categoria: ${categoria}, Pagamento: ${pagamento}`;
-    
+    const detalhes: Record<string, any> = {
+      tipo,
+      valor,
+      categoria,
+      pagamento,
+      descricao,
+      ...(mensagemOriginal ? { mensagem_original: mensagemOriginal.slice(0, 300) } : {}),
+    };
+
     // Verificar se é parcelamento
     if (values[6]) { // parcelamento_id
       acao = 'CRIAR_PARCELAMENTO';
-      const totalParcelas = values[8] || 0;
-      detalhes += `, Parcelamento: ${totalParcelas}x`;
+      detalhes.parcelamento = `${values[8] || 0}x`;
     }
-    
+
     // Verificar se é recorrente
     if (values[10]) { // recorrente
       acao = 'CRIAR_RECORRENTE';
-      detalhes += `, Recorrente: ${values[11] || 'N/A'}`;
+      detalhes.recorrente_fim = values[11] || 'N/A';
     }
-    
+
     // Verificar se é cartão
     if (values[13]) { // cartao_nome
-      detalhes += `, Cartão: ${values[13]}`;
+      detalhes.cartao = values[13];
     }
-    
+
     await registrarLog(userId, acao, detalhes);
-    
+
     return lancamentoId;
   } catch (error: any) {
     fileLogger.error('❌ Erro ao adicionar lançamento:', error);

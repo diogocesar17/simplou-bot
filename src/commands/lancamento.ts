@@ -685,7 +685,7 @@ async function lancamentoCommand(sock, userId, texto) {
         };
 
         await limparEstado(userId);
-        return await processarLancamento(sock, userId, parsedCompat);
+        return await processarLancamento(sock, userId, parsedCompat, texto);
       }
 
       if (negou) {
@@ -769,7 +769,7 @@ async function lancamentoCommand(sock, userId, texto) {
         };
 
         await limparEstado(userId);
-        return await processarLancamento(sock, userId, parsedCompat);
+        return await processarLancamento(sock, userId, parsedCompat, texto);
       }
 
       if (negou) {
@@ -842,12 +842,12 @@ async function lancamentoCommand(sock, userId, texto) {
         }
         // Forma de pagamento presente, processar lançamento
         await limparEstado(userId);
-        return await processarLancamento(sock, userId, parsed);
+        return await processarLancamento(sock, userId, parsed, texto);
       }
       if (opcaoConfirmacao === 2) {
         await limparEstado(userId);
-        await sock.sendMessage(userId, { 
-          text: '❌ Lançamento cancelado. Tente novamente com um formato mais claro.' 
+        await sock.sendMessage(userId, {
+          text: '❌ Lançamento cancelado. Tente novamente com um formato mais claro.'
         });
         return;
       }
@@ -878,7 +878,7 @@ async function lancamentoCommand(sock, userId, texto) {
       }
       // Forma de pagamento presente, processar lançamento
       await limparEstado(userId);
-      return await processarLancamento(sock, userId, parsed);
+      return await processarLancamento(sock, userId, parsed, texto);
     } else if (resposta === 'não' || resposta === 'nao' || resposta === 'n' || resposta === 'no') {
       await limparEstado(userId);
       await sock.sendMessage(userId, { 
@@ -929,7 +929,7 @@ async function lancamentoCommand(sock, userId, texto) {
     }
 
     parsed.pagamento = formaPagamento;
-    return await processarLancamento(sock, userId, parsed);
+    return await processarLancamento(sock, userId, parsed, texto);
   }
 
   // 2. Fluxo aguardando data de vencimento
@@ -947,7 +947,7 @@ async function lancamentoCommand(sock, userId, texto) {
     }
     
     parsed.dataVencimento = texto;
-    return await processarLancamento(sock, userId, parsed);
+    return await processarLancamento(sock, userId, parsed, texto);
   }
 
   // 3. Fluxo aguardando escolha de cartão
@@ -1046,7 +1046,8 @@ async function lancamentoCommand(sock, userId, texto) {
       ano_fatura: resultadoContabilizacao.anoFatura,
       dia_vencimento: cartaoEscolhido.dia_vencimento,
       status_fatura: 'pendente',
-      data_vencimento: converterDataParaISO(parsed.dataVencimento)
+      data_vencimento: converterDataParaISO(parsed.dataVencimento),
+      mensagemOriginal: texto,
     };
   logger.info({ tipo: dados.tipo, valor: dados.valor, categoria: dados.categoria, pagamento: dados.pagamento, cartao: dados.cartao_nome }, '🔔 Dados do lançamento (resumo)');
     const novoIdEscolhido = await lancamentosService.salvarLancamento(userId, dados as any);
@@ -1117,7 +1118,7 @@ async function lancamentoCommand(sock, userId, texto) {
       return;
     }
 
-    return await processarLancamento(sock, userId, parsedDriver);
+    return await processarLancamento(sock, userId, parsedDriver, texto);
   }
 
   let parsed = parseMessage(texto);
@@ -1146,7 +1147,7 @@ async function lancamentoCommand(sock, userId, texto) {
           numParcelas: 1,
           confiancaCategoria: 'alta' as const,
         };
-        return await processarLancamento(sock, userId, parsedFromCache);
+        return await processarLancamento(sock, userId, parsedFromCache, texto);
       }
     }
 
@@ -1250,10 +1251,10 @@ async function lancamentoCommand(sock, userId, texto) {
   }
 
   // Processar lançamento
-  await processarLancamento(sock, userId, parsed);
+  await processarLancamento(sock, userId, parsed, texto);
 }
 
-async function processarLancamento(sock, userId, parsed) {
+async function processarLancamento(sock, userId, parsed, mensagemOriginal?: string) {
   // Se veio de confirmação da IA e tem texto original, gravar padrão no cache
   if (parsed.textoOriginal && parsed.categoria && parsed.tipo) {
     const padrao = normalizarParaCache(parsed.textoOriginal);
@@ -1287,9 +1288,10 @@ async function processarLancamento(sock, userId, parsed) {
         valor: parsed.valor,
         categoria: parsed.categoria,
         pagamento: parsed.pagamento,
-        data_vencimento: converterDataParaISO(parsed.dataVencimento)
+        data_vencimento: converterDataParaISO(parsed.dataVencimento),
+        mensagemOriginal: mensagemOriginal ?? parsed.textoOriginal,
       };
-      
+
       const novoIdSemCartao = await lancamentosService.salvarLancamento(userId, dados);
       logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'sem_cartao' }, '[LANCAMENTO] Salvo');
       const msgSemCartao = await gerarMensagemSucesso(userId, parsed) + `\n\n💡 *Dica:* Para controlar faturas, use "configurar cartao"!`;
@@ -1362,7 +1364,8 @@ async function processarLancamento(sock, userId, parsed) {
         ano_fatura: resultadoContabilizacao.anoFatura,
         dia_vencimento: cartao.dia_vencimento,
         status_fatura: 'pendente',
-        data_vencimento: converterDataParaISO(parsed.dataVencimento)
+        data_vencimento: converterDataParaISO(parsed.dataVencimento),
+        mensagemOriginal: mensagemOriginal ?? parsed.textoOriginal,
       };
 
       const novoIdCartao = await lancamentosService.salvarLancamento(userId, dados);
@@ -1450,6 +1453,7 @@ async function processarLancamento(sock, userId, parsed) {
     data_vencimento: converterDataParaISO(parsed.dataVencimento),
     platform: parsed.platform || null,
     business_context: parsed.business_context || null,
+    mensagemOriginal: mensagemOriginal ?? parsed.textoOriginal,
   };
 
   const novoId = await lancamentosService.salvarLancamento(userId, dados);
