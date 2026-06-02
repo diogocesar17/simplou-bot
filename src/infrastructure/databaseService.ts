@@ -635,8 +635,7 @@ async function salvarConfiguracaoCartao(userId: string, nomeCartao: string, diaV
     const result = await queryDatabase(query, [userId, nomeCartao, diaVencimento, diaFechamento]);
     
     // Registrar log de auditoria
-    const detalhes = `Cartão: ${nomeCartao}, Vencimento: dia ${diaVencimento}, Fechamento: dia ${diaFechamento || 'N/A'}`;
-    await registrarLog(userId, 'CONFIGURAR_CARTAO', detalhes);
+    await registrarLog(userId, 'CONFIGURAR_CARTAO', { cartao: nomeCartao, vencimento_dia: diaVencimento, fechamento_dia: diaFechamento ?? null });
     
     return result.rows[0].id;
   } catch (error: any) {
@@ -657,8 +656,7 @@ async function atualizarCartaoConfigurado(userId: string, nomeCartao: string, di
     const result = await queryDatabase(query, [userId, nomeCartao, diaVencimento, diaFechamento]);
     
     // Registrar log de auditoria
-    const detalhes = `Cartão: ${nomeCartao}, Vencimento: dia ${diaVencimento}, Fechamento: dia ${diaFechamento || 'N/A'}`;
-    await registrarLog(userId, 'ATUALIZAR_CARTAO', detalhes);
+    await registrarLog(userId, 'ATUALIZAR_CARTAO', { cartao: nomeCartao, vencimento_dia: diaVencimento, fechamento_dia: diaFechamento ?? null });
     
     return result.rows[0]?.id;
   } catch (error: any) {
@@ -720,7 +718,7 @@ async function excluirCartaoConfigurado(userId, nomeCartao) {
     }
 
     // Registrar log de auditoria
-    await registrarLog(userId, 'EXCLUIR_CARTAO', `Cartão: ${nomeCartao}, Lançamentos associados: ${totalLancamentos}`);
+    await registrarLog(userId, 'EXCLUIR_CARTAO', { cartao: nomeCartao, lancamentos_associados: totalLancamentos });
 
     return {
       sucesso: true,
@@ -826,27 +824,19 @@ async function appendRowToDatabase(userId, values) {
     const descricao = values[2] || 'Lançamento';
     
     let acao = 'CRIAR_LANCAMENTO';
-    let detalhes = `Tipo: ${tipo}, Valor: ${formatarComMoeda(valor)}, Categoria: ${categoria}, Pagamento: ${pagamento}`;
-    
-    // Verificar se é parcelamento
-    if (values[6]) { // parcelamento_id
-      acao = 'CRIAR_PARCELAMENTO';
-      const totalParcelas = values[8] || 0;
-      detalhes += `, Parcelamento: ${totalParcelas}x`;
-    }
-    
-    // Verificar se é recorrente
-    if (values[10]) { // recorrente
-      acao = 'CRIAR_RECORRENTE';
-      detalhes += `, Recorrente: ${values[11] || 'N/A'}`;
-    }
-    
-    // Verificar se é cartão
-    if (values[13]) { // cartao_nome
-      detalhes += `, Cartão: ${values[13]}`;
-    }
-    
-    await registrarLog(userId, acao, detalhes);
+    if (values[6]) acao = 'CRIAR_PARCELAMENTO';
+    if (values[10]) acao = 'CRIAR_RECORRENTE';
+
+    await registrarLog(userId, acao, {
+      tipo,
+      valor,
+      categoria,
+      pagamento,
+      descricao,
+      ...(values[6]  ? { parcelamento_total: values[8] || 0 } : {}),
+      ...(values[10] ? { recorrente_fim: values[11] || null } : {}),
+      ...(values[13] ? { cartao: values[13] } : {}),
+    });
     
     return lancamentoId;
   } catch (error: any) {
@@ -1294,8 +1284,7 @@ async function atualizarLancamentoPorId(userId, id, novosDados) {
       }
       
       if (mudancas.length > 0) {
-        const detalhes = `ID: ${id}, Mudanças: ${mudancas.join(', ')}`;
-        await registrarLog(userId, 'EDITAR_LANCAMENTO', detalhes);
+        await registrarLog(userId, 'EDITAR_LANCAMENTO', { lancamento_id: id, mudancas });
       }
     }
     
@@ -1320,8 +1309,7 @@ async function excluirLancamentoPorId(userId, id) {
     const deleteResult = await queryDatabase(query, [userId, id]);
     
     // Registrar log de auditoria
-    const detalhes = `ID: ${id}, Tipo: ${lancamento.tipo}, Valor: ${formatarComMoeda(lancamento.valor)}, Categoria: ${lancamento.categoria}, Descrição: ${lancamento.descricao}`;
-    await registrarLog(userId, 'EXCLUIR_LANCAMENTO', detalhes);
+    await registrarLog(userId, 'EXCLUIR_LANCAMENTO', { lancamento_id: id, tipo: lancamento.tipo, valor: lancamento.valor, categoria: lancamento.categoria, descricao: lancamento.descricao });
     
     return deleteResult.rowCount; // Retorna o número de lançamentos excluídos
   } catch (error: any) {
@@ -1359,8 +1347,7 @@ async function excluirParcelasFuturasApartir(
     `;
     const result = await queryDatabase(deleteQuery, params);
 
-    const detalhes = `Parcelamento ID: ${parcelamentoId}, A partir de: ${parcelaAtualSelecionada ?? dataSelecionada}, Parcelas excluídas: ${result.rowCount}`;
-    await registrarLog(userId, 'EXCLUIR_PARCELAS_FUTURAS', detalhes);
+    await registrarLog(userId, 'EXCLUIR_PARCELAS_FUTURAS', { parcelamento_id: parcelamentoId, a_partir_de: parcelaAtualSelecionada ?? dataSelecionada, parcelas_excluidas: result.rowCount });
 
     return result.rowCount;
   } catch (error: any) {
@@ -1393,8 +1380,7 @@ async function excluirRecorrenciasFuturasApartir(
     `;
     const result = await queryDatabase(deleteQuery, params);
 
-    const detalhes = `Recorrente ID: ${recorrenteId}, A partir de: ${dataSelecionada}, Recorrências excluídas: ${result.rowCount}`;
-    await registrarLog(userId, 'EXCLUIR_RECORRENCIAS_FUTURAS', detalhes);
+    await registrarLog(userId, 'EXCLUIR_RECORRENCIAS_FUTURAS', { recorrente_id: recorrenteId, a_partir_de: dataSelecionada, recorrencias_excluidas: result.rowCount });
 
     return result.rowCount;
   } catch (error: any) {
@@ -1477,8 +1463,7 @@ async function atualizarRecorrenciasApartir(
     `;
     const result = await queryDatabase(updateQuery, [...valores, ...whereParams]);
 
-    const detalhes = `Recorrente ID: ${recorrenteId}, A partir de: ${dataSelecionada}, Recorrências atualizadas: ${result.rowCount}`;
-    await registrarLog(userId, 'ATUALIZAR_RECORRENTES_FUTUROS', detalhes);
+    await registrarLog(userId, 'ATUALIZAR_RECORRENTES_FUTUROS', { recorrente_id: recorrenteId, a_partir_de: dataSelecionada, recorrencias_atualizadas: result.rowCount });
 
     return result.rowCount;
   } catch (error: any) {
@@ -1565,8 +1550,7 @@ async function atualizarLancamentosParceladosApartir(
 
     const result = await queryDatabase(query, [...valores, ...whereParams]);
 
-    const detalhes = `Parcelamento ID: ${parcelamentoId}, A partir da parcela: ${parcelaAtualSelecionada}, Campos atualizados: ${campos.length}, Registros afetados: ${result.rowCount}`;
-    await registrarLog(userId, 'EDITAR_LANCAMENTO_EM_LOTE', detalhes);
+    await registrarLog(userId, 'EDITAR_LANCAMENTO_EM_LOTE', { parcelamento_id: parcelamentoId, a_partir_da_parcela: parcelaAtualSelecionada, campos_atualizados: campos.length, registros_afetados: result.rowCount });
 
     return result.rowCount;
   } catch (error: any) {
@@ -1624,8 +1608,7 @@ async function excluirParcelamentoPorId(userId, parcelamentoId) {
     const deleteResult = await queryDatabase(deleteQuery, [userId, parcelamentoId]);
     
     // Registrar log de auditoria
-    const detalhes = `Parcelamento ID: ${parcelamentoId}, Parcelas: ${info.total_parcelas}, Valor Total: ${formatarComMoeda(info.valor_total)}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
-    await registrarLog(userId, 'EXCLUIR_PARCELAMENTO', detalhes);
+    await registrarLog(userId, 'EXCLUIR_PARCELAMENTO', { parcelamento_id: parcelamentoId, parcelas: info.total_parcelas, valor_total: info.valor_total, categoria: info.categoria, descricao: info.descricao });
     
     return deleteResult.rowCount;
   } catch (error: any) {
@@ -1658,8 +1641,7 @@ async function excluirRecorrentePorId(userId, recorrenteId) {
     const deleteResult = await queryDatabase(deleteQuery, [userId, recorrenteId]);
     
     // Registrar log de auditoria
-    const detalhes = `Recorrente ID: ${recorrenteId}, Recorrências: ${info.total_recorrencias}, Valor: ${formatarComMoeda(info.valor)}, Categoria: ${info.categoria}, Descrição: ${info.descricao}`;
-    await registrarLog(userId, 'EXCLUIR_RECORRENTE', detalhes);
+    await registrarLog(userId, 'EXCLUIR_RECORRENTE', { recorrente_id: recorrenteId, recorrencias: info.total_recorrencias, valor: info.valor, categoria: info.categoria, descricao: info.descricao });
     
     return deleteResult.rowCount;
   } catch (error: any) {
@@ -2054,11 +2036,13 @@ function gerarMensagemAlertas(alertas) {
  */
 async function registrarLog(userId, acao, detalhes: any = null) {
   try {
-    const query = `
-      INSERT INTO logs_auditoria (user_id, acao, detalhes) 
-      VALUES ($1, $2, $3)
-    `;
-    await queryDatabase(query, [userId, acao, detalhes]);
+    const valor = detalhes === null ? null
+      : typeof detalhes === 'string' ? JSON.stringify({ mensagem: detalhes })
+      : JSON.stringify(detalhes);
+    await queryDatabase(
+      `INSERT INTO logs_auditoria (user_id, acao, detalhes) VALUES ($1, $2, $3)`,
+      [userId, acao, valor]
+    );
   } catch (error: any) {
     fileLogger.error('[LOGS] Erro ao registrar log:', error);
   }
@@ -2484,13 +2468,26 @@ async function gerarLogAuditoria(limite = 100) {
     `;
     const result = await queryDatabase(query, [limite]);
     const logs = result.rows;
-    const headers = ['User ID', 'Ação', 'Detalhes', 'Timestamp'];
+    const headers = ['User ID', 'Ação', 'Mensagem Original', 'Detalhes', 'Timestamp'];
     let csv = headers.join(',') + '\n';
     logs.forEach(log => {
+      let mensagemOriginal = '';
+      let detalhesStr = '';
+      try {
+        const parsed = log.detalhes ? JSON.parse(log.detalhes) : null;
+        if (parsed) {
+          mensagemOriginal = parsed.mensagem_original ?? '';
+          const { mensagem_original: _, ...rest } = parsed;
+          detalhesStr = JSON.stringify(rest);
+        }
+      } catch {
+        detalhesStr = log.detalhes ?? '';
+      }
       csv += [
         log.user_id,
         log.acao,
-        '"' + (log.detalhes ? log.detalhes.replace(/"/g, '""') : '') + '"',
+        '"' + mensagemOriginal.replace(/"/g, '""') + '"',
+        '"' + detalhesStr.replace(/"/g, '""') + '"',
         log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : ''
       ].join(',') + '\n';
     });

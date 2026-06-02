@@ -141,7 +141,7 @@ export async function criarLembrete(userId: string, dados: CriarLembreteData): P
 
     const lembrete = result.rows[0];
     
-    await registrarLog(userId, 'lembrete_criado', {
+    await registrarLog(userId, 'LEMBRETE_CRIADO', {
       lembrete_id: lembrete.id,
       titulo: lembrete.titulo
     });
@@ -340,7 +340,7 @@ export async function atualizarLembrete(userId: string, lembreteId: string, dado
     const result = await pool.query(query, valores);
     const lembreteAtualizado = result.rows[0];
 
-    await registrarLog(userId, 'lembrete_atualizado', {
+    await registrarLog(userId, 'LEMBRETE_ATUALIZADO', {
       lembrete_id: lembreteId,
       campos_alterados: Object.keys(dados)
     });
@@ -382,7 +382,7 @@ export async function excluirLembrete(userId: string, lembreteId: string): Promi
       [lembreteId, userId]
     );
 
-    await registrarLog(userId, 'lembrete_excluido', {
+    await registrarLog(userId, 'LEMBRETE_EXCLUIDO', {
       lembrete_id: lembreteId,
       titulo: lembreteExistente.titulo
     });
@@ -411,7 +411,7 @@ export async function alternarStatusLembrete(userId: string, lembreteId: string)
 
     const lembreteAtualizado = result.rows[0];
 
-    await registrarLog(userId, 'lembrete_status_alterado', {
+    await registrarLog(userId, 'LEMBRETE_STATUS_ALTERADO', {
       lembrete_id: lembreteId,
       novo_status: novoStatus
     });
@@ -547,7 +547,7 @@ export async function marcarLembreteEnviado(lembreteId: string): Promise<void> {
       `, [agora, lembreteId]);
     }
 
-    await registrarLog(lembrete.user_id, 'lembrete_enviado', {
+    await registrarLog(lembrete.user_id, 'LEMBRETE_ENVIADO', {
       lembrete_id: lembreteId,
       titulo: lembrete.titulo
     });
