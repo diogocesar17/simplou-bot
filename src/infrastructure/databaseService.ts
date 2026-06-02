@@ -3,7 +3,6 @@ import { Pool } from 'pg';
 import { logger, fileLogger } from './logger';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { ADMIN_USERS, AUTHORIZED_USERS } from '../config/config';
 
 // Configuração otimizada da conexão com PostgreSQL
 const pool = new Pool({
@@ -357,9 +356,6 @@ async function initializeDatabase() {
         END IF;
       END $$;
     `);
-
-    // Migração: Migrar usuários do config.js para a tabela
-    await migrarUsuariosConfig(client);
 
     // Migrações Driver (additive — não afeta dados existentes)
     await migrateDriverTables(client);
@@ -2781,53 +2777,6 @@ async function buscarGastosValorAlto(userId, valorMinimo = 100, limite = 20, mes
 }
 
 // ===== FUNÇÕES DE USUÁRIOS =====
-
-// Função para migrar usuários do config.js para a tabela
-async function migrarUsuariosConfig(client) {
-  try {
-    // ADMIN_USERS e AUTHORIZED_USERS já importados no topo do arquivo
-    
-    // Verificar se já existem usuários na tabela
-    const checkQuery = 'SELECT COUNT(*) as total FROM usuarios';
-    const checkResult = await client.query(checkQuery);
-    
-    if (parseInt(checkResult.rows[0].total) > 0) {
-      logger.info('✅ Usuários já migrados, pulando migração');
-      return;
-    }
-    
-    logger.info('🔄 Migrando usuários do config.js...');
-    
-    // Migrar administradores
-    for (const adminId of ADMIN_USERS) {
-      await client.query(`
-        INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (user_id) DO NOTHING
-      `, [adminId, 'Administrador', 'premium', 'ativo', true, 'sistema']);
-      
-      logger.info(`✅ Admin migrado: ${adminId}`);
-    }
-    
-    // Migrar usuários autorizados
-    for (const userId of AUTHORIZED_USERS) {
-      if (!ADMIN_USERS.includes(userId)) {
-        await client.query(`
-          INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por)
-          VALUES ($1, $2, $3, $4, $5, $6)
-          ON CONFLICT (user_id) DO NOTHING
-        `, [userId, 'Usuário', 'gratuito', 'ativo', false, 'sistema']);
-        
-        logger.info(`✅ Usuário migrado: ${userId}`);
-      }
-    }
-    
-    logger.info('✅ Migração de usuários concluída');
-  } catch (error) {
-    logger.error('❌ Erro na migração de usuários:', error);
-    throw error;
-  }
-}
 
 // Função para cadastrar novo usuário
 async function cadastrarUsuario(userId, dados) {

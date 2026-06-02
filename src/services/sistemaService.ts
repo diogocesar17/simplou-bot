@@ -62,15 +62,4 @@ export async function limparDadosAntigos(): Promise<any> {
   return await databaseService.limparDadosAntigos();
 }
 
-// Funções para migração de dados
-export async function migrarUsuariosConfig(): Promise<any> {
-  // Esta função não existe no databaseService atual
-  return { success: false, message: 'Função não implementada' };
-}
-
-// Funções para consultas diretas
-export async function queryDatabase(query: string, params: any[] = []): Promise<any> {
-  // Esta função não existe no databaseService atual
-  return { success: false, message: 'Função não implementada' };
-}
 
