@@ -794,7 +794,7 @@ function calcularDataContabilizacao(dataLancamento, diaVencimento, diaFechamento
 }
 
 // Funções para operações CRUD
-async function appendRowToDatabase(userId, values) {
+async function appendRowToDatabase(userId, values, mensagemOriginal?: string) {
   try {
     // values[0..19] = colunas originais ($2..$21)
     // values[20] = platform (opcional, nullable)
@@ -815,14 +815,14 @@ async function appendRowToDatabase(userId, values) {
 
     const result = await queryDatabase(query, [userId, ...values.slice(0, 20), platform, businessContext]);
     const lancamentoId = result.rows[0].id;
-    
+
     // Registrar log de auditoria
     const tipo = values[1] || 'gasto';
     const valor = values[3] || 0;
     const categoria = values[4] || 'Outros';
     const pagamento = values[5] || 'NÃO INFORMADO';
     const descricao = values[2] || 'Lançamento';
-    
+
     let acao = 'CRIAR_LANCAMENTO';
     if (values[6]) acao = 'CRIAR_PARCELAMENTO';
     if (values[10]) acao = 'CRIAR_RECORRENTE';
@@ -833,11 +833,12 @@ async function appendRowToDatabase(userId, values) {
       categoria,
       pagamento,
       descricao,
+      ...(mensagemOriginal ? { mensagem_original: mensagemOriginal.slice(0, 300) } : {}),
       ...(values[6]  ? { parcelamento_total: values[8] || 0 } : {}),
       ...(values[10] ? { recorrente_fim: values[11] || null } : {}),
       ...(values[13] ? { cartao: values[13] } : {}),
     });
-    
+
     return lancamentoId;
   } catch (error: any) {
     fileLogger.error('❌ Erro ao adicionar lançamento:', error);

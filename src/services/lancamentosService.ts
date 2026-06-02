@@ -26,6 +26,7 @@ interface DadosLancamento {
   // Campos driver (nullable — não quebra usuários existentes)
   platform?: string | null;
   business_context?: string | null;
+  mensagemOriginal?: string;
 }
 
 interface ResumoFinanceiro {
@@ -111,7 +112,7 @@ export async function salvarLancamento(userId: string, dados: DadosLancamento): 
     dados.business_context || null // $23 (driver)
   ];
   
-  return await databaseService.appendRowToDatabase(userId, values);
+  return await databaseService.appendRowToDatabase(userId, values, dados.mensagemOriginal);
 }
 
 export async function atualizarLancamentoPorId(userId: string, id: number, dados: Partial<DadosLancamento>): Promise<unknown> {
