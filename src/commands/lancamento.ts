@@ -607,8 +607,8 @@ async function lancamentoCommand(sock, userId, texto) {
       });
       return;
     }
+    // Input não reconhecido como botão — limpa estado e processa como novo lançamento
     await limparEstado(userId);
-    return;
   }
 
   // 1. Fluxo aguardando confirmação da IA
