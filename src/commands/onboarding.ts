@@ -93,6 +93,9 @@ export async function handleOnboardingTipoTrabalho(sock: any, userId: string, te
     return;
   }
 
+  // Brasil: grava BRL explicitamente para limpar qualquer preferência anterior
+  await setMoeda(userId, 'BRL');
+
   await definirEstado(userId, 'onboarding_meta_diaria', {});
   await perguntarMetaDiaria(sock, userId, TIPO_LABELS[tipo]);
 }
