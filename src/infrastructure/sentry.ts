@@ -76,3 +76,17 @@ export function captureException(err: unknown, context?: Record<string, unknown>
     // falha do Sentry nunca deve derrubar o bot
   }
 }
+
+export async function testeSentry(): Promise<{ ok: boolean; motivo?: string }> {
+  if (!process.env.SENTRY_DSN) return { ok: false, motivo: 'SENTRY_DSN não configurado' };
+  if (process.env.NODE_ENV !== 'production') return { ok: false, motivo: 'NODE_ENV não é production (atual: ' + (process.env.NODE_ENV ?? 'undefined') + ')' };
+  try {
+    const err = new Error('[TESTE] Verificação manual do Sentry — pode ignorar');
+    err.name = 'SentryManualTest';
+    Sentry.captureException(err);
+    await Sentry.flush(3000);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, motivo: e instanceof Error ? e.message : String(e) };
+  }
+}

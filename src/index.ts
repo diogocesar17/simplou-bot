@@ -1,6 +1,6 @@
 // Controle de fluxo agora é totalmente baseado em Redis (stateManager)
 
-import { initSentry, captureException } from './infrastructure/sentry';
+import { initSentry, captureException, testeSentry } from './infrastructure/sentry';
 initSentry();
 
 // Imports dos comandos
@@ -587,6 +587,19 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   }
   if (textoLower.startsWith('promover ')) {
     await promoverUsuarioCommand(sock, userId, texto);
+    return;
+  }
+  if (textoLower === 'sentry test' || textoLower === 'sentry teste') {
+    if (!await verificarAdmin(userId)) {
+      await sock.sendMessage(userId, { text: '❌ Comando exclusivo para administradores.' });
+      return;
+    }
+    const resultado = await testeSentry();
+    if (resultado.ok) {
+      await sock.sendMessage(userId, { text: '✅ *Sentry OK* — evento enviado. Verifique o dashboard em ~30 segundos.' });
+    } else {
+      await sock.sendMessage(userId, { text: `⚠️ *Sentry inativo*\nMotivo: ${resultado.motivo}` });
+    }
     return;
   }
   if (textoLower === 'fila espera' || textoLower === 'fila de espera' || textoLower === 'beta fila') {
