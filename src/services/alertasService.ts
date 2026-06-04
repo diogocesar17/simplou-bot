@@ -440,13 +440,20 @@ async function enviarResumoSemanal(adapter: IWhatsAppAdapter, userId: string): P
 
     await redisDedup.set(chaveDedup, '1', 'EX', 7 * 24 * 60 * 60); // TTL: 7 dias
 
-    await adapter.sendMessage(userId, {
-      text: `📊 *Resumo da semana* — você gastou ${formatarComMoeda(formatarValorAlerta(total))} nos últimos 7 dias.`
-    });
-
-    logger.info({ userId, semana, total }, '[ALERTAS] Resumo semanal enviado');
+    try {
+      await adapter.sendMessage(userId, {
+        text: `📊 *Resumo da semana* — você gastou ${formatarComMoeda(formatarValorAlerta(total))} nos últimos 7 dias.`
+      });
+      logger.info({ userId, semana, total }, '[ALERTAS] Resumo semanal enviado');
+    } catch (sendErr: any) {
+      if (sendErr?.metaCode === 131047) {
+        logger.warn({ userId, metaCode: 131047 }, '[ALERTAS] Janela 24h fechada — resumo semanal não entregue (template necessário)');
+      } else {
+        logger.error({ userId, metaCode: sendErr?.metaCode, err: sendErr?.message || sendErr }, '[ALERTAS] Falha ao enviar resumo semanal');
+      }
+    }
   } catch (error) {
-    logger.error({ userId, err: (error as any)?.message || error }, '[ALERTAS] Erro ao enviar resumo semanal');
+    logger.error({ userId, err: (error as any)?.message || error }, '[ALERTAS] Erro ao processar resumo semanal');
   }
 }
 
@@ -469,9 +476,18 @@ async function verificarEEnviarAlertasAutomaticos(adapter: IWhatsAppAdapter, eLe
         const alertas = await buscarTodosAlertas(usuario.user_id, eLembreteFinal);
 
         if (alertas) {
-          await adapter.sendMessage(usuario.user_id, { text: alertas });
-          enviados++;
-          logger.info({ userId: usuario.user_id, lembreteFinal: eLembreteFinal }, '[ALERTAS] Alerta enviado');
+          try {
+            await adapter.sendMessage(usuario.user_id, { text: alertas });
+            enviados++;
+            logger.info({ userId: usuario.user_id, lembreteFinal: eLembreteFinal }, '[ALERTAS] Alerta enviado');
+          } catch (sendErr: any) {
+            erros++;
+            if (sendErr?.metaCode === 131047) {
+              logger.warn({ userId: usuario.user_id, metaCode: 131047 }, '[ALERTAS] Janela 24h fechada — alerta proativo não entregue (template necessário)');
+            } else {
+              logger.error({ userId: usuario.user_id, metaCode: sendErr?.metaCode, err: sendErr?.message || sendErr }, '[ALERTAS] Falha ao enviar alerta proativo');
+            }
+          }
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
@@ -482,7 +498,7 @@ async function verificarEEnviarAlertasAutomaticos(adapter: IWhatsAppAdapter, eLe
         }
       } catch (error) {
         erros++;
-        logger.error({ userId: usuario.user_id, err: (error as any)?.message || error }, '[ALERTAS] Erro ao enviar alerta');
+        logger.error({ userId: usuario.user_id, err: (error as any)?.message || error }, '[ALERTAS] Erro inesperado no loop de alertas');
       }
     }
 

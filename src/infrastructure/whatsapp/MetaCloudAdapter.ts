@@ -21,6 +21,21 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
     return to.replace(/@.*$/, '').replace(/\D/g, '');
   }
 
+  // Lança erro estruturado com metaCode para facilitar diagnóstico de falhas proativas
+  private async _throwMetaError(response: Response): Promise<never> {
+    const errText = await response.text();
+    let metaCode: number | undefined;
+    let errMsg = errText;
+    try {
+      const errJson = JSON.parse(errText);
+      metaCode = errJson?.error?.code;
+      errMsg = errJson?.error?.message ?? errText;
+    } catch { /* resposta não é JSON */ }
+    const err = new Error(`Meta API erro ${response.status}: ${errMsg}`);
+    (err as any).metaCode = metaCode;
+    throw err;
+  }
+
   async sendMessage(to: string, content: WhatsAppMessageContent): Promise<void> {
     const phone = this.normalizePhone(to);
 
@@ -60,10 +75,7 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
       body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Meta API erro ${response.status}: ${err}`);
-    }
+    if (!response.ok) await this._throwMetaError(response);
   }
 
   async sendInteractiveMessage(to: string, interactive: WhatsAppInteractiveMessage): Promise<void> {
@@ -121,10 +133,7 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
       body: JSON.stringify(body),
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`Meta API erro ${response.status}: ${err}`);
-    }
+    if (!response.ok) await this._throwMetaError(response);
   }
 
   async downloadAudio(message: any): Promise<{ buffer: Buffer; mimeType: string }> {
