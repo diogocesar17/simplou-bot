@@ -2,6 +2,7 @@
 
 import { initSentry, captureException, testeSentry } from './infrastructure/sentry';
 import { formatarEstatisticas } from './infrastructure/geminiMonitor';
+import { adminHelpCommand } from './commands/adminHelp';
 initSentry();
 
 // Imports dos comandos
@@ -588,6 +589,14 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   }
   if (textoLower.startsWith('promover ')) {
     await promoverUsuarioCommand(sock, userId, texto);
+    return;
+  }
+  if (textoLower === 'admin help' || textoLower === 'admin ajuda' || textoLower === 'painel admin') {
+    if (!await verificarAdmin(userId)) {
+      await sock.sendMessage(userId, { text: '❌ Comando exclusivo para administradores.' });
+      return;
+    }
+    await adminHelpCommand(sock, userId);
     return;
   }
   if (textoLower === 'gemini status' || textoLower === 'gemini monitoracao' || textoLower === 'gemini monitoração') {
