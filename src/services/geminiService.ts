@@ -25,6 +25,41 @@ const GEMINI_VISION_MODEL = GEMINI_TEXT_MODEL;
 let gemini: GoogleGenerativeAI | null = null;
 let isGeminiAvailable = false;
 
+// Retry com backoff exponencial: 3 tentativas com delays 1s → 3s → 9s
+const RETRY_DELAYS_MS = [1_000, 3_000, 9_000];
+
+function isRetryable(err: any): boolean {
+  const msg = String(err?.message ?? err).toLowerCase();
+  const status = err?.status ?? err?.httpStatus ?? err?.code;
+  return (
+    status === 429 ||
+    status === 503 ||
+    msg.includes('overloaded') ||
+    msg.includes('resource_exhausted') ||
+    msg.includes('too many requests') ||
+    msg.includes('service unavailable') ||
+    msg.includes('unavailable')
+  );
+}
+
+async function comRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  let lastError: any;
+  for (let i = 0; i <= RETRY_DELAYS_MS.length; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (i < RETRY_DELAYS_MS.length && isRetryable(err)) {
+        logger.warn({ label, tentativa: i + 1, proximoDelayMs: RETRY_DELAYS_MS[i] }, '[GEMINI] sobrecarga — aguardando retry');
+        await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[i]));
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw lastError;
+}
+
 // Inicializar Gemini
 export function initializeGemini(): boolean {
   const rawKey = process.env.GEMINI_API_KEY ?? '';
@@ -59,7 +94,7 @@ export async function gerarJSONComGemini(prompt: string): Promise<any | null> {
 
   try {
     const t0 = Date.now();
-    const result = await model.generateContent(String(prompt || ''));
+    const result = await comRetry(() => model.generateContent(String(prompt || '')), 'gerarJSON');
     const response = await result.response;
     const textResp = response.text();
     const jsonMatch = textResp.match(/\{[\s\S]*\}/);
@@ -111,7 +146,7 @@ Regras importantes:
 `;
 
     const t0 = Date.now();
-    const result = await model.generateContent(prompt);
+    const result = await comRetry(() => model.generateContent(prompt), 'analisarTransacao');
     const response = await result.response;
     const textResp = response.text();
     const latencyMs = Date.now() - t0;
@@ -160,7 +195,7 @@ Use linguagem direta, emojis e valores em reais. Máximo 25 linhas.
 `;
 
     const t0 = Date.now();
-    const result = await model.generateContent(prompt);
+    const result = await comRetry(() => model.generateContent(prompt), 'analisarPadroes');
     const response = await result.response;
     logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] analisarPadroes');
     return response.text();
@@ -198,7 +233,7 @@ Use linguagem direta e motivacional. Valores em reais. Máximo 25 linhas.
 `;
 
     const t0 = Date.now();
-    const result = await model.generateContent(prompt);
+    const result = await comRetry(() => model.generateContent(prompt), 'gerarSugestoes');
     const response = await result.response;
     logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] gerarSugestoes');
     return response.text();
@@ -237,7 +272,7 @@ Valores em reais, linguagem clara. Máximo 25 linhas.
 `;
 
     const t0 = Date.now();
-    const result = await model.generateContent(prompt);
+    const result = await comRetry(() => model.generateContent(prompt), 'preverGastos');
     const response = await result.response;
     logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] preverGastos');
     return response.text();
@@ -271,7 +306,7 @@ Pergunta: "${pergunta}"`;
     prompt += `\n\nResponda de forma prática e útil para um motorista/entregador, usando linguagem simples e emojis. Máximo 20 linhas.`;
 
     const t0 = Date.now();
-    const result = await model.generateContent(prompt);
+    const result = await comRetry(() => model.generateContent(prompt), 'responderPergunta');
     const response = await result.response;
     const texto = response.text();
     logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] responderPergunta');
@@ -346,7 +381,7 @@ Regras:
 - Para identificar parcelamento, procure por termos como "QTDE PARCELAS", "X/Y" (ex: 01/03), "PARC". Se encontrar, defina "parcelado": true e extraia o total de parcelas.
 `;
 
-    const result = await model.generateContent([
+    const result = await comRetry(() => model.generateContent([
       {
         inlineData: {
           data: base64Data,
@@ -354,7 +389,7 @@ Regras:
         },
       },
       { text: prompt },
-    ]);
+    ]), 'analisarVoucher');
     const response = await result.response;
     const textResp = response.text();
 
@@ -444,7 +479,7 @@ Regras:
 - Se forma de pagamento não for clara, use "outro".
 `;
 
-    const result = await model.generateContent([
+    const result = await comRetry(() => model.generateContent([
       {
         inlineData: {
           data: base64Data,
@@ -452,7 +487,7 @@ Regras:
         },
       },
       { text: prompt },
-    ]);
+    ]), 'transcreverAudio');
 
     const response = await result.response;
     const textResp = response.text();
