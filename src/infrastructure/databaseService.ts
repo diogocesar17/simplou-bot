@@ -2779,13 +2779,13 @@ async function buscarGastosValorAlto(userId, valorMinimo = 100, limite = 20, mes
 // Função para cadastrar novo usuário
 async function cadastrarUsuario(userId, dados) {
   try {
-    const { nome = 'Usuário', plano = 'gratuito', is_admin = false, criado_por } = dados;
-    
+    const { nome = 'Usuário', plano = 'gratuito', is_admin = false, criado_por, status = 'ativo' } = dados;
+
     const result = await queryDatabase(`
       INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [userId, nome, plano, 'ativo', is_admin, criado_por]);
+    `, [userId, nome, plano, status, is_admin, criado_por]);
     
     // Registrar log de auditoria
     await registrarLog(criado_por || 'sistema', 'CADASTRO_USUARIO', {
@@ -3313,6 +3313,8 @@ export {
   getUserPreference,
   setUserPreference,
   atualizarNomeUsuario,
+  aprovarUsuarioBeta,
+  listarFilaEspera,
 };
 
 async function atualizarNomeUsuario(userId: string, nome: string): Promise<void> {
@@ -3320,4 +3322,24 @@ async function atualizarNomeUsuario(userId: string, nome: string): Promise<void>
     `UPDATE usuarios SET nome = $2, atualizado_em = CURRENT_TIMESTAMP WHERE user_id = $1`,
     [userId, nome]
   );
+}
+
+async function aprovarUsuarioBeta(userId: string, aprovadoPor: string): Promise<boolean> {
+  const result = await queryDatabase(
+    `UPDATE usuarios SET status = 'ativo', atualizado_em = CURRENT_TIMESTAMP WHERE user_id = $1 AND status = 'aguardando' RETURNING user_id`,
+    [userId]
+  );
+  if ((result.rowCount ?? 0) > 0) {
+    await registrarLog(aprovadoPor, 'APROVAR_BETA', { usuario_aprovado: userId });
+    return true;
+  }
+  return false;
+}
+
+async function listarFilaEspera(): Promise<any[]> {
+  const result = await queryDatabase(
+    `SELECT user_id, nome, criado_em FROM usuarios WHERE status = 'aguardando' ORDER BY criado_em ASC`,
+    []
+  );
+  return result.rows;
 }

@@ -67,8 +67,9 @@ import * as geminiService from './services/geminiService';
 import { initializeDatabase } from './infrastructure/databaseService';
 import * as lancamentosService from './services/lancamentosService';
 import { routeIntent } from './intents/intentRouter';
-import { buscarUsuario, cadastrarUsuario } from './services/usuariosService';
+import { buscarUsuario, cadastrarUsuario, verificarAdmin } from './services/usuariosService';
 import { verificarRateLimit } from './services/rateLimitService';
+import { listarFilaEsperaCommand, aprovarUsuarioCommand } from './commands/betaAcesso';
 
 // Exemplo de função de roteamento (simples)
 async function handleMessage(sock: any, userId: string, texto: string, nomeContato?: string): Promise<void> {
@@ -84,22 +85,21 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   // Onboarding: cadastrar e dar boas-vindas a novos usuários
   const usuario = await buscarUsuario(userId);
   if (!usuario) {
-    await cadastrarUsuario(userId, { nome: nomeContato || 'Usuário' });
+    await cadastrarUsuario(userId, { nome: nomeContato || 'Usuário', status: 'aguardando' });
     await sock.sendMessage(userId, {
       text:
-        '👋 *Bem-vindo ao Simplou Driver!*\n\n' +
-        '🚗 Sou seu assistente financeiro no WhatsApp, feito para *motoristas de app e entregadores*.\n\n' +
-        'Uber, 99, iFood, Rappi, Loggi — registro tudo por mensagem simples:\n\n' +
-        '💰 *Receitas*\n' +
-        '• _ganhei 280 no uber_ → registra corrida\n' +
-        '• _recebi 90 no ifood_ → registra entrega\n\n' +
-        '⛽ *Custos operacionais*\n' +
-        '• _abasteci 150 de gasolina_ → registra combustível\n' +
-        '• _paguei 12 de pedágio_ → registra pedágio\n\n' +
-        'Escreva naturalmente — não precisa decorar comandos. Digite *ajuda* para ver tudo que posso fazer.'
+        '👋 Olá! Obrigado pelo interesse no *Simplou Driver*.\n\n' +
+        '🚗 Somos um assistente financeiro no WhatsApp para motoristas de app e entregadores.\n\n' +
+        '⏳ Estamos em *fase beta* com vagas limitadas. Sua solicitação foi registrada e você será notificado assim que uma vaga for liberada.\n\n' +
+        'Qualquer dúvida: contato@simplou.com',
     });
-    await definirEstado(userId, 'onboarding_nome', { nomeProfile: nomeContato });
-    await perguntarNome(sock, userId, nomeContato);
+    return;
+  }
+
+  if (usuario.status === 'aguardando') {
+    await sock.sendMessage(userId, {
+      text: '⏳ Sua solicitação ainda está em análise. Você será avisado assim que for aprovado. Obrigado pela paciência!',
+    });
     return;
   }
 
@@ -563,6 +563,22 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   }
   if (textoLower.startsWith('promover ')) {
     await promoverUsuarioCommand(sock, userId, texto);
+    return;
+  }
+  if (textoLower === 'fila espera' || textoLower === 'fila de espera' || textoLower === 'beta fila') {
+    if (!await verificarAdmin(userId)) {
+      await sock.sendMessage(userId, { text: '❌ Comando exclusivo para administradores.' });
+      return;
+    }
+    await listarFilaEsperaCommand(sock, userId);
+    return;
+  }
+  if (textoLower.startsWith('aprovar ')) {
+    if (!await verificarAdmin(userId)) {
+      await sock.sendMessage(userId, { text: '❌ Comando exclusivo para administradores.' });
+      return;
+    }
+    await aprovarUsuarioCommand(sock, userId, texto);
     return;
   }
   if (textoLower === 'status') {
