@@ -1,6 +1,7 @@
 // Controle de fluxo agora é totalmente baseado em Redis (stateManager)
 
 import { initSentry, captureException, testeSentry } from './infrastructure/sentry';
+import { formatarEstatisticas } from './infrastructure/geminiMonitor';
 initSentry();
 
 // Imports dos comandos
@@ -587,6 +588,14 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   }
   if (textoLower.startsWith('promover ')) {
     await promoverUsuarioCommand(sock, userId, texto);
+    return;
+  }
+  if (textoLower === 'gemini status' || textoLower === 'gemini monitoracao' || textoLower === 'gemini monitoração') {
+    if (!await verificarAdmin(userId)) {
+      await sock.sendMessage(userId, { text: '❌ Comando exclusivo para administradores.' });
+      return;
+    }
+    await sock.sendMessage(userId, { text: formatarEstatisticas() });
     return;
   }
   if (textoLower === 'sentry test' || textoLower === 'sentry teste') {

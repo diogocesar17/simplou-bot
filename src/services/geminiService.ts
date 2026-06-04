@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { logger } from '../infrastructure/logger';
+import { registrarChamada, registrarRetry } from '../infrastructure/geminiMonitor';
 
 // Interfaces para tipagem
 interface AnaliseTransacao {
@@ -50,6 +51,7 @@ async function comRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
     } catch (err) {
       lastError = err;
       if (i < RETRY_DELAYS_MS.length && isRetryable(err)) {
+        registrarRetry(label);
         logger.warn({ label, tentativa: i + 1, proximoDelayMs: RETRY_DELAYS_MS[i] }, '[GEMINI] sobrecarga — aguardando retry');
         await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[i]));
       } else {
@@ -92,16 +94,21 @@ export async function gerarJSONComGemini(prompt: string): Promise<any | null> {
   const model = getTextModel();
   if (!model) return null;
 
+  const t0 = Date.now();
   try {
-    const t0 = Date.now();
     const result = await comRetry(() => model.generateContent(String(prompt || '')), 'gerarJSON');
     const response = await result.response;
     const textResp = response.text();
     const jsonMatch = textResp.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
+    if (!jsonMatch) {
+      registrarChamada('gerarJSON', Date.now() - t0, false);
+      return null;
+    }
+    registrarChamada('gerarJSON', Date.now() - t0, true);
     logger.debug({ latencyMs: Date.now() - t0 }, '[GEMINI] gerarJSON');
     return JSON.parse(jsonMatch[0]);
   } catch (error: any) {
+    registrarChamada('gerarJSON', Date.now() - t0, false);
     logger.error({ err: error?.message || error }, '[GEMINI] gerarJSON erro');
     return null;
   }
@@ -121,6 +128,7 @@ export async function analisarTransacaoComGemini(
   const model = getTextModel();
   if (!model) return null;
 
+  const t0 = Date.now();
   try {
     const prompt = `
 Analise a seguinte mensagem de transação financeira e extraia as informações em formato JSON:
@@ -145,7 +153,6 @@ Regras importantes:
 - Retorne APENAS o JSON, sem texto adicional
 `;
 
-    const t0 = Date.now();
     const result = await comRetry(() => model.generateContent(prompt), 'analisarTransacao');
     const response = await result.response;
     const textResp = response.text();
@@ -154,13 +161,16 @@ Regras importantes:
     const jsonMatch = textResp.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed: AnaliseTransacao = JSON.parse(jsonMatch[0]);
+      registrarChamada('analisarTransacao', latencyMs, true);
       logger.info({ userId, latencyMs, tipo: parsed.tipo, categoria: parsed.categoria, confianca: parsed.confianca }, '[GEMINI] analisarTransacao');
       return parsed;
     } else {
+      registrarChamada('analisarTransacao', latencyMs, false);
       logger.warn({ userId, latencyMs, respLen: (textResp || '').length }, '[GEMINI] analisarTransacao sem JSON na resposta');
       return null;
     }
   } catch (error: any) {
+    registrarChamada('analisarTransacao', Date.now() - t0, false);
     logger.error({ userId, err: error?.message || String(error) }, '[GEMINI] analisarTransacao erro');
     return null;
   }
@@ -175,6 +185,7 @@ export async function analisarPadroesGastos(
   const model = getTextModel();
   if (!model) return null;
 
+  const t0 = Date.now();
   try {
     const prompt = `
 Você é um assistente financeiro especializado em motoristas e entregadores de aplicativo.
@@ -194,12 +205,13 @@ Forneça uma análise em português brasileiro com:
 Use linguagem direta, emojis e valores em reais. Máximo 25 linhas.
 `;
 
-    const t0 = Date.now();
     const result = await comRetry(() => model.generateContent(prompt), 'analisarPadroes');
     const response = await result.response;
+    registrarChamada('analisarPadroes', Date.now() - t0, true);
     logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] analisarPadroes');
     return response.text();
   } catch (error: any) {
+    registrarChamada('analisarPadroes', Date.now() - t0, false);
     logger.error({ userId, err: error?.message || error }, '[GEMINI] analisarPadroes erro');
     return null;
   }
@@ -214,6 +226,7 @@ export async function gerarSugestoesEconomia(
   const model = getTextModel();
   if (!model) return null;
 
+  const t0 = Date.now();
   try {
     const prompt = `
 Você é um consultor financeiro especializado em motoristas e entregadores de aplicativo.
@@ -232,12 +245,13 @@ Forneça exatamente:
 Use linguagem direta e motivacional. Valores em reais. Máximo 25 linhas.
 `;
 
-    const t0 = Date.now();
     const result = await comRetry(() => model.generateContent(prompt), 'gerarSugestoes');
     const response = await result.response;
+    registrarChamada('gerarSugestoes', Date.now() - t0, true);
     logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] gerarSugestoes');
     return response.text();
   } catch (error: any) {
+    registrarChamada('gerarSugestoes', Date.now() - t0, false);
     logger.error({ userId, err: error?.message || error }, '[GEMINI] gerarSugestoes erro');
     return null;
   }
@@ -252,6 +266,7 @@ export async function preverGastosFuturos(
   const model = getTextModel();
   if (!model) return null;
 
+  const t0 = Date.now();
   try {
     const prompt = `
 Você é um analista financeiro especializado em motoristas e entregadores de aplicativo.
@@ -271,12 +286,13 @@ Forneça:
 Valores em reais, linguagem clara. Máximo 25 linhas.
 `;
 
-    const t0 = Date.now();
     const result = await comRetry(() => model.generateContent(prompt), 'preverGastos');
     const response = await result.response;
+    registrarChamada('preverGastos', Date.now() - t0, true);
     logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] preverGastos');
     return response.text();
   } catch (error: any) {
+    registrarChamada('preverGastos', Date.now() - t0, false);
     logger.error({ userId, err: error?.message || error }, '[GEMINI] preverGastos erro');
     return null;
   }
@@ -292,6 +308,7 @@ export async function responderPerguntaFinanceira(
   const model = getTextModel();
   if (!model) return null;
 
+  const t0 = Date.now();
   try {
     let prompt = `Você é um assistente financeiro especializado em motoristas e entregadores de aplicativo no Brasil.
 ${driverContext ? `\nPERFIL DO USUÁRIO:\n${driverContext}\n` : ''}
@@ -305,13 +322,14 @@ Pergunta: "${pergunta}"`;
 
     prompt += `\n\nResponda de forma prática e útil para um motorista/entregador, usando linguagem simples e emojis. Máximo 20 linhas.`;
 
-    const t0 = Date.now();
     const result = await comRetry(() => model.generateContent(prompt), 'responderPergunta');
     const response = await result.response;
     const texto = response.text();
+    registrarChamada('responderPergunta', Date.now() - t0, true);
     logger.info({ userId, latencyMs: Date.now() - t0 }, '[GEMINI] responderPergunta');
     return texto;
   } catch (error: any) {
+    registrarChamada('responderPergunta', Date.now() - t0, false);
     logger.error({ userId, err: error?.message || error }, '[GEMINI] responderPergunta erro');
     return null;
   }
@@ -355,8 +373,8 @@ export async function analisarVoucherFinanceiro(
   const model = getVisionModel();
   if (!model) return null;
 
+  const t0 = Date.now();
   try {
-    const t0 = Date.now();
     const base64Data = fileBuffer.toString('base64');
     const prompt = `Você é uma IA que lê comprovantes financeiros (voucher/recibo/extrato) e extrai os campos abaixo. Atenção: responda APENAS um JSON válido.
 
@@ -432,9 +450,11 @@ Regras:
       parcelas: typeof parsed.parcelas === 'number' ? parsed.parcelas : 1
     };
 
+    registrarChamada('analisarVoucher', Date.now() - t0, true);
     logger.info({ userId, latencyMs: Date.now() - t0, tipo: resultado.tipo, valor: resultado.valor, categoria: resultado.categoria, parcelado: resultado.parcelado }, '[GEMINI] analisarVoucher');
     return resultado;
   } catch (error: any) {
+    registrarChamada('analisarVoucher', Date.now() - t0, false);
     logger.error({ userId, err: error?.message || error }, '[GEMINI] analisarVoucher erro');
     return null;
   }
@@ -457,8 +477,8 @@ export async function transcreverAudioFinanceiro(
   const model = getVisionModel();
   if (!model) return null;
 
+  const t0 = Date.now();
   try {
-    const t0 = Date.now();
     const base64Data = audioBuffer.toString('base64');
     const prompt = `Você receberá um áudio (mensagem de voz). Tarefas:
 1) Transcreva fielmente o conteúdo em português.
@@ -527,9 +547,11 @@ Regras:
       data: dataISO,
     };
 
+    registrarChamada('transcreverAudio', Date.now() - t0, true);
     logger.info({ userId, latencyMs: Date.now() - t0, tipo: resultado.tipo, valor: resultado.valor, categoria: resultado.categoria, transcricaoLen: resultado.transcricao.length }, '[GEMINI] transcreverAudio');
     return resultado;
   } catch (error: any) {
+    registrarChamada('transcreverAudio', Date.now() - t0, false);
     logger.error({ userId, err: error?.message || error }, '[GEMINI] transcreverAudio erro');
     return null;
   }
