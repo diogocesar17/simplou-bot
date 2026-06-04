@@ -64,7 +64,7 @@ import { formatarCancelamento } from './utils/formatMessages';
 import { formatarValor, formatarComMoeda } from './utils/formatUtils';
 import { logger, fileLogger } from './infrastructure/logger';
 import * as geminiService from './services/geminiService';
-import { initializeDatabase } from './infrastructure/databaseService';
+import { initializeDatabase, contarUsuariosAtivos } from './infrastructure/databaseService';
 import * as lancamentosService from './services/lancamentosService';
 import { routeIntent } from './intents/intentRouter';
 import { buscarUsuario, cadastrarUsuario, verificarAdmin } from './services/usuariosService';
@@ -85,14 +85,38 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   // Onboarding: cadastrar e dar boas-vindas a novos usuários
   const usuario = await buscarUsuario(userId);
   if (!usuario) {
-    await cadastrarUsuario(userId, { nome: nomeContato || 'Usuário', status: 'aguardando' });
+    const limiteBeta = parseInt(process.env.BETA_LIMITE ?? '50', 10);
+    const totalAtivos = await contarUsuariosAtivos();
+    const vagasDisponiveis = totalAtivos < limiteBeta;
+
+    await cadastrarUsuario(userId, { nome: nomeContato || 'Usuário', status: vagasDisponiveis ? 'ativo' : 'aguardando' });
+
+    if (!vagasDisponiveis) {
+      await sock.sendMessage(userId, {
+        text:
+          '👋 Olá! Obrigado pelo interesse no *Simplou Driver*.\n\n' +
+          '🚗 Somos um assistente financeiro no WhatsApp para motoristas de app e entregadores.\n\n' +
+          '⏳ Estamos em *fase beta* com vagas limitadas. Sua solicitação foi registrada e você será notificado assim que uma vaga for liberada.\n\n' +
+          'Qualquer dúvida: contato@simplou.com',
+      });
+      return;
+    }
+
     await sock.sendMessage(userId, {
       text:
-        '👋 Olá! Obrigado pelo interesse no *Simplou Driver*.\n\n' +
-        '🚗 Somos um assistente financeiro no WhatsApp para motoristas de app e entregadores.\n\n' +
-        '⏳ Estamos em *fase beta* com vagas limitadas. Sua solicitação foi registrada e você será notificado assim que uma vaga for liberada.\n\n' +
-        'Qualquer dúvida: contato@simplou.com',
+        '👋 *Bem-vindo ao Simplou Driver!*\n\n' +
+        '🚗 Sou seu assistente financeiro no WhatsApp, feito para *motoristas de app e entregadores*.\n\n' +
+        'Uber, 99, iFood, Rappi, Loggi — registro tudo por mensagem simples:\n\n' +
+        '💰 *Receitas*\n' +
+        '• _ganhei 280 no uber_ → registra corrida\n' +
+        '• _recebi 90 no ifood_ → registra entrega\n\n' +
+        '⛽ *Custos operacionais*\n' +
+        '• _abasteci 150 de gasolina_ → registra combustível\n' +
+        '• _paguei 12 de pedágio_ → registra pedágio\n\n' +
+        'Escreva naturalmente — não precisa decorar comandos. Digite *ajuda* para ver tudo que posso fazer.'
     });
+    await definirEstado(userId, 'onboarding_nome', { nomeProfile: nomeContato });
+    await perguntarNome(sock, userId, nomeContato);
     return;
   }
 

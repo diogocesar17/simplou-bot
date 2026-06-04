@@ -3315,6 +3315,7 @@ export {
   atualizarNomeUsuario,
   aprovarUsuarioBeta,
   listarFilaEspera,
+  contarUsuariosAtivos,
 };
 
 async function atualizarNomeUsuario(userId: string, nome: string): Promise<void> {
@@ -3322,6 +3323,14 @@ async function atualizarNomeUsuario(userId: string, nome: string): Promise<void>
     `UPDATE usuarios SET nome = $2, atualizado_em = CURRENT_TIMESTAMP WHERE user_id = $1`,
     [userId, nome]
   );
+}
+
+async function contarUsuariosAtivos(): Promise<number> {
+  const result = await queryDatabase(
+    `SELECT COUNT(*) AS total FROM usuarios WHERE status = 'ativo'`,
+    []
+  );
+  return parseInt(result.rows[0].total, 10);
 }
 
 async function aprovarUsuarioBeta(userId: string, aprovadoPor: string): Promise<boolean> {
