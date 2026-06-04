@@ -17,7 +17,7 @@ interface TesteConexao {
 }
 
 // 🔧 Configuração de modelo (texto e, futuramente, imagens de vouchers)
-const GEMINI_TEXT_MODEL = 'gemini-2.5-flash';
+const GEMINI_TEXT_MODEL = 'gemini-3.1-flash-lite';
 // Usar o mesmo modelo para multimodal conforme instrução do projeto
 const GEMINI_VISION_MODEL = GEMINI_TEXT_MODEL;
 
