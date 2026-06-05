@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/node';
 const MONTHLY_CAP = 4_800;
 let eventCount = 0;
 let countMonth = new Date().getMonth();
+let sentryInitialized = false;
 
 function isActive(): boolean {
   return !!process.env.SENTRY_DSN && process.env.NODE_ENV === 'production';
@@ -63,6 +64,7 @@ export function initSentry(): void {
         return event;
       },
     });
+    sentryInitialized = true;
   } catch {
     // falha do Sentry nunca deve derrubar o bot
   }
@@ -80,11 +82,13 @@ export function captureException(err: unknown, context?: Record<string, unknown>
 export async function testeSentry(): Promise<{ ok: boolean; motivo?: string }> {
   if (!process.env.SENTRY_DSN) return { ok: false, motivo: 'SENTRY_DSN não configurado' };
   if (process.env.NODE_ENV !== 'production') return { ok: false, motivo: 'NODE_ENV não é production (atual: ' + (process.env.NODE_ENV ?? 'undefined') + ')' };
+  if (!sentryInitialized) return { ok: false, motivo: 'Sentry não foi inicializado — DSN pode ser inválido' };
   try {
     const err = new Error('[TESTE] Verificação manual do Sentry — pode ignorar');
     err.name = 'SentryManualTest';
     Sentry.captureException(err);
-    await Sentry.flush(3000);
+    const flushed = await Sentry.flush(5000);
+    if (!flushed) return { ok: false, motivo: 'Timeout ao enviar evento — verifique conectividade do servidor com sentry.io' };
     return { ok: true };
   } catch (e) {
     return { ok: false, motivo: e instanceof Error ? e.message : String(e) };
