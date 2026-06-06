@@ -1,61 +1,44 @@
-import * as sistemaService from '../services/sistemaService';
 import * as usuariosService from '../services/usuariosService';
-import { formatarMensagem } from '../utils/formatMessages';
+import { runBackupNow } from '../infrastructure/backupScheduler';
+import { logger } from '../infrastructure/logger';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
 
-async function backupCommand(sock, userId) {
+async function backupCommand(sock: any, userId: string): Promise<void> {
   try {
     const isAdmin = await usuariosService.verificarAdmin(userId);
     if (!isAdmin) {
       await sock.sendMessage(userId, {
-        text: ERROR_MESSAGES.SEM_PERMISSAO('Gerar backup', 'Apenas administradores podem executar este comando')
+        text: ERROR_MESSAGES.SEM_PERMISSAO('Gerar backup', 'Apenas administradores podem executar este comando'),
       });
       return;
     }
-    const resultado = await sistemaService.gerarBackupCSV(userId);
-    
-    if (resultado && resultado.sucesso) {
-      await sock.sendMessage(userId, { 
-        text: formatarMensagem({
-          titulo: 'Backup gerado com sucesso',
-          emojiTitulo: '💾',
-          secoes: [
-            {
-              titulo: 'Detalhes do Arquivo',
-              itens: [
-                `Arquivo: ${resultado.nomeArquivo}`,
-                `Lançamentos: ${resultado.totalLancamentos}`,
-                `Período: ${resultado.periodo}`,
-                `Tamanho: ${resultado.tamanho} KB`
-              ],
-              emoji: '📁'
-            },
-            {
-              titulo: 'Localização',
-              itens: [`${resultado.caminhoArquivo}`],
-              emoji: '📥'
-            }
-          ],
-          dicas: [
-            { texto: 'Ver status do sistema', comando: 'status' },
-            { texto: 'Ver logs do sistema', comando: 'logs' }
-          ],
-          ajuda: 'O arquivo foi salvo no servidor. Você pode acessá-lo via FTP ou solicitar ao administrador'
-        })
+
+    await sock.sendMessage(userId, { text: '⏳ Executando pg_dump... aguarde.' });
+
+    const resultado = await runBackupNow();
+
+    if (resultado.ok) {
+      await sock.sendMessage(userId, {
+        text:
+          '💾 *Backup concluído*\n\n' +
+          `📁 Arquivo: \`${resultado.file}\`\n` +
+          `📦 Tamanho: ${resultado.sizeKb} KB\n` +
+          `🗂️ Total armazenado: ${resultado.totalArquivos} backup(s)\n` +
+          `🗓️ Retenção: 30 dias\n\n` +
+          '_Arquivos em `backups/` no servidor_',
       });
     } else {
-      const erroMsg = resultado?.erro || 'Erro desconhecido';
-      await sock.sendMessage(userId, { 
-        text: ERROR_MESSAGES.ERRO_BANCO('Gerar backup', erroMsg)
+      logger.error({ err: resultado.error }, '[BACKUP] Falha no backup manual');
+      await sock.sendMessage(userId, {
+        text: `❌ Falha no backup\n\n\`${resultado.error}\``,
       });
     }
-  } catch (error) {
-  logger.error({ err: (error as any)?.message || error }, 'Erro ao gerar backup');
-    await sock.sendMessage(userId, { 
-      text: ERROR_MESSAGES.ERRO_INTERNO('Gerar backup', 'Tente novamente em alguns instantes')
+  } catch (error: any) {
+    logger.error({ err: error?.message || error }, '[BACKUP] Erro inesperado no comando backup');
+    await sock.sendMessage(userId, {
+      text: ERROR_MESSAGES.ERRO_INTERNO('Gerar backup', 'Tente novamente em alguns instantes'),
     });
   }
 }
 
-export default backupCommand; 
-import { logger } from '../infrastructure/logger';
+export default backupCommand;

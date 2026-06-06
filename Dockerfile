@@ -1,6 +1,9 @@
 # Usar Node.js 20 como base
 FROM node:20-alpine
 
+# pg_dump para backups automáticos do banco
+RUN apk add --no-cache postgresql-client
+
 # Definir diretório de trabalho
 WORKDIR /app
 

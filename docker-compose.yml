@@ -23,6 +23,8 @@ services:
       - ./auth:/app/auth
       # Persistir logs (opcional)
       - ./logs:/app/logs
+      # Persistir backups do banco
+      - ./backups:/app/backups
     networks:
       - simplou-network
     # Configurações de saúde e recursos

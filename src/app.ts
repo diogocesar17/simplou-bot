@@ -2,6 +2,7 @@ import { initializeDatabase } from './infrastructure/databaseService'
 import { startHealthServer } from './infrastructure/healthServer'
 import { MetaCloudAdapter } from './infrastructure/whatsapp/MetaCloudAdapter'
 import { logger } from './infrastructure/logger'
+import { iniciarBackupScheduler } from './infrastructure/backupScheduler'
 const geminiService = require('./services/geminiService')
 
 import {
@@ -80,4 +81,5 @@ export async function bootstrap(): Promise<void> {
 
   startHealthServer()
   iniciarSistemaAlertas()
+  iniciarBackupScheduler()
 }
