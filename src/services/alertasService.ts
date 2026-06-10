@@ -418,8 +418,19 @@ function getNumeroSemana(data: Date): number {
 
 // ─── Formatador de resumo financeiro ────────────────────────────────────────
 
-function formatarMensagemResumo(resumo: driverService.DriverResumo, titulo: string): string | null {
-  if (resumo.totalLancamentos === 0) return null;
+function formatarMensagemResumo(resumo: driverService.DriverResumo, titulo: string): string {
+  if (resumo.totalLancamentos === 0) {
+    return (
+      `📊 *${titulo}*\n\n` +
+      `😶 Nenhum registro encontrado neste período.\n\n` +
+      `Registrar suas corridas e gastos é o primeiro passo para saber se está valendo a pena trabalhar.\n\n` +
+      `💡 *É simples:*\n` +
+      `• _"ganhei 280 no uber"_ → receita\n` +
+      `• _"abasteci 90 de gasolina"_ → custo\n` +
+      `• _"lucro hoje"_ → ver o resultado\n\n` +
+      `Comece agora e no próximo resumo você vai ver exatamente quanto lucrou. 🚀`
+    );
+  }
 
   const { receitas, despesas, lucroReal, custosFixosRateados, porPlataforma, porCategoriaDespesa, meta } = resumo;
   const emojiLucro = lucroReal >= 0 ? '🟢' : '🔴';
@@ -488,11 +499,10 @@ async function enviarResumoSemanal(adapter: IWhatsAppAdapter, userId: string): P
 
     const resumo = await driverService.getResumoSemana(userId);
     const msg = formatarMensagemResumo(resumo, 'Resumo dos últimos 7 dias');
-    if (!msg) return;
 
     try {
       await adapter.sendMessage(userId, { text: msg });
-      logger.info({ userId, semana }, '[ALERTAS] Resumo semanal enviado');
+      logger.info({ userId, semana, comDados: resumo.totalLancamentos > 0 }, '[ALERTAS] Resumo semanal enviado');
     } catch (sendErr: any) {
       if (sendErr?.metaCode === 131047) {
         logger.warn({ userId }, '[ALERTAS] Janela 24h fechada — resumo semanal não entregue');
@@ -521,11 +531,10 @@ async function enviarResumoMensal(adapter: IWhatsAppAdapter, userId: string): Pr
     const nomeMes = mesAnterior.toLocaleString('pt-BR', { month: 'long' });
     const titulo = `Resumo de ${nomeMes}`;
     const msg = formatarMensagemResumo(resumo, titulo);
-    if (!msg) return;
 
     try {
       await adapter.sendMessage(userId, { text: msg });
-      logger.info({ userId, mes: nomeMes }, '[ALERTAS] Resumo mensal enviado');
+      logger.info({ userId, mes: nomeMes, comDados: resumo.totalLancamentos > 0 }, '[ALERTAS] Resumo mensal enviado');
     } catch (sendErr: any) {
       if (sendErr?.metaCode === 131047) {
         logger.warn({ userId }, '[ALERTAS] Janela 24h fechada — resumo mensal não entregue');
