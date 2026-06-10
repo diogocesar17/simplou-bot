@@ -8,6 +8,7 @@ import {
 } from '../infrastructure/databaseService';
 import { logger } from '../infrastructure/logger';
 import * as lembretesService from './lembretesService';
+import * as driverService from './driverService';
 import { IWhatsAppAdapter } from '../infrastructure/whatsapp/IWhatsAppAdapter';
 import Redis from 'ioredis';
 
@@ -415,45 +416,138 @@ function getNumeroSemana(data: Date): number {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-/**
- * Envia resumo semanal de gastos para um usuário
- */
+// ─── Formatador de resumo financeiro ────────────────────────────────────────
+
+function formatarMensagemResumo(resumo: driverService.DriverResumo, titulo: string): string | null {
+  if (resumo.totalLancamentos === 0) return null;
+
+  const { receitas, despesas, lucroReal, custosFixosRateados, porPlataforma, porCategoriaDespesa, meta } = resumo;
+  const emojiLucro = lucroReal >= 0 ? '🟢' : '🔴';
+
+  let msg = `📊 *${titulo}*\n\n`;
+
+  // Receitas
+  msg += `💰 Receitas: *${formatarComMoeda(receitas)}*\n`;
+  if (porPlataforma.length > 0) {
+    porPlataforma.slice(0, 4).forEach((p, i, arr) => {
+      const prefix = i === arr.length - 1 ? '└' : '├';
+      msg += `   ${prefix} ${p.plataforma}: ${formatarComMoeda(p.total)}\n`;
+    });
+  }
+
+  // Despesas
+  msg += `\n💸 Despesas: *${formatarComMoeda(despesas)}*\n`;
+  if (porCategoriaDespesa.length > 0) {
+    const combustivel = porCategoriaDespesa.find((c) =>
+      /combust|gasolina|etanol|diesel|álcool|alcool/i.test(c.categoria)
+    );
+    const totalOutras = despesas - (combustivel?.total ?? 0);
+
+    if (combustivel) {
+      msg += `   ├ Combustível: ${formatarComMoeda(combustivel.total)}\n`;
+      if (totalOutras > 0.01) msg += `   └ Outras: ${formatarComMoeda(totalOutras)}\n`;
+    } else {
+      porCategoriaDespesa.slice(0, 3).forEach((c, i, arr) => {
+        const prefix = i === arr.length - 1 ? '└' : '├';
+        msg += `   ${prefix} ${c.categoria}: ${formatarComMoeda(c.total)}\n`;
+      });
+    }
+  }
+
+  // Custos fixos rateados
+  if (custosFixosRateados > 0) {
+    msg += `\n🏠 Custos fixos: *${formatarComMoeda(custosFixosRateados)}*\n`;
+  }
+
+  msg += `${'─'.repeat(22)}\n`;
+  msg += `${emojiLucro} *Lucro líquido: ${formatarComMoeda(lucroReal)}*\n`;
+
+  // Barra de meta
+  if (meta && meta.valor > 0) {
+    const pct = Math.min(Math.round((lucroReal / meta.valor) * 10), 10);
+    const barra = '█'.repeat(pct) + '░'.repeat(10 - pct);
+    const pctTotal = Math.round((lucroReal / meta.valor) * 100);
+    const falta = meta.valor - lucroReal;
+    msg += `\n🎯 Meta: ${barra} ${pctTotal}%\n`;
+    msg += falta > 0 ? `   Faltou: ${formatarComMoeda(falta)}\n` : `   ✅ Meta atingida!\n`;
+  }
+
+  return msg.trim();
+}
+
+// ─── Resumo semanal (toda segunda-feira às 8h) ────────────────────────────────
+
 async function enviarResumoSemanal(adapter: IWhatsAppAdapter, userId: string): Promise<void> {
   try {
     const agora = new Date();
     const semana = `${agora.getFullYear()}-W${String(getNumeroSemana(agora)).padStart(2, '0')}`;
     const chaveDedup = `alerta:${userId}_resumo_semanal_${semana}`;
 
-    const jaEnviado = await redisDedup.get(chaveDedup);
-    if (jaEnviado) return;
+    if (await redisDedup.get(chaveDedup)) return;
+    await redisDedup.set(chaveDedup, '1', 'EX', 8 * 24 * 60 * 60);
 
-    const resultado = await queryDatabase(
-      `SELECT COALESCE(SUM(valor), 0) as total
-       FROM lancamentos
-       WHERE user_id = $1
-         AND tipo = 'gasto'
-         AND data >= CURRENT_DATE - INTERVAL '7 days'`,
-      [userId]
-    );
-
-    const total = parseFloat(resultado.rows[0]?.total || '0');
-
-    await redisDedup.set(chaveDedup, '1', 'EX', 7 * 24 * 60 * 60); // TTL: 7 dias
+    const resumo = await driverService.getResumoSemana(userId);
+    const msg = formatarMensagemResumo(resumo, 'Resumo dos últimos 7 dias');
+    if (!msg) return;
 
     try {
-      await adapter.sendMessage(userId, {
-        text: `📊 *Resumo da semana* — você gastou ${formatarComMoeda(formatarValorAlerta(total))} nos últimos 7 dias.`
-      });
-      logger.info({ userId, semana, total }, '[ALERTAS] Resumo semanal enviado');
+      await adapter.sendMessage(userId, { text: msg });
+      logger.info({ userId, semana }, '[ALERTAS] Resumo semanal enviado');
     } catch (sendErr: any) {
       if (sendErr?.metaCode === 131047) {
-        logger.warn({ userId, metaCode: 131047 }, '[ALERTAS] Janela 24h fechada — resumo semanal não entregue (template necessário)');
+        logger.warn({ userId }, '[ALERTAS] Janela 24h fechada — resumo semanal não entregue');
       } else {
-        logger.error({ userId, metaCode: sendErr?.metaCode, err: sendErr?.message || sendErr }, '[ALERTAS] Falha ao enviar resumo semanal');
+        logger.error({ userId, err: sendErr?.message || sendErr }, '[ALERTAS] Falha ao enviar resumo semanal');
       }
     }
   } catch (error) {
     logger.error({ userId, err: (error as any)?.message || error }, '[ALERTAS] Erro ao processar resumo semanal');
+  }
+}
+
+// ─── Resumo mensal (dia 1 de cada mês às 8h) ─────────────────────────────────
+
+async function enviarResumoMensal(adapter: IWhatsAppAdapter, userId: string): Promise<void> {
+  try {
+    const agora = new Date();
+    // Resumo do mês anterior (que acabou de fechar)
+    const mesAnterior = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
+    const chaveDedup = `alerta:${userId}_resumo_mensal_${mesAnterior.getFullYear()}-${mesAnterior.getMonth() + 1}`;
+
+    if (await redisDedup.get(chaveDedup)) return;
+    await redisDedup.set(chaveDedup, '1', 'EX', 32 * 24 * 60 * 60);
+
+    const resumo = await driverService.getResumoPorMesAno(userId, mesAnterior.getMonth() + 1, mesAnterior.getFullYear());
+    const nomeMes = mesAnterior.toLocaleString('pt-BR', { month: 'long' });
+    const titulo = `Resumo de ${nomeMes}`;
+    const msg = formatarMensagemResumo(resumo, titulo);
+    if (!msg) return;
+
+    try {
+      await adapter.sendMessage(userId, { text: msg });
+      logger.info({ userId, mes: nomeMes }, '[ALERTAS] Resumo mensal enviado');
+    } catch (sendErr: any) {
+      if (sendErr?.metaCode === 131047) {
+        logger.warn({ userId }, '[ALERTAS] Janela 24h fechada — resumo mensal não entregue');
+      } else {
+        logger.error({ userId, err: sendErr?.message || sendErr }, '[ALERTAS] Falha ao enviar resumo mensal');
+      }
+    }
+  } catch (error) {
+    logger.error({ userId, err: (error as any)?.message || error }, '[ALERTAS] Erro ao processar resumo mensal');
+  }
+}
+
+export async function enviarResumosMensaisParaTodos(adapter: IWhatsAppAdapter): Promise<void> {
+  try {
+    const usuarios = await listarUsuarios({ ativos: true });
+    logger.info({ total: usuarios.length }, '[ALERTAS] Enviando resumos mensais');
+    for (const usuario of usuarios) {
+      await enviarResumoMensal(adapter, usuario.user_id);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  } catch (error) {
+    logger.error({ err: (error as any)?.message || error }, '[ALERTAS] Erro ao enviar resumos mensais');
   }
 }
 

@@ -7,6 +7,7 @@ const geminiService = require('./services/geminiService')
 
 import {
   verificarEEnviarAlertasAutomaticos,
+  enviarResumosMensaisParaTodos,
   estaNoHorarioAlertas,
   ePrimeiraVerificacaoDoDia,
   eVerificacaoFinalDoDia,
@@ -27,9 +28,16 @@ function iniciarSistemaAlertas(): void {
   const adapter = new MetaCloudAdapter()
 
   alertasIntervalId = setInterval(async () => {
-    if (!estaNoHorarioAlertas()) return
+    const agora = new Date()
+    const hora = agora.getHours()
 
-    const hora = new Date().getHours()
+    // Resumo mensal: dia 1 às 8h, qualquer dia da semana (mês pode começar no fim de semana)
+    if (agora.getDate() === 1 && hora === 8) {
+      logger.info('[ALERTAS] Disparando resumos mensais (dia 1)')
+      await enviarResumosMensaisParaTodos(adapter)
+    }
+
+    if (!estaNoHorarioAlertas()) return
 
     if (ePrimeiraVerificacaoDoDia()) {
       logger.info({ hora }, '[ALERTAS] Primeira verificação do dia')
