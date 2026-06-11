@@ -760,8 +760,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   // Metas financeiras: "minha meta diária é 250", "meta mensal 6000", "ver metas", "quanto falta para a meta"
   if (
     textoLower === 'meta' || textoLower === 'metas' ||
+    textoLower === 'cadastrar meta' || textoLower === 'cadastrar metas' ||
     textoLower.startsWith('meta ') || textoLower.startsWith('minha meta') ||
     textoLower.startsWith('definir meta') || textoLower.startsWith('remover meta') ||
+    textoLower.startsWith('cadastrar meta') ||
     textoLower.startsWith('quero ganhar') || textoLower.startsWith('quero lucrar') ||
     textoLower.startsWith('quero fazer') ||
     /quanto falta (para|pra) (a\s+)?(minha\s+)?meta/.test(textoLower) ||
