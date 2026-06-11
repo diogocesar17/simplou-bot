@@ -18,12 +18,14 @@ async function backupCommand(sock: any, userId: string): Promise<void> {
     const resultado = await runBackupNow();
 
     if (resultado.ok) {
+      const criptografia = resultado.encrypted ? '🔒 Criptografado (AES-256)' : '⚠️ Sem criptografia (configure BACKUP_ENCRYPTION_KEY)';
       await sock.sendMessage(userId, {
         text:
           '💾 *Backup concluído*\n\n' +
           `📁 Arquivo: \`${resultado.file}\`\n` +
           `📦 Tamanho: ${resultado.sizeKb} KB\n` +
           `🗂️ Total armazenado: ${resultado.totalArquivos} backup(s)\n` +
+          `🔐 ${criptografia}\n` +
           `🗓️ Retenção: 30 dias\n\n` +
           '_Arquivos em `backups/` no servidor_',
       });
