@@ -26,7 +26,7 @@ export async function perguntarConsentimento(sock: any, userId: string, nomeProf
       '• Nome e número de WhatsApp\n' +
       '• Lançamentos financeiros (corridas, gastos, custos)\n' +
       '• Perfil de motorista\n\n' +
-      '🤖 *Importante:* suas mensagens passam pelo Google Gemini para categorização automática.\n\n' +
+      '🤖 *Inteligência artificial:* determinadas funcionalidades utilizam provedores de IA para processar suas solicitações.\n\n' +
       '🔒 *Seus direitos:* exportar e excluir seus dados a qualquer momento.\n\n' +
       '📄 Leia a política completa: simplou.com/privacidade',
     buttons: [
