@@ -199,6 +199,12 @@ async function initializeDatabase() {
       ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS trial_ativado BOOLEAN DEFAULT false;
     `);
 
+    // Migração: consentimento LGPD
+    await client.query(`
+      ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS consentimento_lgpd BOOLEAN DEFAULT false;
+      ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS data_consentimento TIMESTAMP WITH TIME ZONE;
+    `);
+
     // Migração: Adicionar colunas de cartão se não existirem
     await migrateCartaoColumns(client);
     
@@ -2779,13 +2785,13 @@ async function buscarGastosValorAlto(userId, valorMinimo = 100, limite = 20, mes
 // Função para cadastrar novo usuário
 async function cadastrarUsuario(userId, dados) {
   try {
-    const { nome = 'Usuário', plano = 'gratuito', is_admin = false, criado_por, status = 'ativo' } = dados;
+    const { nome = 'Usuário', plano = 'gratuito', is_admin = false, criado_por, status = 'ativo', consentimento_lgpd = false, data_consentimento = null } = dados;
 
     const result = await queryDatabase(`
-      INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por, consentimento_lgpd, data_consentimento)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
-    `, [userId, nome, plano, status, is_admin, criado_por]);
+    `, [userId, nome, plano, status, is_admin, criado_por, consentimento_lgpd, data_consentimento]);
     
     // Registrar log de auditoria
     await registrarLog(criado_por || 'sistema', 'CADASTRO_USUARIO', {
