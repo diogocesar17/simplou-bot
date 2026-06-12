@@ -556,6 +556,12 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     await orcamentoCommand(sock, userId, texto); return;
   }
 
+  // Exclusão de conta (deve vir antes do excluir genérico)
+  if (['excluir minha conta', 'excluir conta', 'apagar minha conta', 'apagar conta', 'deletar conta', 'deletar minha conta'].includes(textoLower)) {
+    await excluirContaCommand(sock, userId);
+    return;
+  }
+
   // Roteamento para o comando de excluir (menu inteligente)
   if (textoLower.startsWith('excluir')) {
     await excluirComMenuCommand(sock, userId, texto);
