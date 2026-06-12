@@ -234,7 +234,7 @@ export async function notificarAtualizacaoPolitica(sock: any, userId: string): P
       'Para continuar usando o Simplou, precisamos do seu aceite.\n\n' +
       corpoConsentimento(),
     buttons: [
-      { id: 'aceitar_lgpd', title: '✅ Aceito a nova versão' },
+      { id: 'aceitar_lgpd', title: '✅ Aceito' },
       { id: 'recusar_lgpd', title: '❌ Não aceito' },
     ],
   });

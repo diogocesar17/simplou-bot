@@ -128,8 +128,9 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     return;
   }
 
-  // Política atualizada: exige novo aceite antes de qualquer comando
-  if (usuario.versao_politica !== VERSAO_POLITICA_ATUAL) {
+  // Política atualizada: exige novo aceite apenas se usuário já tinha versão registrada e ela mudou.
+  // versao_politica = null significa usuário anterior ao versionamento — não bloqueia.
+  if (usuario.versao_politica && usuario.versao_politica !== VERSAO_POLITICA_ATUAL) {
     if (estado?.etapa === 'aguardando_atualizacao_politica') {
       await handleAtualizacaoPolitica(sock, userId, texto, atualizarConsentimento);
       return;
