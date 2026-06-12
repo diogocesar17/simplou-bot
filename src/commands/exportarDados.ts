@@ -106,7 +106,7 @@ export async function exportarDadosCommand(sock: any, userId: string): Promise<v
 
     await sock.sendMessage(userId, {
       document: buffer,
-      mimetype: 'text/csv',
+      mimetype: 'text/plain',
       fileName: nomeArquivo,
       caption:
         `✅ *Seus dados exportados (LGPD)*\n\n` +
