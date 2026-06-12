@@ -56,6 +56,8 @@ import {
   perguntarConsentimento, handleConsentimento,
   perguntarReConsentimento, handleReConsentimento,
   revogarConsentimentoCommand, handleConfirmacaoRevogacao,
+  notificarAtualizacaoPolitica, handleAtualizacaoPolitica,
+  VERSAO_POLITICA_ATUAL,
 } from './commands/consentimento';
 import { excluirContaCommand, handleConfirmacaoExclusaoConta } from './commands/excluirConta';
 import { exportarDadosCommand } from './commands/exportarDados';
@@ -126,6 +128,16 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     return;
   }
 
+  // Política atualizada: exige novo aceite antes de qualquer comando
+  if (usuario.versao_politica !== VERSAO_POLITICA_ATUAL) {
+    if (estado?.etapa === 'aguardando_atualizacao_politica') {
+      await handleAtualizacaoPolitica(sock, userId, texto, atualizarConsentimento);
+      return;
+    }
+    await notificarAtualizacaoPolitica(sock, userId);
+    return;
+  }
+
   // Rate limiting: bloquear usuários que excederam 40 mensagens/hora
   const permitido = await verificarRateLimit(userId);
   if (!permitido) {
@@ -192,6 +204,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     }
     if (estado.etapa === 'confirmando_revogacao_consentimento') {
       await handleConfirmacaoRevogacao(sock, userId, texto, atualizarConsentimento);
+      return;
+    }
+    if (estado.etapa === 'aguardando_atualizacao_politica') {
+      await handleAtualizacaoPolitica(sock, userId, texto, atualizarConsentimento);
       return;
     }
     if (estado.etapa === 'onboarding_nome') {

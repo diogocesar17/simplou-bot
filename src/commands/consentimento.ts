@@ -220,3 +220,70 @@ export async function handleConfirmacaoRevogacao(
 
   await revogarConsentimentoCommand(sock, userId);
 }
+
+// ─── Notificação de atualização de política ───────────────────────────────────
+
+export async function notificarAtualizacaoPolitica(sock: any, userId: string): Promise<void> {
+  await definirEstado(userId, 'aguardando_atualizacao_politica', {});
+
+  await sock.sendInteractiveMessage(userId, {
+    type: 'button',
+    header: '📋 Nossa política foi atualizada',
+    body:
+      `Nossa Política de Privacidade foi atualizada para a versão *${VERSAO_POLITICA_ATUAL}*.\n\n` +
+      'Para continuar usando o Simplou, precisamos do seu aceite.\n\n' +
+      corpoConsentimento(),
+    buttons: [
+      { id: 'aceitar_lgpd', title: '✅ Aceito a nova versão' },
+      { id: 'recusar_lgpd', title: '❌ Não aceito' },
+    ],
+  });
+}
+
+export async function handleAtualizacaoPolitica(
+  sock: any,
+  userId: string,
+  texto: string,
+  atualizarConsentimento: (userId: string, dados: any) => Promise<void>,
+): Promise<void> {
+  const norm = texto.toLowerCase().trim();
+
+  const aceitou = norm === 'aceitar_lgpd' || norm === 'aceitar' || norm === 'aceito';
+  const recusou = norm === 'recusar_lgpd' || norm === 'recusar' || norm === 'não aceito' || norm === 'nao aceito';
+
+  if (aceitou) {
+    await atualizarConsentimento(userId, {
+      consentimento_lgpd: true,
+      status: 'ativo',
+      versao_politica: VERSAO_POLITICA_ATUAL,
+      data_consentimento: new Date(),
+    });
+    await limparEstado(userId);
+    logger.info({ userId, versao: VERSAO_POLITICA_ATUAL }, '[CONSENTIMENTO] Política atualizada aceita');
+    await sock.sendMessage(userId, {
+      text:
+        `✅ Obrigado! Política v${VERSAO_POLITICA_ATUAL} registrada.\n\n` +
+        'Pode continuar usando o Simplou normalmente. Reenvie o que queria fazer. 😊',
+    });
+    return;
+  }
+
+  if (recusou) {
+    await atualizarConsentimento(userId, {
+      consentimento_lgpd: false,
+      status: 'inativo',
+      versao_politica: null,
+      data_consentimento: null,
+    });
+    await limparEstado(userId);
+    logger.info({ userId }, '[CONSENTIMENTO] Política atualizada recusada — conta desativada');
+    await sock.sendMessage(userId, {
+      text:
+        'Tudo bem! Sua conta foi desativada.\n\n' +
+        'Seus dados ficam armazenados por 30 dias. Se mudar de ideia, é só nos chamar. 😊',
+    });
+    return;
+  }
+
+  await notificarAtualizacaoPolitica(sock, userId);
+}
