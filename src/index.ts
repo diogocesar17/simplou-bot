@@ -52,7 +52,11 @@ import { custoFixoCommand } from './commands/custoFixo';
 import iaFallbacksCommand from './commands/iaFallbacks';
 import moedaCommand from './commands/moeda';
 import { perguntarNome, handleOnboardingNome, handleOnboardingTipoTrabalho, handleOnboardingMoeda, handleOnboardingMetaDiaria } from './commands/onboarding';
-import { perguntarConsentimento, handleConsentimento } from './commands/consentimento';
+import {
+  perguntarConsentimento, handleConsentimento,
+  perguntarReConsentimento, handleReConsentimento,
+  revogarConsentimentoCommand, handleConfirmacaoRevogacao,
+} from './commands/consentimento';
 import { excluirContaCommand, handleConfirmacaoExclusaoConta } from './commands/excluirConta';
 import { exportarDadosCommand } from './commands/exportarDados';
 import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery } from './utils/driverParser';
@@ -67,7 +71,7 @@ import { formatarCancelamento } from './utils/formatMessages';
 import { formatarValor, formatarComMoeda } from './utils/formatUtils';
 import { logger, fileLogger } from './infrastructure/logger';
 import * as geminiService from './services/geminiService';
-import { initializeDatabase, contarUsuariosAtivos } from './infrastructure/databaseService';
+import { initializeDatabase, contarUsuariosAtivos, atualizarConsentimento } from './infrastructure/databaseService';
 import * as lancamentosService from './services/lancamentosService';
 import { routeIntent } from './intents/intentRouter';
 import { buscarUsuario, cadastrarUsuario, verificarAdmin } from './services/usuariosService';
@@ -110,6 +114,15 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     await sock.sendMessage(userId, {
       text: '⏳ Sua solicitação ainda está em análise. Você será avisado assim que for aprovado. Obrigado pela paciência!',
     });
+    return;
+  }
+
+  if (usuario.status === 'inativo') {
+    if (estado?.etapa === 'aguardando_reconsentimento') {
+      await handleReConsentimento(sock, userId, texto, atualizarConsentimento);
+      return;
+    }
+    await perguntarReConsentimento(sock, userId);
     return;
   }
 
@@ -175,6 +188,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     // Wizard de onboarding driver
     if (estado.etapa === 'confirmando_exclusao_conta') {
       await handleConfirmacaoExclusaoConta(sock, userId, texto);
+      return;
+    }
+    if (estado.etapa === 'confirmando_revogacao_consentimento') {
+      await handleConfirmacaoRevogacao(sock, userId, texto, atualizarConsentimento);
       return;
     }
     if (estado.etapa === 'onboarding_nome') {
@@ -561,6 +578,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   // Roteamento para comandos administrativos
   if (['excluir minha conta', 'excluir conta', 'apagar minha conta', 'apagar conta', 'deletar conta', 'deletar minha conta'].includes(textoLower)) {
     await excluirContaCommand(sock, userId);
+    return;
+  }
+  if (['revogar consentimento', 'revogar meu consentimento', 'revogar lgpd', 'cancelar consentimento'].includes(textoLower)) {
+    await revogarConsentimentoCommand(sock, userId);
     return;
   }
   if (textoLower === 'usuarios' || textoLower === 'usuários') {

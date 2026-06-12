@@ -203,6 +203,7 @@ async function initializeDatabase() {
     await client.query(`
       ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS consentimento_lgpd BOOLEAN DEFAULT false;
       ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS data_consentimento TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS versao_politica VARCHAR(10);
     `);
 
     // Migração: Adicionar colunas de cartão se não existirem
@@ -2785,13 +2786,13 @@ async function buscarGastosValorAlto(userId, valorMinimo = 100, limite = 20, mes
 // Função para cadastrar novo usuário
 async function cadastrarUsuario(userId, dados) {
   try {
-    const { nome = 'Usuário', plano = 'gratuito', is_admin = false, criado_por, status = 'ativo', consentimento_lgpd = false, data_consentimento = null } = dados;
+    const { nome = 'Usuário', plano = 'gratuito', is_admin = false, criado_por, status = 'ativo', consentimento_lgpd = false, data_consentimento = null, versao_politica = null } = dados;
 
     const result = await queryDatabase(`
-      INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por, consentimento_lgpd, data_consentimento)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO usuarios (user_id, nome, plano, status, is_admin, criado_por, consentimento_lgpd, data_consentimento, versao_politica)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
-    `, [userId, nome, plano, status, is_admin, criado_por, consentimento_lgpd, data_consentimento]);
+    `, [userId, nome, plano, status, is_admin, criado_por, consentimento_lgpd, data_consentimento, versao_politica]);
     
     // Registrar log de auditoria
     await registrarLog(criado_por || 'sistema', 'CADASTRO_USUARIO', {
@@ -3319,10 +3320,27 @@ export {
   getUserPreference,
   setUserPreference,
   atualizarNomeUsuario,
+  atualizarConsentimento,
   aprovarUsuarioBeta,
   listarFilaEspera,
   contarUsuariosAtivos,
 };
+
+async function atualizarConsentimento(
+  userId: string,
+  dados: { consentimento_lgpd: boolean; status: string; versao_politica?: string | null; data_consentimento?: Date | null }
+): Promise<void> {
+  await queryDatabase(
+    `UPDATE usuarios
+     SET consentimento_lgpd = $2,
+         status = $3,
+         versao_politica = $4,
+         data_consentimento = $5,
+         atualizado_em = CURRENT_TIMESTAMP
+     WHERE user_id = $1`,
+    [userId, dados.consentimento_lgpd, dados.status, dados.versao_politica ?? null, dados.data_consentimento ?? null]
+  );
+}
 
 async function atualizarNomeUsuario(userId: string, nome: string): Promise<void> {
   await queryDatabase(
