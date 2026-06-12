@@ -1,7 +1,7 @@
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
 import { logger } from '../infrastructure/logger';
 
-export const VERSAO_POLITICA_ATUAL = '1.1';
+export const VERSAO_POLITICA_ATUAL = '1.1'; // atualizar aqui sempre que simplou.com/privacidade mudar
 
 const MENSAGEM_BOAS_VINDAS =
   '✅ Consentimento registrado!\n\n' +
