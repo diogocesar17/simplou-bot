@@ -734,7 +734,7 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
 
   // Atalhos explícitos de resumo driver
   if (
-    ['lucro hoje', 'lucro do dia', 'como foi meu dia', 'quanto sobrou hoje', 'quanto lucrei hoje'].includes(textoLower) ||
+    ['lucro hoje', 'lucro do dia', 'resultado do dia', 'resultado de hoje', 'como foi meu dia', 'quanto sobrou hoje', 'quanto lucrei hoje'].includes(textoLower) ||
     textoLower.startsWith('lucro da semana') || textoLower.startsWith('lucro do mes') ||
     textoLower.startsWith('resumo motorista') || textoLower === 'lucro'
   ) {
