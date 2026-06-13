@@ -3,10 +3,64 @@ import excluirLancamentoCommand from './excluirLancamento';
 import excluirCartaoCommand from './excluirCartao';
 import { formatarCancelamento, formatarMenuComCancelamento, formatarMensagem } from '../utils/formatMessages';
 import { ERROR_MESSAGES } from '../utils/errorMessages';
+import * as lancamentosService from '../services/lancamentosService';
+import { formatarComMoeda } from '../utils/formatUtils';
 
-async function excluirComMenuCommand(sock, userId, texto) {
+async function mostrarListaParaExcluir(sock: any, userId: string): Promise<void> {
+  const lancamentos = await lancamentosService.buscarLancamentosRecentes(userId, 5);
+
+  if (!lancamentos || lancamentos.length === 0) {
+    await limparEstado(userId);
+    await sock.sendMessage(userId, { text: '📭 Nenhum lançamento encontrado para excluir.' });
+    return;
+  }
+
+  await definirEstado(userId, 'aguardando_selecao_exclusao_lancamento', {
+    lista: lancamentos,
+    timestamp: Date.now(),
+  });
+
+  const rows = lancamentos.map((l: any, i: number) => {
+    const emoji = l.tipo === 'receita' ? '💰' : '💸';
+    const data = new Date(l.data).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const title = `${emoji} ${formatarComMoeda(l.valor)} · ${l.categoria}`.slice(0, 24);
+    return { id: String(i + 1), title, description: `${data} · ${l.descricao || ''}`.slice(0, 72) };
+  });
+
+  await sock.sendInteractiveMessage(userId, {
+    type: 'list',
+    header: '🗑️ Qual lançamento excluir?',
+    body: 'Selecione o lançamento que deseja remover:',
+    buttonLabel: 'Ver lançamentos',
+    sections: [{ rows }],
+  });
+}
+
+async function excluirComMenuCommand(sock: any, userId: string, texto: string) {
   const textoLower = texto.toLowerCase().trim();
   const estado = await obterEstado(userId);
+
+  // Usuário selecionou um lançamento da lista interativa
+  if (estado?.etapa === 'aguardando_selecao_exclusao_lancamento') {
+    if (textoLower === 'cancelar' || texto === '0') {
+      await limparEstado(userId);
+      await sock.sendMessage(userId, { text: '↩️ Operação cancelada.' });
+      return;
+    }
+
+    const lista = (estado.dadosParciais as any).lista;
+    const idx = parseInt(texto) - 1;
+
+    if (isNaN(idx) || idx < 0 || !lista[idx]) {
+      await sock.sendMessage(userId, { text: `❌ Opção inválida. Escolha de 1 a ${lista.length}.` });
+      return;
+    }
+
+    // Configura estado que excluirLancamento.ts espera e delega para ele
+    await definirEstado(userId, 'historico_exibido', { lista, timestamp: Date.now() });
+    await excluirLancamentoCommand(sock, userId, `excluir ${idx + 1}`);
+    return;
+  }
 
   // Se está aguardando escolha do tipo de exclusão
   if (estado?.etapa === 'aguardando_tipo_exclusao') {
@@ -26,10 +80,7 @@ async function excluirComMenuCommand(sock, userId, texto) {
     
     switch (escolha) {
       case 1:
-        await limparEstado(userId);
-        await sock.sendMessage(userId, { 
-          text: '🗑️ *Excluir Lançamento*\n\n💡 Para excluir um lançamento:\n1️⃣ Primeiro use "histórico" para ver os lançamentos\n2️⃣ Depois use "excluir <número>"\n\n📋 Exemplo:\n• histórico\n• excluir 2' 
-        });
+        await mostrarListaParaExcluir(sock, userId);
         return;
         
       case 2:
@@ -64,9 +115,7 @@ async function excluirComMenuCommand(sock, userId, texto) {
 
   // Se o usuário digitou "excluir lançamento"
   if (textoLower === 'excluir lancamento' || textoLower === 'excluir lançamento') {
-    await sock.sendMessage(userId, { 
-      text: '🗑️ *Excluir Lançamento*\n\n💡 Para excluir um lançamento:\n1️⃣ Primeiro use "histórico" para ver os lançamentos\n2️⃣ Depois use "excluir <número>"\n\n📋 Exemplo:\n• histórico\n• excluir 2' 
-    });
+    await mostrarListaParaExcluir(sock, userId);
     return;
   }
 

@@ -292,7 +292,7 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
       return;
     }
 
-    if(estado.etapa.includes('tipo_exclusao')) {
+    if (estado.etapa.includes('tipo_exclusao') || estado.etapa.includes('selecao_exclusao_lancamento')) {
       await excluirComMenuCommand(sock, userId, texto);
       return;
     }
