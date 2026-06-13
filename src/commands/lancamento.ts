@@ -560,8 +560,8 @@ async function enviarConfirmacaoInterativa(sock, userId, lancamentoId: any, pars
     header: '✅ Lançamento registrado!',
     body: mensagemSucesso,
     buttons: [
-      { id: '1', title: '✏️ Editar' },
-      { id: '2', title: '👍 OK' },
+      { id: 'pos_editar', title: '✏️ Editar' },
+      { id: 'pos_ok', title: '👍 OK' },
     ],
   });
   await definirEstado(userId, 'aguardando_pos_lancamento', { lancamentoId, lancamento: lancamentoParaEstado });
@@ -575,11 +575,11 @@ async function lancamentoCommand(sock, userId, texto) {
   if (estadoInicial?.etapa === 'aguardando_pos_lancamento') {
     const { lancamentoId, lancamento } = estadoInicial.dadosParciais as any;
     const resposta = texto.trim();
-    if (resposta === '2' || resposta.toLowerCase() === 'ok') {
+    if (resposta === 'pos_ok' || resposta === '2' || resposta.toLowerCase() === 'ok') {
       await limparEstado(userId);
       return;
     }
-    if (resposta === '1' || resposta.toLowerCase() === 'editar') {
+    if (resposta === 'pos_editar' || resposta === '1' || resposta.toLowerCase() === 'editar') {
       await definirEstado(userId, 'aguardando_campo_edicao_lancamento', {
         lancamentoId,
         lancamento,
@@ -642,8 +642,8 @@ async function lancamentoCommand(sock, userId, texto) {
               `📅 Data: ${parsed.data}`,
             footer: 'Para ajustar a categoria, digite: categoria [nome]',
             buttons: [
-              { id: '1', title: '✅ Confirmar' },
-              { id: '2', title: '❌ Cancelar' },
+              { id: 'ia_confirmar', title: '✅ Confirmar' },
+              { id: 'ia_cancelar', title: '❌ Cancelar' },
             ],
           });
           return;
@@ -656,8 +656,8 @@ async function lancamentoCommand(sock, userId, texto) {
       }
 
       const opcaoConfirmacao = parseInt(resposta, 10);
-      const confirmou = (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 1) || ['s', 'sim', 'y', 'yes'].includes(resposta);
-      const negou = (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 2) || ['n', 'nao', 'não', 'no'].includes(resposta);
+      const confirmou = resposta === 'ia_confirmar' || (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 1) || ['s', 'sim', 'y', 'yes'].includes(resposta);
+      const negou = resposta === 'ia_cancelar' || (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 2) || ['n', 'nao', 'não', 'no'].includes(resposta);
 
       if (confirmou) {
         const dataBR = (() => {
@@ -725,8 +725,8 @@ async function lancamentoCommand(sock, userId, texto) {
               parceladoTexto,
             footer: 'Para ajustar a categoria, digite: categoria [nome]',
             buttons: [
-              { id: '1', title: '✅ Confirmar' },
-              { id: '2', title: '❌ Cancelar' },
+              { id: 'ia_confirmar', title: '✅ Confirmar' },
+              { id: 'ia_cancelar', title: '❌ Cancelar' },
             ],
           });
           return;
@@ -739,8 +739,8 @@ async function lancamentoCommand(sock, userId, texto) {
       }
 
       const opcaoConfirmacao = parseInt(resposta, 10);
-      const confirmou = (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 1) || ['s', 'sim', 'y', 'yes'].includes(resposta);
-      const negou = (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 2) || ['n', 'nao', 'não', 'no'].includes(resposta);
+      const confirmou = resposta === 'ia_confirmar' || (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 1) || ['s', 'sim', 'y', 'yes'].includes(resposta);
+      const negou = resposta === 'ia_cancelar' || (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 2) || ['n', 'nao', 'não', 'no'].includes(resposta);
 
       if (confirmou) {
         // Montar parsed compatível com processarLancamento para reaproveitar fluxo (cartão, parcelamento, etc.)
@@ -805,8 +805,8 @@ async function lancamentoCommand(sock, userId, texto) {
             `📅 Data: ${parsed.data}`,
           footer: 'Para ajustar a categoria, digite: categoria [nome]',
           buttons: [
-            { id: '1', title: '✅ Confirmar' },
-            { id: '2', title: '❌ Cancelar' },
+            { id: 'ia_confirmar', title: '✅ Confirmar' },
+            { id: 'ia_cancelar', title: '❌ Cancelar' },
           ],
         });
         return;
@@ -819,8 +819,8 @@ async function lancamentoCommand(sock, userId, texto) {
     }
     
     const opcaoConfirmacao = parseInt(resposta, 10);
-    if (!isNaN(opcaoConfirmacao)) {
-      if (opcaoConfirmacao === 1) {
+    if (!isNaN(opcaoConfirmacao) || resposta === 'ia_confirmar' || resposta === 'ia_cancelar') {
+      if (opcaoConfirmacao === 1 || resposta === 'ia_confirmar') {
         // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
         if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento)) {
           await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
@@ -844,7 +844,7 @@ async function lancamentoCommand(sock, userId, texto) {
         await limparEstado(userId);
         return await processarLancamento(sock, userId, parsed, texto);
       }
-      if (opcaoConfirmacao === 2) {
+      if (opcaoConfirmacao === 2 || resposta === 'ia_cancelar') {
         await limparEstado(userId);
         await sock.sendMessage(userId, {
           text: '❌ Lançamento cancelado. Tente novamente com um formato mais claro.'
@@ -1187,8 +1187,8 @@ async function lancamentoCommand(sock, userId, texto) {
           avisoConfianca,
         footer: 'Para ajustar a categoria, digite: categoria [nome]',
         buttons: [
-          { id: '1', title: '✅ Confirmar' },
-          { id: '2', title: '❌ Cancelar' },
+          { id: 'ia_confirmar', title: '✅ Confirmar' },
+          { id: 'ia_cancelar', title: '❌ Cancelar' },
         ],
       });
 
