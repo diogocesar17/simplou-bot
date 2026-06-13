@@ -34,30 +34,58 @@ function detectarTipoTrabalho(texto: string): 'MOTORISTA_APP' | 'DELIVERY' | 'AM
 // ─── Step 1: Nome ─────────────────────────────────────────────────────────────
 
 export async function perguntarNome(sock: any, userId: string, nomeProfile?: string): Promise<void> {
-  const sugestao = nomeProfile
-    ? `\n\nSeu WhatsApp mostra o nome *${nomeProfile}*. Pode confirmar digitando o mesmo ou digitar outro nome.`
-    : '';
+  if (nomeProfile) {
+    // Trunca para caber no botão (máx 20 chars: "✅ " = 3, sobram 17 para o nome)
+    const nomeBtn = nomeProfile.length > 17 ? nomeProfile.slice(0, 16) + '…' : nomeProfile;
 
-  await sock.sendMessage(userId, {
-    text: `👋 Antes de começar, qual é o seu nome?${sugestao}`,
-  });
+    await sock.sendInteractiveMessage(userId, {
+      type: 'button',
+      header: '👋 Como quer ser chamado?',
+      body: `Seu WhatsApp usa o nome *${nomeProfile}*. Pode usar esse ou escolher outro.`,
+      buttons: [
+        { id: 'nome_confirmar', title: `✅ ${nomeBtn}` },
+        { id: 'nome_outro', title: '✏️ Usar outro nome' },
+      ],
+    });
+  } else {
+    await sock.sendMessage(userId, { text: '👋 Qual é o seu nome?' });
+  }
 }
 
-export async function handleOnboardingNome(sock: any, userId: string, texto: string): Promise<void> {
-  const nome = texto.trim();
+async function salvarNomeEContinuar(sock: any, userId: string, nome: string): Promise<void> {
+  await usuariosService.atualizarNomeUsuario(userId, nome);
+  await definirEstado(userId, 'onboarding_tipo_trabalho', {});
+  await sock.sendMessage(userId, { text: `Olá, *${nome}*! 😊` });
+  await perguntarTipoTrabalho(sock, userId);
+}
 
+export async function handleOnboardingNome(sock: any, userId: string, texto: string, nomeProfile?: string): Promise<void> {
+  const norm = texto.toLowerCase().trim();
+
+  // Usuário confirmou o nome do perfil via botão
+  if (norm === 'nome_confirmar') {
+    if (!nomeProfile || nomeProfile.length < 2) {
+      await sock.sendMessage(userId, { text: '👋 Qual é o seu nome?' });
+      return;
+    }
+    await salvarNomeEContinuar(sock, userId, nomeProfile);
+    return;
+  }
+
+  // Usuário quer digitar outro nome
+  if (norm === 'nome_outro') {
+    await sock.sendMessage(userId, { text: '✏️ Qual nome prefere usar?' });
+    return; // permanece no estado onboarding_nome aguardando digitação
+  }
+
+  // Usuário digitou o nome
+  const nome = texto.trim();
   if (nome.length < 2) {
     await sock.sendMessage(userId, { text: '❌ Nome muito curto. Por favor, informe seu nome:' });
     return;
   }
 
-  await usuariosService.atualizarNomeUsuario(userId, nome);
-  await definirEstado(userId, 'onboarding_tipo_trabalho', {});
-
-  await sock.sendMessage(userId, {
-    text: `Olá, *${nome}*! 😊`,
-  });
-  await perguntarTipoTrabalho(sock, userId);
+  await salvarNomeEContinuar(sock, userId, nome);
 }
 
 // ─── Step 2: Tipo de trabalho ─────────────────────────────────────────────────

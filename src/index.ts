@@ -212,7 +212,7 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
       return;
     }
     if (estado.etapa === 'onboarding_nome') {
-      await handleOnboardingNome(sock, userId, texto);
+      await handleOnboardingNome(sock, userId, texto, estado.dadosParciais?.nomeProfile as string | undefined);
       return;
     }
     if (estado.etapa === 'onboarding_tipo_trabalho') {
