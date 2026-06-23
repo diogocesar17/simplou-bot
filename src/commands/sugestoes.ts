@@ -3,11 +3,18 @@ import * as lancamentosService from '../services/lancamentosService';
 import * as driverService from '../services/driverService';
 import { formatarMensagem, gerarDicasContextuais } from '../utils/formatMessages';
 import { isPremium, MSG_UPGRADE } from '../services/planoService';
+import { verificarLimiteGeminiDia, incrementarGeminiDia } from '../services/rateLimitService';
+
+const MSG_LIMITE_GEMINI = '⚠️ *Limite diário de IA atingido*\n\nVocê atingiu o limite de 30 análises por IA hoje. Tente novamente amanhã.';
 
 async function sugestoesCommand(sock, userId) {
   const premium = await isPremium(userId);
   if (!premium) {
     await sock.sendMessage(userId, { text: MSG_UPGRADE });
+    return;
+  }
+  if (!(await verificarLimiteGeminiDia(userId))) {
+    await sock.sendMessage(userId, { text: MSG_LIMITE_GEMINI });
     return;
   }
   const [dados, driverContext] = await Promise.all([
@@ -27,6 +34,7 @@ async function sugestoesCommand(sock, userId) {
   }
   await sock.sendMessage(userId, { text: '💡 Gerando sugestões para aumentar sua rentabilidade... Isso pode levar alguns segundos.' });
 
+  incrementarGeminiDia(userId).catch(() => {});
   const sugestoes = await geminiService.gerarSugestoesEconomia(userId, dados, driverContext);
   if (!sugestoes) {
     await sock.sendMessage(userId, {

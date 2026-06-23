@@ -1,5 +1,5 @@
 #!/bin/bash
-# Backup automático do PostgreSQL — roda via cron no host do Hetzner
+# Backup automático do PostgreSQL com upload para Cloudflare R2
 # Cron sugerido (3h da manhã, todo dia): 0 3 * * * /opt/simplou/scripts/backup-postgres.sh
 
 set -euo pipefail
@@ -70,13 +70,50 @@ else
   log "Backup concluído — tamanho: $(du -sh "$BACKUP_FILE" | cut -f1)"
 fi
 
-# ── Remover backups antigos ───────────────────────────────────────────────────
-REMOVIDOS=$(find "$BACKUP_DIR" \( -name "simplou_*.sql.gz" -o -name "simplou_*.sql.gz.enc" \) -mtime +"$RETENTION_DAYS" -print -delete | wc -l)
-if [ "$REMOVIDOS" -gt 0 ]; then
-  log "Removidos $REMOVIDOS backup(s) com mais de $RETENTION_DAYS dias"
+# ── Upload para Cloudflare R2 ─────────────────────────────────────────────────
+# Requer no .env:
+#   CLOUDFLARE_ACCOUNT_ID=<seu account id>
+#   R2_ACCESS_KEY_ID=<access key gerado no R2>
+#   R2_SECRET_ACCESS_KEY=<secret key gerado no R2>
+#   R2_BUCKET_NAME=simplou-backups
+#   R2_PREFIX=db  (opcional, default: db)
+#
+# Requer awscli instalado no host: apt install awscli -y
+
+R2_PREFIX="${R2_PREFIX:-db}"
+
+if [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ] && \
+   [ -n "${R2_ACCESS_KEY_ID:-}" ] && \
+   [ -n "${R2_SECRET_ACCESS_KEY:-}" ] && \
+   [ -n "${R2_BUCKET_NAME:-}" ]; then
+
+  R2_ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+  R2_KEY="${R2_PREFIX}/$(basename "$BACKUP_FILE")"
+
+  log "Enviando backup para R2 → s3://${R2_BUCKET_NAME}/${R2_KEY}"
+
+  AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \
+  AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
+  aws s3 cp "$BACKUP_FILE" "s3://${R2_BUCKET_NAME}/${R2_KEY}" \
+    --endpoint-url "$R2_ENDPOINT" \
+    --region auto \
+    --no-progress \
+    2>&1 | tee -a "$LOG_FILE" \
+    && log "Upload R2 concluído ✓" \
+    || log "AVISO: upload R2 falhou — backup local mantido"
+
+else
+  log "AVISO: variáveis R2 não configuradas — upload offsite ignorado"
+  log "  Defina CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY e R2_BUCKET_NAME no .env"
 fi
 
-# ── Listar backups existentes ─────────────────────────────────────────────────
+# ── Remover backups locais antigos ────────────────────────────────────────────
+REMOVIDOS=$(find "$BACKUP_DIR" \( -name "simplou_*.sql.gz" -o -name "simplou_*.sql.gz.enc" \) -mtime +"$RETENTION_DAYS" -print -delete | wc -l)
+if [ "$REMOVIDOS" -gt 0 ]; then
+  log "Removidos $REMOVIDOS backup(s) local(is) com mais de $RETENTION_DAYS dias"
+fi
+
+# ── Listar backups locais existentes ──────────────────────────────────────────
 TOTAL=$(find "$BACKUP_DIR" \( -name "simplou_*.sql.gz" -o -name "simplou_*.sql.gz.enc" \) | wc -l)
-log "Total de backups armazenados: $TOTAL"
+log "Total de backups locais armazenados: $TOTAL"
 log "─────────────────────────────────────"

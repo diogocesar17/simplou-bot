@@ -861,12 +861,14 @@ async function getDatabaseData(userId, meses?: number) {
       WHERE user_id = $1
         AND data >= CURRENT_DATE - INTERVAL '${Math.floor(meses)} months'
       ORDER BY data DESC, criado_em DESC
+      LIMIT 500
     `
     : `
       SELECT id, data, tipo, descricao, valor, categoria, pagamento
       FROM lancamentos
       WHERE user_id = $1
       ORDER BY data DESC, criado_em DESC
+      LIMIT 500
     `;
 
   const result = await queryDatabase(query, [userId]);

@@ -4,8 +4,12 @@ import { isPremium, MSG_UPGRADE } from '../../services/planoService'
 import { definirEstado } from '../../configs/stateManager'
 import { formatarValor, formatarComMoeda } from '../../utils/formatUtils'
 import { logger } from '../logger'
+import { verificarLimiteGeminiDia, incrementarGeminiDia } from '../../services/rateLimitService'
 
 const geminiService = require('../../services/geminiService')
+
+const MAX_MEDIA_BYTES = 5 * 1024 * 1024 // 5 MB
+const MSG_LIMITE_GEMINI = '⚠️ *Limite diário de IA atingido*\n\nVocê atingiu o limite de análises por IA hoje. Tente novamente amanhã ou envie o lançamento em texto.\n\nEx: _mercado 50 pix_'
 
 // Ponto único de despacho de mensagens — funciona com qualquer adapter (Baileys ou Meta Cloud).
 // mediaRaw: objeto de mídia já extraído pelo adapter específico (audioMessage do Baileys,
@@ -24,9 +28,18 @@ export async function dispatchWhatsAppMessage(
       await adapter.sendMessage(userId, { text: MSG_UPGRADE })
       return
     }
+    if (!(await verificarLimiteGeminiDia(userId))) {
+      await adapter.sendMessage(userId, { text: MSG_LIMITE_GEMINI })
+      return
+    }
     try {
       await adapter.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
       const { buffer, mimeType } = await adapter.downloadAudio(mediaRaw)
+      if (buffer.length > MAX_MEDIA_BYTES) {
+        await adapter.sendMessage(userId, { text: '❌ Áudio muito grande (máx. 5 MB). Envie o lançamento em texto.\n\nEx: _mercado 50 pix_' })
+        return
+      }
+      incrementarGeminiDia(userId).catch(() => {})
       const analise = await geminiService.transcreverAudioFinanceiro(buffer, mimeType, userId)
 
       if (!analise) {
@@ -71,12 +84,21 @@ export async function dispatchWhatsAppMessage(
       await adapter.sendMessage(userId, { text: MSG_UPGRADE })
       return
     }
+    if (!(await verificarLimiteGeminiDia(userId))) {
+      await adapter.sendMessage(userId, { text: MSG_LIMITE_GEMINI })
+      return
+    }
     try {
       await adapter.sendMessage(userId, { text: '⌛ Estou analisando sua mensagem, só um instante.' })
       const { buffer, mimeType } =
         tipo === 'image'
           ? await adapter.downloadImage(mediaRaw)
           : await adapter.downloadDocument(mediaRaw)
+      if (buffer.length > MAX_MEDIA_BYTES) {
+        await adapter.sendMessage(userId, { text: '❌ Arquivo muito grande (máx. 5 MB). Envie o lançamento em texto.\n\nEx: _mercado 50 pix_' })
+        return
+      }
+      incrementarGeminiDia(userId).catch(() => {})
       const analise = await geminiService.analisarVoucherFinanceiro(buffer, mimeType, userId)
 
       if (!analise) {

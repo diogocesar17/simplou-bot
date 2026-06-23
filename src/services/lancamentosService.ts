@@ -1,4 +1,5 @@
 import * as databaseService from '../infrastructure/databaseService';
+import { verificarLimiteLancamentosDia, incrementarLancamentosDia } from './rateLimitService';
 import { Lancamento } from '../types/global';
 
 // Interfaces específicas para este serviço
@@ -86,6 +87,9 @@ export async function getLancamentoPorId(userId: string, id: number): Promise<La
 
 // Funções para salvar/atualizar
 export async function salvarLancamento(userId: string, dados: DadosLancamento): Promise<unknown> {
+  const permitido = await verificarLimiteLancamentosDia(userId);
+  if (!permitido) throw new Error('LIMITE_LANCAMENTOS_DIA');
+
   // Converter objeto para array na ordem correta dos campos
   const values = [
     dados.data,                    // $2
@@ -112,7 +116,9 @@ export async function salvarLancamento(userId: string, dados: DadosLancamento): 
     dados.business_context || null // $23 (driver)
   ];
   
-  return await databaseService.appendRowToDatabase(userId, values, dados.mensagemOriginal);
+  const resultado = await databaseService.appendRowToDatabase(userId, values, dados.mensagemOriginal);
+  incrementarLancamentosDia(userId).catch(() => {});
+  return resultado;
 }
 
 export async function atualizarLancamentoPorId(userId: string, id: number, dados: Partial<DadosLancamento>): Promise<unknown> {

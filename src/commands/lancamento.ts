@@ -25,6 +25,7 @@ import { converterDataParaISO } from '../utils/dataUtils';
 import { definirEstado, obterEstado, limparEstado } from '../configs/stateManager';
 import { formatarMensagem } from '../utils/formatMessages';
 import { logger } from '../infrastructure/logger';
+import { verificarLimiteGeminiDia, incrementarGeminiDia } from '../services/rateLimitService';
 
 // Normaliza frase para uso como chave no parser_cache.
 // Substitui o valor monetário por X mas preserva números que são nomes de plataforma (ex: "99").
@@ -275,6 +276,11 @@ Anteontem: ${new Date(Date.now() - 2*86400000).toLocaleDateString('pt-BR')}
       });
     };
 
+    if (!(await verificarLimiteGeminiDia(userId))) {
+      logger.info({ userId }, '[IA_ANALISE] Limite diário Gemini atingido — abortando fallback');
+      return null;
+    }
+    incrementarGeminiDia(userId).catch(() => {});
     const analiseGemini = await withTimeout(
       geminiService.gerarJSONComGemini(prompt),
       TIMEOUT_MS
@@ -569,6 +575,20 @@ async function enviarConfirmacaoInterativa(sock, userId, lancamentoId: any, pars
 
 async function lancamentoCommand(sock, userId, texto) {
   logger.info({ userId, textoLen: (texto || '').length }, '[LANCAMENTO] Comando iniciado');
+  try {
+    return await _lancamentoCommandImpl(sock, userId, texto);
+  } catch (e: any) {
+    if (e?.message === 'LIMITE_LANCAMENTOS_DIA') {
+      await sock.sendMessage(userId, {
+        text: '⚠️ *Limite diário atingido*\n\nVocê atingiu o limite de 100 lançamentos por dia. Tente novamente amanhã.',
+      });
+      return;
+    }
+    throw e;
+  }
+}
+
+async function _lancamentoCommandImpl(sock, userId, texto) {
 
   // 0. Fluxo aguardando ação pós-lançamento (botão Editar / OK)
   const estadoInicial = await obterEstado(userId);
@@ -1488,4 +1508,4 @@ async function processarLancamento(sock, userId, parsed, mensagemOriginal?: stri
   }
 }
 
-export default lancamentoCommand;
+export { lancamentoCommand as default };

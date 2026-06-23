@@ -2,11 +2,18 @@ import * as geminiService from '../services/geminiService';
 import * as lancamentosService from '../services/lancamentosService';
 import * as driverService from '../services/driverService';
 import { isPremium, MSG_UPGRADE } from '../services/planoService';
+import { verificarLimiteGeminiDia, incrementarGeminiDia } from '../services/rateLimitService';
+
+const MSG_LIMITE_GEMINI = '⚠️ *Limite diário de IA atingido*\n\nVocê atingiu o limite de 30 análises por IA hoje. Tente novamente amanhã.';
 
 async function previsaoCommand(sock, userId) {
   const premium = await isPremium(userId);
   if (!premium) {
     await sock.sendMessage(userId, { text: MSG_UPGRADE });
+    return;
+  }
+  if (!(await verificarLimiteGeminiDia(userId))) {
+    await sock.sendMessage(userId, { text: MSG_LIMITE_GEMINI });
     return;
   }
   const [dados, driverContext] = await Promise.all([
@@ -19,6 +26,7 @@ async function previsaoCommand(sock, userId) {
   }
   await sock.sendMessage(userId, { text: '🔮 Analisando seus ganhos e custos dos últimos meses... Isso pode levar alguns segundos.' });
 
+  incrementarGeminiDia(userId).catch(() => {});
   const previsao = await geminiService.preverGastosFuturos(userId, dados, driverContext);
   if (!previsao) {
     await sock.sendMessage(userId, {
