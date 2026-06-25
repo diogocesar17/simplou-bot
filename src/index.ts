@@ -3,6 +3,7 @@
 import { initSentry, captureException, testeSentry } from './infrastructure/sentry';
 import { formatarEstatisticas } from './infrastructure/geminiMonitor';
 import { adminHelpCommand } from './commands/adminHelp';
+import { lastMessageIdByUser } from './infrastructure/healthServer';
 initSentry();
 
 // Imports dos comandos
@@ -641,7 +642,12 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
       return;
     }
     try {
-      const resultado: string = await (sock as any).sendTypingIndicatorDebug(userId);
+      const messageId = lastMessageIdByUser.get(userId);
+      if (!messageId) {
+        await sock.sendMessage(userId, { text: '⚠️ Nenhum message_id disponível. Envie outra mensagem primeiro e tente novamente.' });
+        return;
+      }
+      const resultado: string = await (sock as any).sendTypingIndicatorDebug(messageId);
       await sock.sendMessage(userId, { text: `🔍 *Typing Indicator Debug*\n\n${resultado}` });
     } catch (err: any) {
       await sock.sendMessage(userId, { text: `❌ Erro:\n${err?.message || err}` });

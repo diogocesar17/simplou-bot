@@ -9,6 +9,8 @@ import { dispatchWhatsAppMessage } from './whatsapp/messageDispatcher'
 let server: http.Server | null = null
 let started = false
 
+export const lastMessageIdByUser = new Map<string, string>()
+
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = []
@@ -74,7 +76,7 @@ export function startHealthServer(port?: number): void {
         const mediaRaw = rawMessage.audio ?? rawMessage.image ?? rawMessage.document
         const adapter = new MetaCloudAdapter()
         adapter.markAsRead(userId, rawMessage.id).catch(() => {/* silencioso */})
-        adapter.sendTypingIndicator(userId).catch(() => {/* silencioso */})
+        lastMessageIdByUser.set(userId, rawMessage.id)
         dispatchWhatsAppMessage(adapter, userId, texto, tipo, mediaRaw, nomeContato).catch((err) => {
           captureException(err)
           logger.error({ err: (err as any)?.message || err }, '[META WEBHOOK] Erro ao despachar mensagem')

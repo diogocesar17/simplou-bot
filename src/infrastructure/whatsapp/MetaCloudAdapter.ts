@@ -137,11 +137,11 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
   }
 
   async markAsRead(to: string, messageId: string): Promise<void> {
-    const phone = this.normalizePhone(to);
     const body = {
       messaging_product: 'whatsapp',
       status: 'read',
       message_id: messageId,
+      typing_indicator: { type: 'text' },
     };
     await fetch(BASE_URL(), {
       method: 'POST',
@@ -153,34 +153,17 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
     });
   }
 
-  async sendTypingIndicator(to: string): Promise<void> {
-    const phone = this.normalizePhone(to);
-    const body = {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: phone,
-      type: 'typing_indicator',
-      typing_indicator: { type: 'text' },
-    };
-    const response = await fetch(BASE_URL(), {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) await this._throwMetaError(response);
+  async sendTypingIndicator(_to: string): Promise<void> {
+    // Typing indicator é enviado junto com markAsRead (mesmo request, mesmo message_id).
+    // Esta chamada isolada não é mais necessária.
   }
 
-  async sendTypingIndicatorDebug(to: string): Promise<string> {
-    const phone = this.normalizePhone(to);
+  async sendTypingIndicatorDebug(messageId: string): Promise<string> {
     const url = BASE_URL();
     const payload = {
       messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: phone,
-      type: 'typing_indicator',
+      status: 'read',
+      message_id: messageId,
       typing_indicator: { type: 'text' },
     };
     const response = await fetch(url, {
