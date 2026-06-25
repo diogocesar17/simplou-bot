@@ -641,13 +641,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
       return;
     }
     try {
-      const resultado = await (sock as any).sendTypingIndicatorDebug(userId);
-      const status = resultado.ok ? '✅ Sucesso' : '❌ Falha';
-      await sock.sendMessage(userId, {
-        text: `🔍 *Typing Indicator Debug*\n\n${status}\n📡 HTTP ${resultado.status}\n🔗 URL: ${resultado.url}\n📄 Resposta:\n\`\`\`\n${resultado.body}\n\`\`\``
-      });
+      const resultado: string = await (sock as any).sendTypingIndicatorDebug(userId);
+      await sock.sendMessage(userId, { text: `🔍 *Typing Indicator Debug*\n\n${resultado}` });
     } catch (err: any) {
-      await sock.sendMessage(userId, { text: `❌ Erro ao chamar API:\n${err?.message || err}` });
+      await sock.sendMessage(userId, { text: `❌ Erro:\n${err?.message || err}` });
     }
     return;
   }

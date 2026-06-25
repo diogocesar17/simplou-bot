@@ -173,7 +173,7 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
     if (!response.ok) await this._throwMetaError(response);
   }
 
-  async sendTypingIndicatorDebug(to: string): Promise<{ ok: boolean; status: number; body: string; url: string }> {
+  async sendTypingIndicatorDebug(to: string): Promise<string> {
     const phone = this.normalizePhone(to);
     const url = BASE_URL();
     const payload = {
@@ -185,14 +185,12 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
     };
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const text = await response.text();
-    return { ok: response.ok, status: response.status, body: text, url };
+    const resBody = await response.text();
+    const icon = response.ok ? '✅' : '❌';
+    return `${icon} HTTP ${response.status}\n🔗 ${url}\n\n📦 *Payload:*\n${JSON.stringify(payload, null, 2)}\n\n📄 *Resposta:*\n${resBody}`;
   }
 
   async downloadAudio(message: any): Promise<{ buffer: Buffer; mimeType: string }> {
