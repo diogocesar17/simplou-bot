@@ -536,7 +536,6 @@ async function enviarConfirmacaoInterativa(sock, userId, lancamentoId: any, pars
   };
   await sock.sendInteractiveMessage(userId, {
     type: 'button',
-    header: '✅ Lançamento registrado!',
     body: mensagemSucesso,
     buttons: [
       { id: 'pos_editar', title: '✏️ Editar' },
@@ -1287,7 +1286,7 @@ async function processarLancamento(sock, userId, parsed, mensagemOriginal?: stri
 
       const novoIdSemCartao = await lancamentosService.salvarLancamento(userId, dados);
       logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, pagamento: parsed.pagamento, origem: 'sem_cartao' }, '[LANCAMENTO] Salvo');
-      const msgSemCartao = await gerarMensagemSucesso(userId, parsed) + `\n\n💡 *Dica:* Para controlar faturas, use "configurar cartao"!`;
+      const msgSemCartao = await gerarMensagemSucesso(userId, parsed);
       await enviarConfirmacaoInterativa(sock, userId, novoIdSemCartao, parsed, msgSemCartao);
 
       // Verificar orçamento da categoria
