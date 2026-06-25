@@ -434,7 +434,7 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   }
 
   // Roteamento para mensagens de boas-vindas
-  const SAUDACOES = ['oi', 'olá', 'ola', 'hello', 'hi', 'ei', 'opa', 'bom dia', 'boa tarde', 'boa noite', 'tudo bem', 'tudo bom', 'e aí', 'e ai'];
+  const SAUDACOES = ['oi', 'olá', 'ola', 'hello', 'hi', 'ei', 'opa', 'bom dia', 'boa tarde', 'boa noite', 'tudo bem', 'tudo bom', 'e aí', 'e ai', 'oi simplou', 'olá simplou', 'ola simplou', 'ei simplou', 'oi, simplou', 'olá, simplou'];
   if (SAUDACOES.includes(textoLower)) {
     const nomeUsuario = usuario.nome && usuario.nome !== 'Usuário' ? `, ${usuario.nome}` : '';
     let corpo = '';
