@@ -153,45 +153,20 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
     });
   }
 
-  async sendTypingIndicator(to: string): Promise<void> {
-    const phone = this.normalizePhone(to);
-    const body = {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: phone,
-      type: 'typing_indicator',
-      typing_indicator: { type: 'text' },
-    };
-    const response = await fetch(BASE_URL(), {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) await this._throwMetaError(response);
+  async sendTypingIndicator(_to: string): Promise<void> {
+    // Typing indicator não é suportado pelo endpoint /messages da Meta Cloud API.
+    // Os tipos válidos são: text, image, audio, document, video, interactive, template, reaction, etc.
+    // Mantido como no-op para não gerar erros 400 na API.
   }
 
-  async sendTypingIndicatorDebug(to: string): Promise<{ ok: boolean; status: number; body: string }> {
-    const phone = this.normalizePhone(to);
-    const payload = {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: phone,
-      type: 'typing_indicator',
-      typing_indicator: { type: 'text' },
+  async sendTypingIndicatorDebug(_to: string): Promise<{ ok: boolean; status: number; body: string }> {
+    return {
+      ok: false,
+      status: 0,
+      body: 'Typing indicator não é suportado pela Meta Cloud API (endpoint /messages). ' +
+            'Tipos válidos: text, image, audio, document, video, interactive, template, reaction, etc. ' +
+            'A funcionalidade foi desativada para evitar erros 400.',
     };
-    const response = await fetch(BASE_URL(), {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-    const text = await response.text();
-    return { ok: response.ok, status: response.status, body: text };
   }
 
   async downloadAudio(message: any): Promise<{ buffer: Buffer; mimeType: string }> {
