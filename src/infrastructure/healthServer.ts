@@ -73,7 +73,8 @@ export function startHealthServer(port?: number): void {
 
         const mediaRaw = rawMessage.audio ?? rawMessage.image ?? rawMessage.document
         const adapter = new MetaCloudAdapter()
-        adapter.markAsRead(userId, rawMessage.id).catch(() => {/* silencioso — não bloqueia o fluxo */})
+        adapter.markAsRead(userId, rawMessage.id).catch(() => {/* silencioso */})
+        adapter.sendTypingIndicator(userId).catch(() => {/* silencioso */})
         dispatchWhatsAppMessage(adapter, userId, texto, tipo, mediaRaw, nomeContato).catch((err) => {
           captureException(err)
           logger.error({ err: (err as any)?.message || err }, '[META WEBHOOK] Erro ao despachar mensagem')

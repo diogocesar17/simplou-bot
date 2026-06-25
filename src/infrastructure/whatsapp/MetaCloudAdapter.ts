@@ -153,6 +153,25 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
     });
   }
 
+  async sendTypingIndicator(to: string): Promise<void> {
+    const phone = this.normalizePhone(to);
+    const body = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: phone,
+      type: 'typing_indicator',
+      typing_indicator: { type: 'text' },
+    };
+    await fetch(BASE_URL(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
   async downloadAudio(message: any): Promise<{ buffer: Buffer; mimeType: string }> {
     // Na Meta API, message.id é o media_id
     // 1. GET /{media_id} → obtém a URL temporária
