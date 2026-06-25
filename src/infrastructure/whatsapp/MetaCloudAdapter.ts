@@ -162,7 +162,7 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
       type: 'typing_indicator',
       typing_indicator: { type: 'text' },
     };
-    await fetch(BASE_URL(), {
+    const response = await fetch(BASE_URL(), {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.token}`,
@@ -170,6 +170,28 @@ export class MetaCloudAdapter implements IWhatsAppAdapter {
       },
       body: JSON.stringify(body),
     });
+    if (!response.ok) await this._throwMetaError(response);
+  }
+
+  async sendTypingIndicatorDebug(to: string): Promise<{ ok: boolean; status: number; body: string }> {
+    const phone = this.normalizePhone(to);
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: phone,
+      type: 'typing_indicator',
+      typing_indicator: { type: 'text' },
+    };
+    const response = await fetch(BASE_URL(), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    const text = await response.text();
+    return { ok: response.ok, status: response.status, body: text };
   }
 
   async downloadAudio(message: any): Promise<{ buffer: Buffer; mimeType: string }> {

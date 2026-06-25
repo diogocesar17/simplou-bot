@@ -635,6 +635,22 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     await sock.sendMessage(userId, { text: formatarEstatisticas() });
     return;
   }
+  if (textoLower === 'typing test' || textoLower === 'typing teste') {
+    if (!await verificarAdmin(userId)) {
+      await sock.sendMessage(userId, { text: '❌ Comando exclusivo para administradores.' });
+      return;
+    }
+    try {
+      const resultado = await (sock as any).sendTypingIndicatorDebug(userId);
+      const status = resultado.ok ? '✅ Sucesso' : '❌ Falha';
+      await sock.sendMessage(userId, {
+        text: `🔍 *Typing Indicator Debug*\n\n${status}\n📡 HTTP ${resultado.status}\n📄 Resposta:\n\`\`\`\n${resultado.body}\n\`\`\``
+      });
+    } catch (err: any) {
+      await sock.sendMessage(userId, { text: `❌ Erro ao chamar API:\n${err?.message || err}` });
+    }
+    return;
+  }
   if (textoLower === 'sentry test' || textoLower === 'sentry teste') {
     if (!await verificarAdmin(userId)) {
       await sock.sendMessage(userId, { text: '❌ Comando exclusivo para administradores.' });
