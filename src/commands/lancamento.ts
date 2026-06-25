@@ -499,33 +499,6 @@ async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) 
     return msg;
   }
 
-  // Mensagem específica para cartão de crédito (tolerante a acentos)
-  const pagamentoSemAcentosMsg = removerAcentos((parsed.pagamento || '').toLowerCase());
-  if (cartao && !isReceita && (pagamentoSemAcentosMsg.includes('credito') || pagamentoSemAcentosMsg.includes('cartao'))) {
-    // Calcular data de contabilização
-    const resultadoContabilizacao = await cartoesService.calcularDataContabilizacao(parsed.data.split('/').reverse().join('-'), cartao.dia_vencimento);
-    const dataContabilizacao = resultadoContabilizacao.dataContabilizacao;
-    const dataContabilizacaoFormatada = formatarDateParaISO(dataContabilizacao).split('-').reverse().join('/');
-
-    let mensagem = `💳 ${tipoTexto} registrado no cartão ${cartao.nome_cartao}!\n\n`;
-    mensagem += `📅 Data: ${parsed.data}\n`;
-    mensagem += `💰 Valor: ${formatarComMoeda(parsed.valor)}\n`;
-    mensagem += `📂 Categoria: ${parsed.categoria}\n`;
-    mensagem += `💳 Pagamento: ${parsed.pagamento}\n`;
-    mensagem += `📝 Descrição: ${parsed.descricao}\n`;
-    mensagem += `📊 Contabilização: ${dataContabilizacaoFormatada}`;
-    const agora = new Date();
-    const resumoMes = await lancamentosService.getResumoDoMesAtual(userId);
-    const nomesMes = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-    const nomeMes = nomesMes[agora.getMonth()];
-    if (parsed.tipo?.toLowerCase() === 'gasto') {
-      mensagem += `\n\n📊 Seus gastos de ${nomeMes}: ${formatarComMoeda(resumoMes.totalDespesas)}`;
-    } else {
-      mensagem += `\n\n📊 Suas receitas de ${nomeMes}: ${formatarComMoeda(resumoMes.totalReceitas)}`;
-    }
-    return mensagem;
-  }
-
   // Mensagem padrão
   let mensagem = `${emoji} ${tipoTexto} registrado com sucesso!\n\n`;
   mensagem += `📅 Data: ${parsed.data}\n`;
