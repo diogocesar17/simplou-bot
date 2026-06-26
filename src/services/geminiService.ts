@@ -439,11 +439,12 @@ Regras:
       dataISO = `${y}-${m}-${d}`;
     }
 
+    const tipoVoucher = String(parsed.tipo).toLowerCase() === 'receita' ? 'receita' : 'gasto';
     const resultado = {
-      tipo: String(parsed.tipo).toLowerCase() === 'receita' ? 'receita' : 'gasto',
+      tipo: tipoVoucher,
       valor: Number(parsed.valor),
       categoria: parsed.categoria || 'Outros',
-      formaPagamento: formaPagamentoNormalizada,
+      formaPagamento: tipoVoucher === 'receita' ? 'NÃO INFORMADO' : formaPagamentoNormalizada,
       descricao: parsed.descricao || 'Lançamento por voucher',
       data: dataISO,
       parcelado: parsed.parcelado === true,
@@ -537,12 +538,13 @@ Regras:
       dataISO = `${y}-${m}-${d}`;
     }
 
+    const tipoAudio = String(parsed.tipo).toLowerCase() === 'receita' ? 'receita' : 'gasto';
     const resultado = {
       transcricao: String(parsed.transcricao || ''),
-      tipo: String(parsed.tipo).toLowerCase() === 'receita' ? 'receita' : 'gasto',
+      tipo: tipoAudio,
       valor: Number(parsed.valor),
       categoria: parsed.categoria || 'Outros',
-      formaPagamento: formaPagamentoNormalizada,
+      formaPagamento: tipoAudio === 'receita' ? 'NÃO INFORMADO' : formaPagamentoNormalizada,
       descricao: parsed.descricao || 'Lançamento por áudio',
       data: dataISO,
     };

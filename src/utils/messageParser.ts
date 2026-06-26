@@ -316,15 +316,17 @@ function parseMessage(msg) {
     return { error: 'Valor não encontrado ou inválido na mensagem' };
   }
 
-  // Pagamento
-  const pagamentoMatch = texto.match(/(pix|cr[eé]dito|d[eé]bito|dinheiro|boleto|transferência|transferencia|cartão|cartao|nubank|inter|itau|bradesco|santander|caixa)/i);
-  let pagamento = pagamentoMatch ? pagamentoMatch[1].toUpperCase() : 'NÃO INFORMADO';
-  
-  // Se é parcelamento e não especificou pagamento, assume CRÉDITO
-  if (parcelamento && pagamento === 'NÃO INFORMADO') {
-    pagamento = 'CRÉDITO';
+  // Pagamento (irrelevante para receitas)
+  let pagamento = 'NÃO INFORMADO';
+  if (tipo !== 'receita') {
+    const pagamentoMatch = texto.match(/(pix|cr[eé]dito|d[eé]bito|dinheiro|boleto|transferência|transferencia|cartão|cartao|nubank|inter|itau|bradesco|santander|caixa)/i);
+    pagamento = pagamentoMatch ? pagamentoMatch[1].toUpperCase() : 'NÃO INFORMADO';
+    // Se é parcelamento e não especificou pagamento, assume CRÉDITO
+    if (parcelamento && pagamento === 'NÃO INFORMADO') {
+      pagamento = 'CRÉDITO';
+    }
   }
-  
+
   // Verificar se falta forma de pagamento (apenas para gastos)
   const faltaFormaPagamento = tipo === 'gasto' && pagamento === 'NÃO INFORMADO';
 
