@@ -500,28 +500,8 @@ async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) 
   }
 
   // Mensagem padrão
-  let mensagem = `${emoji} ${tipoTexto} registrado com sucesso!\n\n`;
-  mensagem += `📅 Data: ${parsed.data}\n`;
-  mensagem += `💰 Valor: ${formatarComMoeda(parsed.valor)}\n`;
-  mensagem += `📂 Categoria: ${parsed.categoria}\n`;
-
-  if (!isReceita) {
-    mensagem += `💳 Pagamento: ${parsed.pagamento}\n`;
-  }
-
-  mensagem += `📝 Descrição: ${parsed.descricao}`;
-
-  const agora = new Date();
-  const resumoMes = await lancamentosService.getResumoDoMesAtual(userId);
-  const nomesMes = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-  const nomeMes = nomesMes[agora.getMonth()];
-  if (parsed.tipo?.toLowerCase() === 'gasto') {
-    mensagem += `\n\n📊 Seus gastos de ${nomeMes}: ${formatarComMoeda(resumoMes.totalDespesas)}`;
-  } else {
-    mensagem += `\n\n📊 Suas receitas de ${nomeMes}: ${formatarComMoeda(resumoMes.totalReceitas)}`;
-  }
-
-  return mensagem;
+  const tipoSimples = isReceita ? 'Receita' : 'Gasto';
+  return `✅ *${tipoSimples} registrado:*\n${parsed.categoria} — ${formatarComMoeda(parsed.valor)}`;
 }
 
 async function enviarConfirmacaoInterativa(sock, userId, lancamentoId: any, parsed: any, mensagemSucesso: string) {
