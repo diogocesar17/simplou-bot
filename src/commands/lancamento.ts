@@ -464,44 +464,30 @@ async function criarRecorrente(userId, parsed, cartaoInfo: any = null) {
 // Função para gerar mensagem de sucesso
 async function gerarMensagemSucesso(userId: string, parsed, cartao: any = null) {
   const isReceita = parsed.tipo && parsed.tipo.toLowerCase() === 'receita';
-  const tipoTexto = isReceita ? 'Receita' : 'Gasto';
-  const emoji = isReceita ? '💰' : '💸';
 
-  // Contexto driver: mostra lucro do dia após o lançamento
-  const isDriver = parsed.business_context === 'DRIVER' || DRIVER_CATEGORIAS.has(parsed.categoria);
-  if (isDriver) {
-    const [lucroReal, metaDiaria, resumoDia] = await Promise.all([
-      driverService.getLucroDia(userId),
-      driverService.getGoal(userId, 'DIARIA'),
-      driverService.getResumoDia(userId),
-    ]);
-    const emojiLucro = lucroReal >= 0 ? '🟢' : '🔴';
-    const tipo = isReceita ? 'Receita' : 'Custo';
-    let msg = `✅ *${tipo} registrado:*\n${parsed.categoria} — ${formatarComMoeda(parsed.valor)}`;
-    const temFixo = resumoDia.custosFixosRateados > 0;
-    if (metaDiaria && lucroReal >= metaDiaria.valor) {
-      msg += `\n\n🎯 *Meta diária atingida!* Lucro real hoje: ${formatarComMoeda(lucroReal)}. Parabéns! 🏆`;
-    } else if (isReceita) {
-      msg += `\n\n${emojiLucro} Lucro real hoje: ${formatarComMoeda(lucroReal)}`;
-      if (temFixo) msg += `\n📌 (já descontados ${formatarComMoeda(resumoDia.custosFixosRateados)} de custos fixos)`;
-      if (metaDiaria) {
-        const faltam = metaDiaria.valor - lucroReal;
-        if (faltam > 0) msg += `\n💡 Faltam ${formatarComMoeda(faltam)} para sua meta diária`;
-      }
-    } else {
-      msg += `\n\n${emojiLucro} Lucro real hoje: ${formatarComMoeda(lucroReal)}`;
-      if (temFixo) msg += `\n📌 (já descontados ${formatarComMoeda(resumoDia.custosFixosRateados)} de custos fixos)`;
-      if (metaDiaria) {
-        const faltam = metaDiaria.valor - lucroReal;
-        if (faltam > 0) msg += `\n💡 Faltam ${formatarComMoeda(faltam)} para sua meta diária`;
-      }
+  const [lucroReal, metaDiaria, resumoDia] = await Promise.all([
+    driverService.getLucroDia(userId),
+    driverService.getGoal(userId, 'DIARIA'),
+    driverService.getResumoDia(userId),
+  ]);
+
+  const emojiLucro = lucroReal >= 0 ? '🟢' : '🔴';
+  const tipo = isReceita ? 'Receita' : 'Custo';
+  let msg = `✅ *${tipo} registrado:*\n${parsed.categoria} — ${formatarComMoeda(parsed.valor)}`;
+  const temFixo = resumoDia.custosFixosRateados > 0;
+
+  if (metaDiaria && lucroReal >= metaDiaria.valor) {
+    msg += `\n\n🎯 *Meta diária atingida!* Lucro real hoje: ${formatarComMoeda(lucroReal)}. Parabéns! 🏆`;
+  } else {
+    msg += `\n\n${emojiLucro} Lucro real hoje: ${formatarComMoeda(lucroReal)}`;
+    if (temFixo) msg += `\n📌 (já descontados ${formatarComMoeda(resumoDia.custosFixosRateados)} de custos fixos)`;
+    if (metaDiaria) {
+      const faltam = metaDiaria.valor - lucroReal;
+      if (faltam > 0) msg += `\n💡 Faltam ${formatarComMoeda(faltam)} para sua meta diária`;
     }
-    return msg;
   }
 
-  // Mensagem padrão
-  const tipoSimples = isReceita ? 'Receita' : 'Gasto';
-  return `✅ *${tipoSimples} registrado:*\n${parsed.categoria} — ${formatarComMoeda(parsed.valor)}`;
+  return msg;
 }
 
 async function enviarConfirmacaoInterativa(sock, userId, lancamentoId: any, parsed: any, mensagemSucesso: string) {
