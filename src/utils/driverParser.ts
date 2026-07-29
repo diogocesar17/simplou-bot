@@ -171,6 +171,34 @@ export function parseDriverMessage(texto: string): DriverParsedResult | null {
   return null;
 }
 
+// Detecta se uma mensagem contém múltiplos lançamentos numa única frase agregada.
+// Heurística conservadora — só retorna true quando todos os critérios estão presentes:
+//   1. 2+ valores numéricos distintos na mensagem
+//   2. Pelo menos um conectivo entre eles ("e", "mais" ou vírgula)
+//   3. Presença simultânea de verbo de receita E verbo de gasto
+// Falso negativo (não detectar) é preferível a falso positivo (interromper lançamento válido).
+export function isMensagemAgregada(texto: string): boolean {
+  const norm = normalizar(texto);
+
+  // Critério 1: 2+ valores numéricos distintos
+  const valoresEncontrados = norm.match(/\d+(?:[.,]\d+)?/g) ?? [];
+  const valoresDistintos = new Set(valoresEncontrados.map(v => parseFloat(v.replace(',', '.'))));
+  if (valoresDistintos.size < 2) return false;
+
+  // Critério 2: conectivo presente
+  const temConectivo = /\be\b|,|\bmais\b/.test(norm);
+  if (!temConectivo) return false;
+
+  // Critério 3: verbo de receita E verbo de gasto na mesma mensagem
+  const verbosReceita = ['fiz', 'ganhei', 'recebi', 'faturei', 'rodei'];
+  const verbosGasto = ['gastei', 'paguei', 'abasteci', 'almocei', 'custou', 'coloquei'];
+
+  const temVerboReceita = verbosReceita.some(v => new RegExp(`\\b${v}\\b`).test(norm));
+  const temVerboGasto = verbosGasto.some(v => new RegExp(`\\b${v}\\b`).test(norm));
+
+  return temVerboReceita && temVerboGasto;
+}
+
 // Detecta se uma mensagem é uma consulta de lucro/resumo driver
 // sem precisar resolver o valor — usado para roteamento no index.ts
 export function isDriverResumoQuery(texto: string): boolean {

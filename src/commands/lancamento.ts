@@ -14,7 +14,7 @@ function formatarDateParaISO(data: Date): string {
 }
 // Comando de lançamento centralizado
 import { parseMessage } from '../utils/parseUtils';
-import { parseDriverMessage } from '../utils/driverParser';
+import { parseDriverMessage, isMensagemAgregada } from '../utils/driverParser';
 import * as lancamentosService from '../services/lancamentosService';
 import * as cartoesService from '../services/cartoesService';
 import * as geminiService from '../services/geminiService';
@@ -1063,7 +1063,18 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
     return;
   }
 
-  // 5. Parsear mensagem — tenta driver parser primeiro (mais específico)
+  // 5. Detectar mensagem agregada antes de qualquer parser.
+  // Se o usuário tentou registrar receita + gasto numa única frase,
+  // orientar a separar — parsers extraem apenas o primeiro valor e descartam o resto silenciosamente.
+  if (isMensagemAgregada(texto)) {
+    logger.info({ userId }, '[LANCAMENTO] Mensagem agregada detectada — orientando usuário');
+    await sock.sendMessage(userId, {
+      text: 'Parece que você quer registrar mais de uma coisa ao mesmo tempo.\n\nMe manda um por vez, fica mais fácil:\n\n• _fiz 320 no uber_\n• _abasteci 60 de gasolina_\n• _almocei 20_',
+    });
+    return;
+  }
+
+  // 6. Parsear mensagem — tenta driver parser primeiro (mais específico)
   const driverParsed = parseDriverMessage(texto);
   if (driverParsed) {
     logger.info({ tipo: driverParsed.tipo, valor: driverParsed.valor, categoria: driverParsed.categoria, platform: driverParsed.platform }, '[LANCAMENTO] Driver parser detectou frase driver-específica');
