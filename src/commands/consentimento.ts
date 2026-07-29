@@ -36,11 +36,14 @@ export async function perguntarConsentimento(sock: any, userId: string, nomeProf
 
   await sock.sendInteractiveMessage(userId, {
     type: 'button',
-    header: '📋 Antes de começar',
-    body: corpoConsentimento(),
+    header: '',
+    body:
+      'Algumas funções usam inteligência artificial pra entender o que você manda.\n\n' +
+      'Detalhes completos: simplou.com/privacidade\n\n' +
+      'Ao continuar, você concorda com o tratamento dos seus dados.',
     buttons: [
-      { id: 'aceitar_lgpd', title: '✅ Aceito' },
-      { id: 'recusar_lgpd', title: '❌ Não aceito' },
+      { id: 'aceitar_lgpd', title: 'Sim, aceito' },
+      { id: 'recusar_lgpd', title: 'Agora não' },
     ],
   });
 }
@@ -60,8 +63,8 @@ export async function handleConsentimento(
   const estado = await obterEstado(userId);
   const nomeProfile: string | null = (estado?.dadosParciais?.nomeProfile as string) ?? null;
 
-  const aceitou = norm === 'aceitar_lgpd' || norm === 'aceitar' || norm === 'aceito';
-  const recusou = norm === 'recusar_lgpd' || norm === 'recusar' || norm === 'não aceito' || norm === 'nao aceito';
+  const aceitou = norm === 'aceitar_lgpd' || norm === 'aceitar' || norm === 'aceito' || norm === 'sim, aceito' || norm === 'sim aceito';
+  const recusou = norm === 'recusar_lgpd' || norm === 'recusar' || norm === 'não aceito' || norm === 'nao aceito' || norm === 'agora não' || norm === 'agora nao';
 
   if (recusou) {
     await limparEstado(userId);

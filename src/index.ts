@@ -123,7 +123,10 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     const aceito = await validarPrimeiraMensagem(sock, userId, texto);
     if (aceito) {
       await sock.sendMessage(userId, {
-        text: 'Oi! Código validado, sua vaga tá garantida 👋\n\nAntes de começar, preciso do seu consentimento rápido:',
+        text:
+          'Oi! Código validado, sua vaga tá garantida 👋\n\n' +
+          'Antes de começar, preciso te avisar: o Simplou vai guardar seus ganhos e gastos pra te mostrar quanto você realmente está lucrando. ' +
+          'Seus dados são só seus e servem só pra isso — e você pode pedir pra apagar tudo quando quiser.',
       });
       await perguntarConsentimento(sock, userId, nomeContato);
     }
