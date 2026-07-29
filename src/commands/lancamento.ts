@@ -51,7 +51,7 @@ function normalizarParaCache(texto: string): string {
 
 const DRIVER_CATEGORIAS = new Set([
   'Uber', '99Pop', 'iFood', 'Rappi', 'Loggi', 'Entrega Particular', 'Corrida Particular',
-  'Ganhos', 'Combustível', 'Pedágio', 'Estacionamento', 'Lavagem', 'IPVA', 'Multa', 'Manutenção',
+  'Ganhos', 'Combustível', 'Pedágio', 'Estacionamento', 'Lavagem', 'IPVA', 'Multa', 'Manutenção', 'Taxa do App',
 ]);
 
 // Função para gerar ID único
@@ -81,14 +81,14 @@ function categorizarPorPalavrasChave(texto) {
   }
 
   // Despesas inequivocamente operacionais de driver
-  if (textoLower.includes('abasteci') || textoLower.includes('gasolina') || textoLower.includes('etanol') || textoLower.includes('diesel')) {
+  if (textoLower.includes('abasteci') || textoLower.includes('gasolina') || textoLower.includes('alcool') || textoLower.includes('etanol') || textoLower.includes('diesel')) {
     logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Combustivel'); return 'Combustível';
   }
   if (textoLower.includes('pedagio')) { logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Pedagio'); return 'Pedágio'; }
   if (textoLower.includes('lava jato') || textoLower.includes('lavagem do carro') || textoLower.includes('lavei o carro')) {
     logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Lavagem'); return 'Lavagem';
   }
-  if (textoLower.includes('troquei oleo') || textoLower.includes('troca de oleo') || textoLower.includes('borracharia') || textoLower.includes('alinhamento') || textoLower.includes('balanceamento')) {
+  if (textoLower.includes('troquei oleo') || textoLower.includes('troquei o oleo') || textoLower.includes('troca de oleo') || textoLower.includes('troca do oleo') || textoLower.includes('borracharia') || textoLower.includes('alinhamento') || textoLower.includes('balanceamento')) {
     logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Manutencao'); return 'Manutenção';
   }
   if (textoLower.includes('ipva') || textoLower.includes('licenciamento')) {
@@ -97,12 +97,15 @@ function categorizarPorPalavrasChave(texto) {
   if (textoLower.includes('multa de transito')) {
     logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Multa'); return 'Multa';
   }
+  if (textoLower.includes('mensalidade do uber') || textoLower.includes('mensalidade do ifood') || textoLower.includes('mensalidade da 99') || textoLower.includes('mensalidade do rappi') || textoLower.includes('taxa do uber') || textoLower.includes('taxa do ifood') || textoLower.includes('taxa da 99')) {
+    logger.debug?.('[CATEGORIZACAO] ✅ Driver despesa: Taxa do App'); return 'Taxa do App';
+  }
 
   // ── Mapeamento genérico (comportamento original) ──
   const categorias = {
     'Alimentação': [
       'mercado', 'supermercado', 'restaurante', 'lanche', 'delivery', 'ifood', 'rappi', 'uber eats',
-      'comida', 'almoco', 'jantar', 'cafe', 'padaria', 'acougue', 'hortifruti', 'feira'
+      'comida', 'almoco', 'almocei', 'jantar', 'jantei', 'cafe', 'padaria', 'acougue', 'hortifruti', 'feira', 'pizza', 'hamburguer'
     ],
     'Transporte': [
       'uber', '99', 'taxi', 'combustivel', 'gasolina', 'etanol', 'onibus', 'metro', 'trem',
@@ -203,11 +206,12 @@ RECEITAS DE MOTORISTA/ENTREGADOR (tipo = "receita"):
 - Ganhos (receita de trabalho autônomo sem plataforma específica)
 
 DESPESAS OPERACIONAIS DE MOTORISTA/ENTREGADOR (tipo = "gasto"):
-- Combustível (gasolina, etanol, diesel, abastecimento)
+- Combustível (gasolina, álcool, etanol, diesel, abastecimento)
 - Manutenção (óleo, pneu, mecânico, freio, bateria, alinhamento, borracharia)
 - Pedágio (pedágio de rodovia ou pista)
 - Estacionamento (estacionamento pago)
 - Lavagem (lava-jato, lavagem do carro)
+- Taxa do App (mensalidade do Uber, mensalidade do iFood, taxa do app, mensalidade da 99)
 - Seguro Auto (seguro do veículo)
 - Financiamento (parcela do financiamento do carro/moto)
 - IPVA (IPVA, licenciamento do veículo)
@@ -230,22 +234,29 @@ CATEGORIAS GERAIS:
 
 REGRAS CRÍTICAS PARA MOTORISTAS/ENTREGADORES:
 1. "ganhei X no uber" / "fiz X na 99" / "recebi X no ifood" → tipo="receita", categoria=plataforma (Uber/99Pop/iFood)
-2. "abasteci X" / "coloquei X de gasolina" → tipo="gasto", categoria="Combustível"
+2. "abasteci X" / "coloquei X de gasolina/álcool/etanol" → tipo="gasto", categoria="Combustível"
 3. "paguei pedágio X" / "X de pedágio" → tipo="gasto", categoria="Pedágio"
 4. "troquei óleo X" / "pneu X" / "mecânico X" → tipo="gasto", categoria="Manutenção"
 5. "lava jato X" / "lavagem X" → tipo="gasto", categoria="Lavagem"
 6. Uber/99/iFood/Rappi como RECEITA nunca usam categoria "Transporte" ou "Alimentação"
 7. "faturei X" / "rodei X hoje" sem plataforma → tipo="receita", categoria="Ganhos"
+8. "mensalidade do uber/ifood/99/rappi" / "taxa do uber/ifood" → tipo="gasto", categoria="Taxa do App"
+9. "almocei X" / "lanchei X" / "comi X" → tipo="gasto", categoria="Alimentação"
 
 Exemplos driver:
-- "ganhei 280 no uber" → {"tipo": "receita", "valor": 280, "descricao": "Uber", "categoria": "Uber", "pagamento": "pix", "confianca": 0.97}
-- "fiz 150 na 99 hoje" → {"tipo": "receita", "valor": 150, "descricao": "99Pop", "categoria": "99Pop", "pagamento": "pix", "confianca": 0.97}
-- "recebi 90 no ifood" → {"tipo": "receita", "valor": 90, "descricao": "iFood", "categoria": "iFood", "pagamento": "pix", "confianca": 0.97}
+- "ganhei 280 no uber" → {"tipo": "receita", "valor": 280, "descricao": "Uber", "categoria": "Uber", "pagamento": "NÃO INFORMADO", "confianca": 0.97}
+- "fiz 150 na 99 hoje" → {"tipo": "receita", "valor": 150, "descricao": "99Pop", "categoria": "99Pop", "pagamento": "NÃO INFORMADO", "confianca": 0.97}
+- "recebi 90 no ifood" → {"tipo": "receita", "valor": 90, "descricao": "iFood", "categoria": "iFood", "pagamento": "NÃO INFORMADO", "confianca": 0.97}
 - "abasteci 180" → {"tipo": "gasto", "valor": 180, "descricao": "Combustível", "categoria": "Combustível", "pagamento": "NÃO INFORMADO", "confianca": 0.95}
+- "coloquei 80 de álcool" → {"tipo": "gasto", "valor": 80, "descricao": "Combustível", "categoria": "Combustível", "pagamento": "NÃO INFORMADO", "confianca": 0.95}
 - "paguei 18 de pedágio" → {"tipo": "gasto", "valor": 18, "descricao": "Pedágio", "categoria": "Pedágio", "pagamento": "NÃO INFORMADO", "confianca": 0.95}
 - "troquei óleo 220" → {"tipo": "gasto", "valor": 220, "descricao": "Manutenção", "categoria": "Manutenção", "pagamento": "NÃO INFORMADO", "confianca": 0.95}
+- "troquei o óleo por 120" → {"tipo": "gasto", "valor": 120, "descricao": "Manutenção", "categoria": "Manutenção", "pagamento": "NÃO INFORMADO", "confianca": 0.95}
 - "lavagem 35" → {"tipo": "gasto", "valor": 35, "descricao": "Lavagem", "categoria": "Lavagem", "pagamento": "NÃO INFORMADO", "confianca": 0.9}
-- "faturei 320 hoje" → {"tipo": "receita", "valor": 320, "descricao": "Ganhos do dia", "categoria": "Ganhos", "pagamento": "pix", "confianca": 0.9}
+- "faturei 320 hoje" → {"tipo": "receita", "valor": 320, "descricao": "Ganhos do dia", "categoria": "Ganhos", "pagamento": "NÃO INFORMADO", "confianca": 0.9}
+- "paguei 45 de mensalidade do uber" → {"tipo": "gasto", "valor": 45, "descricao": "Taxa do App", "categoria": "Taxa do App", "pagamento": "NÃO INFORMADO", "confianca": 0.95}
+- "almocei 25 reais" → {"tipo": "gasto", "valor": 25, "descricao": "Alimentação", "categoria": "Alimentação", "pagamento": "NÃO INFORMADO", "confianca": 0.9}
+- "paguei 15 no lanche" → {"tipo": "gasto", "valor": 15, "descricao": "Alimentação", "categoria": "Alimentação", "pagamento": "NÃO INFORMADO", "confianca": 0.9}
 
 Exemplos gerais:
 - "Gasto de 2619,92 com Plano de Saúde no pix" → {"tipo": "gasto", "valor": 2619.92, "descricao": "Plano de Saúde", "categoria": "Saúde", "pagamento": "pix", "confianca": 0.95}
@@ -582,7 +593,9 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
         const novaCategoria = resposta.replace('categoria ', '').trim();
         const categoriasValidas = [
           'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia',
-          'Lazer', 'Vestuário', 'Serviços', 'Casa', 'Trabalho', 'Renda', 'Outros'
+          'Lazer', 'Trabalho', 'Renda', 'Outros',
+          // Categorias driver
+          'Combustível', 'Manutenção', 'Pedágio', 'Estacionamento', 'Lavagem', 'IPVA', 'Multa', 'Taxa do App',
         ];
 
         if (categoriasValidas.includes(novaCategoria)) {
@@ -664,7 +677,9 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
         const novaCategoria = resposta.replace('categoria ', '').trim();
         const categoriasValidas = [
           'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia',
-          'Lazer', 'Vestuário', 'Serviços', 'Casa', 'Trabalho', 'Renda', 'Outros'
+          'Lazer', 'Trabalho', 'Renda', 'Outros',
+          // Categorias driver
+          'Combustível', 'Manutenção', 'Pedágio', 'Estacionamento', 'Lavagem', 'IPVA', 'Multa', 'Taxa do App',
         ];
 
         if (categoriasValidas.includes(novaCategoria)) {
@@ -746,8 +761,10 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
     if (resposta.startsWith('categoria ')) {
       const novaCategoria = resposta.replace('categoria ', '').trim();
       const categoriasValidas = [
-        'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia', 
-        'Lazer', 'Vestuário', 'Serviços', 'Casa', 'Trabalho', 'Renda', 'Outros'
+        'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia',
+        'Lazer', 'Trabalho', 'Renda', 'Outros',
+        // Categorias driver
+        'Combustível', 'Manutenção', 'Pedágio', 'Estacionamento', 'Lavagem', 'IPVA', 'Multa', 'Taxa do App',
       ];
       
       if (categoriasValidas.includes(novaCategoria)) {

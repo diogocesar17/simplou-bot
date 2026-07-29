@@ -45,13 +45,14 @@ const PLATAFORMAS_RECEITA: Record<string, string[]> = {
 // Despesas operacionais: nome → keywords (sem acento, lowercase)
 // Apenas keywords inequivocamente driver — não genéricos como "lanche"
 const DESPESAS_DRIVER: Record<string, string[]> = {
-  'Combustível': ['gasolina', 'etanol', 'diesel', 'abasteci', 'combustivel', 'posto de gasolina', 'coloquei gasolina', 'coloquei etanol', 'coloquei combustivel'],
-  'Manutenção': ['troquei oleo', 'troca de oleo', 'pneu', 'borracharia', 'alinhamento', 'balanceamento', 'revisao', 'mecanico', 'freio', 'bateria do carro', 'embreagem', 'correia dentada'],
+  'Combustível': ['gasolina', 'alcool', 'etanol', 'diesel', 'abasteci', 'combustivel', 'posto de gasolina', 'coloquei gasolina', 'coloquei alcool', 'coloquei etanol', 'coloquei combustivel'],
+  'Manutenção': ['troquei oleo', 'troquei o oleo', 'troca de oleo', 'troca do oleo', 'pneu', 'borracharia', 'alinhamento', 'balanceamento', 'revisao', 'mecanico', 'freio', 'bateria do carro', 'embreagem', 'correia dentada'],
   'Pedágio': ['pedagio'],
   'Estacionamento': ['estacionamento', 'estacionei'],
   'Lavagem': ['lava jato', 'lavagem do carro', 'lavei o carro'],
   'IPVA': ['ipva', 'licenciamento'],
   'Multa': ['multa de transito', 'multa infrecao'],
+  'Taxa do App': ['mensalidade do uber', 'mensalidade da 99', 'mensalidade do ifood', 'mensalidade do rappi', 'mensalidade do loggi', 'taxa do uber', 'taxa da 99', 'taxa do ifood', 'taxa do rappi', 'taxa do loggi', 'mensalidade uber', 'mensalidade 99', 'mensalidade ifood', 'mensalidade rappi'],
 };
 
 // Verbos que indicam receita de plataforma
@@ -97,8 +98,8 @@ function extrairPagamento(norm: string): { pagamento: string; falta: boolean } {
   return { pagamento: 'NÃO INFORMADO', falta: true };
 }
 
-function buildReceita(valor: number, categoria: string, platform: string | null, norm: string): DriverParsedResult {
-  const { pagamento, falta } = extrairPagamento(norm);
+function buildReceita(valor: number, categoria: string, platform: string | null): DriverParsedResult {
+  // Receitas de plataforma não têm forma de pagamento — o repasse é sempre via app
   return {
     tipo: 'receita',
     valor,
@@ -147,7 +148,7 @@ export function parseDriverMessage(texto: string): DriverParsedResult | null {
         const valor = extrairValor(norm);
         if (valor) {
           const platformKey = platformName.toUpperCase().replace(/[^A-Z0-9]/g, '');
-          return buildReceita(valor, platformName, platformKey, norm);
+          return buildReceita(valor, platformName, platformKey);
         }
       }
     }
@@ -155,7 +156,7 @@ export function parseDriverMessage(texto: string): DriverParsedResult | null {
     // Receita genérica com "faturei X" ou "rodei X hoje"
     if (VERBOS_RECEITA_GENERICA.some(v => norm.includes(v))) {
       const valor = extrairValor(norm);
-      if (valor) return buildReceita(valor, 'Ganhos', null, norm);
+      if (valor) return buildReceita(valor, 'Ganhos', null);
     }
   }
 
