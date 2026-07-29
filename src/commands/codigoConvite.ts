@@ -4,8 +4,8 @@ import { logger } from '../infrastructure/logger'
 import * as databaseService from '../infrastructure/databaseService'
 
 const MSG_CODIGO_INVALIDO =
-  'Esse acesso é por convite. ' +
-  'Se você viu nosso vídeo no TikTok, comenta QUERO por lá que a gente manda o seu código.'
+  'Opa! Esse acesso é por convite 👋\n\n' +
+  'Comenta QUERO no nosso TikTok (@usesimplou) que a gente te manda o código.'
 
 // Mensagem usada apenas no fallback: usuário que chegou sem o link pré-preenchido
 const MSG_SOLICITAR_CODIGO =
