@@ -48,6 +48,9 @@ export const ETAPAS = {
 
   // IA
   PERGUNTA_INTELIGENTE: 'pergunta_inteligente',
+
+  // Beta / acesso
+  AGUARDANDO_CODIGO_CONVITE: 'aguardando_codigo_convite',
 } as const;
 
 // ---------------------------------------------------------------------------

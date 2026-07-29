@@ -8,6 +8,7 @@ export async function adminHelpCommand(sock: any, adminId: string): Promise<void
     `• \`promover <numero>\` — promove a administrador\n\n` +
 
     `*⏳ Beta / Acesso*\n` +
+    `• \`codigo convite\` — exibe o código de convite configurado\n` +
     `• \`fila espera\` — lista usuários aguardando aprovação\n` +
     `• \`aprovar <numero>\` — aprova usuário da fila\n\n` +
 

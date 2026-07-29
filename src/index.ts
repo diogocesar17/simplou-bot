@@ -62,6 +62,7 @@ import {
 } from './commands/consentimento';
 import { excluirContaCommand, handleConfirmacaoExclusaoConta } from './commands/excluirConta';
 import { exportarDadosCommand } from './commands/exportarDados';
+import { validarPrimeiraMensagem, solicitarCodigoConvite, handleCodigoConvite, codigoConviteAdminCommand } from './commands/codigoConvite';
 import { isDriverResumoQuery, isMetaQuery, isCustoFixoQuery, isDriverPerfilQuery } from './utils/driverParser';
 import * as driverService from './services/driverService';
 import { getMoeda } from './services/preferencesService';
@@ -97,6 +98,15 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
   if (!usuario) {
     const limiteBeta = parseInt(process.env.BETA_LIMITE ?? '50', 10);
 
+    // Fallback: usuário chegou sem link pré-preenchido e está aguardando digitar o código
+    if (estado?.etapa === 'aguardando_codigo_convite') {
+      const aceito = await handleCodigoConvite(sock, userId, texto);
+      if (aceito) {
+        await perguntarConsentimento(sock, userId, estado.dadosParciais?.nomeContato as string | undefined);
+      }
+      return;
+    }
+
     // Aguardando resposta de consentimento LGPD
     if (estado?.etapa === 'aguardando_consentimento') {
       await handleConsentimento(sock, userId, texto, {
@@ -108,8 +118,15 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
       return;
     }
 
-    // Primeiro contato: pedir consentimento antes de criar usuário
-    await perguntarConsentimento(sock, userId, nomeContato);
+    // Primeira mensagem: o código de convite deve vir embutido no texto (link wa.me pré-preenchido).
+    // Se não contiver o código, nada é persistido — nem estado Redis nem usuário no banco.
+    const aceito = await validarPrimeiraMensagem(sock, userId, texto);
+    if (aceito) {
+      await sock.sendMessage(userId, {
+        text: 'Oi! Código validado, sua vaga tá garantida 👋\n\nAntes de começar, preciso do seu consentimento rápido:',
+      });
+      await perguntarConsentimento(sock, userId, nomeContato);
+    }
     return;
   }
 
@@ -665,6 +682,14 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     } else {
       await sock.sendMessage(userId, { text: `⚠️ *Sentry inativo*\nMotivo: ${resultado.motivo}` });
     }
+    return;
+  }
+  if (textoLower === 'codigo convite' || textoLower === 'código convite') {
+    if (!await verificarAdmin(userId)) {
+      await sock.sendMessage(userId, { text: '❌ Comando exclusivo para administradores.' });
+      return;
+    }
+    await codigoConviteAdminCommand(sock, userId);
     return;
   }
   if (textoLower === 'fila espera' || textoLower === 'fila de espera' || textoLower === 'beta fila') {
