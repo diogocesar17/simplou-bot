@@ -978,15 +978,10 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
   logger.debug?.({ cartaoEscolhido }, '🔔 Cartão escolhido');
     
     // Processar com base em parcelamento/recorrente ou simples
+    // Parcelamento — feature congelada no beta
     if (parsed.parcelamento && parsed.numParcelas > 1) {
-      const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed, cartaoEscolhido);
       await limparEstado(userId);
-      let msg = `✅ Parcelamento registrado no cartão ${cartaoEscolhido.nome_cartao}!\n\n`;
-      msg += `💰 Valor total: ${formatarComMoeda(parsed.valor)}\n`;
-      msg += `📦 ${parsed.numParcelas}x de ${formatarComMoeda(parsed.valor / parsed.numParcelas)}\n`;
-      msg += `📂 Categoria: ${parsed.categoria}\n`;
-      msg += `📝 Descrição: ${parsed.descricao}`;
-      await sock.sendMessage(userId, { text: msg });
+      await sock.sendMessage(userId, { text: 'Essa função está em desenvolvimento e chegará em breve.\n\nPor enquanto, registre o valor total ou cada parcela separadamente.' });
       return;
     }
 
@@ -1253,13 +1248,10 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
     return;
   }
 
-  // 6. Boleto sem data de vencimento
+  // 6. Boleto sem data de vencimento — fluxo especial congelado no beta
+  // Registra normalmente sem pedir data de vencimento
   if (parsed.faltaDataVencimento) {
-    await definirEstado(userId, 'aguardando_data_vencimento', parsed);
-    await sock.sendMessage(userId, { 
-      text: '📄 Qual a data de vencimento do boleto? (ex: 25/10/2025)' 
-    });
-    return;
+    parsed.faltaDataVencimento = false;
   }
 
   // Processar lançamento
@@ -1333,16 +1325,9 @@ async function processarLancamento(sock, userId, parsed, mensagemOriginal?: stri
       // Apenas um cartão, usar automaticamente
       const cartao = cartoes[0];
       
-      // Parcelamento
+      // Parcelamento — feature congelada no beta
       if (parsed.parcelamento && parsed.numParcelas > 1) {
-        const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed, cartao);
-        logger.info({ userId, tipo: 'gasto', valor: parsed.valor, categoria: parsed.categoria, cartao: cartao.nome_cartao, parcelas: parsed.numParcelas, origem: 'parcelamento_cartao' }, '[LANCAMENTO] Salvo');
-        let msg = `✅ Parcelamento registrado no cartão ${cartao.nome_cartao}!\n\n`;
-        msg += `💰 Valor total: ${formatarComMoeda(parsed.valor)}\n`;
-        msg += `📦 ${parsed.numParcelas}x de ${formatarComMoeda(parsed.valor / parsed.numParcelas)}\n`;
-        msg += `📂 Categoria: ${parsed.categoria}\n`;
-        msg += `📝 Descrição: ${parsed.descricao}`;
-        await sock.sendMessage(userId, { text: msg });
+        await sock.sendMessage(userId, { text: 'Essa função está em desenvolvimento e chegará em breve.\n\nPor enquanto, registre o valor total ou cada parcela separadamente.' });
         return;
       }
 
@@ -1428,16 +1413,9 @@ async function processarLancamento(sock, userId, parsed, mensagemOriginal?: stri
     }
   }
   
-  // Parcelamento sem cartão
+  // Parcelamento sem cartão — feature congelada no beta
   if (parsed.parcelamento && parsed.numParcelas > 1) {
-    const { parcelamentoId, lancamentosCriados } = await criarParcelamento(userId, parsed);
-    logger.info({ userId, tipo: parsed.tipo, valor: parsed.valor, categoria: parsed.categoria, parcelas: parsed.numParcelas, origem: 'parcelamento' }, '[LANCAMENTO] Salvo');
-    let msg = `✅ Parcelamento registrado!\n\n`;
-    msg += `💰 Valor total: ${formatarComMoeda(parsed.valor)}\n`;
-    msg += `📦 ${parsed.numParcelas}x de ${formatarComMoeda(parsed.valor / parsed.numParcelas)}\n`;
-    msg += `📂 Categoria: ${parsed.categoria}\n`;
-    msg += `📝 Descrição: ${parsed.descricao}`;
-    await sock.sendMessage(userId, { text: msg });
+    await sock.sendMessage(userId, { text: 'Essa função está em desenvolvimento e chegará em breve.\n\nPor enquanto, registre o valor total ou cada parcela separadamente.' });
     return;
   }
 

@@ -540,21 +540,21 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     return;
   }
 
-  // Roteamento para o comando de fatura
+  // Roteamento para o comando de fatura — feature congelada no beta
   if (
     /^(fatura)(\s|$)/i.test(textoLower) ||
     /^(detalhar\s+fatura)(\s|$)/i.test(textoLower) ||
     /^(ver\s+compras)(\s|$)/i.test(textoLower) ||
     /quanto\s+vou\s+pagar\s+no\s+cart(ao|ão)/i.test(textoLower)
   ) {
-    await faturaCommand(sock, userId, texto);
+    await sock.sendMessage(userId, { text: 'Essa função está em desenvolvimento e chegará em breve.' });
     return;
   }
 
 
-  // Roteamento para o comando de parcelados
+  // Roteamento para o comando de parcelados — feature congelada no beta
   if (["parcelados", "parcelado"].includes(textoLower)) {
-    await parceladosCommand(sock, userId, texto);
+    await sock.sendMessage(userId, { text: 'Essa função está em desenvolvimento e chegará em breve.' });
     return;
   }
 
@@ -596,24 +596,13 @@ async function _handleMessage(sock: any, userId: string, texto: string, nomeCont
     return;
   }
 
-  // Roteamento para o comando de listar cartões
-  if (["cartoes", "cartões"].includes(textoLower)) {
-    await listarCartoesCommand(sock, userId);
-    return;
-  }
-
-  if (["configurar cartao", "cadastrar cartao", "configurar cartão", "cadastrar cartão"].includes(textoLower)) {
-    await configurarCartaoCommand(sock, userId, texto);
-    return;
-  }
-
-  if (["editar cartao", "editar cartão"].includes(textoLower)) {
-    await editarCartaoCommand(sock, userId, texto);
-    return;
-  }
-
-  if (["excluir cartao", "excluir cartão", "remover cartao", "remover cartão", "deletar cartao", "deletar cartão"].includes(textoLower)) {
-    await excluirCartaoCommand(sock, userId, texto);
+  // Rotas de cartão — feature congelada no beta
+  if (
+    ["cartoes", "cartões", "configurar cartao", "cadastrar cartao", "configurar cartão", "cadastrar cartão",
+     "editar cartao", "editar cartão", "excluir cartao", "excluir cartão",
+     "remover cartao", "remover cartão", "deletar cartao", "deletar cartão"].includes(textoLower)
+  ) {
+    await sock.sendMessage(userId, { text: 'Essa função está em desenvolvimento e chegará em breve.' });
     return;
   }
 

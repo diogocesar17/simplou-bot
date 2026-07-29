@@ -89,12 +89,12 @@ async function ajudaCommand(sock, userId) {
         }
       ],
       dicas: [
-        { texto: 'Ajuda por área', comando: 'ajuda lancamentos · ajuda resumo · ajuda custos fixos · ajuda lembrete · ajuda premium' },
+        { texto: 'Ajuda por área', comando: 'ajuda lancamentos · ajuda resumo · ajuda custos fixos · ajuda lembrete · ajuda premium · ajuda driver' },
         { texto: 'Cancelar qualquer operação', comando: 'cancelar' },
         { texto: 'Desfazer último lançamento', comando: 'desfazer' },
         { texto: 'Suporte', comando: 'contato@simplou.com' }
       ],
-      ajuda: 'Plataformas: Uber, 99, iFood, Rappi, Loggi. Custos: Combustível, Pedágio, Manutenção, Lavagem, IPVA, Multa. Custos fixos: Financiamento, Seguro, Aluguel, Celular. Pagamentos: pix, crédito, débito, dinheiro'
+      ajuda: 'Plataformas: Uber, 99, iFood, Rappi, Loggi. Custos: Combustível, Pedágio, Manutenção, Lavagem, IPVA, Multa. Custos fixos: Financiamento, Seguro, Aluguel, Celular. Pagamentos: pix, débito, dinheiro'
     })
   });
 }

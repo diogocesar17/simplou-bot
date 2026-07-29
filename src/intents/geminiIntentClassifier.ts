@@ -31,26 +31,23 @@ export async function classifyIntentWithGemini(message: string): Promise<ParsedI
 
   try {
     const prompt =
-      'Você é um classificador de intenções para um chatbot financeiro.\n' +
+      'Você é um classificador de intenções para um chatbot financeiro de motoristas e entregadores.\n' +
       'Retorne APENAS JSON válido.\n' +
       'Não explique nada.\n\n' +
       'Intenções:\n' +
-      '- INVOICE_SUMMARY: usuário quer saber valor/resumo da fatura\n' +
-      '- INVOICE_DETAIL: usuário quer ver compras/detalhes da fatura\n' +
-      '- CARD_PAYMENT_FORECAST: usuário quer saber próximas faturas/quanto vai pagar nos cartões\n' +
       '- CREATE_EXPENSE: usuário está lançando gasto/receita\n' +
       '- UNKNOWN: não entendeu\n\n' +
       'Extraia:\n' +
-      'cardName, month, year, status OPEN/CLOSED e confidence de 0 a 1.\n\n' +
+      'confidence de 0 a 1.\n\n' +
       'Exemplos:\n' +
-      '"qual valor da fatura?" =>\n' +
-      '{"intent":"INVOICE_SUMMARY","confidence":0.95}\n\n' +
-      '"quanto está minha fatura do itaú?" =>\n' +
-      '{"intent":"INVOICE_SUMMARY","cardName":"itau","confidence":0.95}\n\n' +
-      '"detalhar fatura nubank abril" =>\n' +
-      '{"intent":"INVOICE_DETAIL","cardName":"nubank","month":4,"confidence":0.95}\n\n' +
-      '"gastei 50 mercado" =>\n' +
+      '"gastei 50 no mercado" =>\n' +
       '{"intent":"CREATE_EXPENSE","confidence":0.95}\n\n' +
+      '"recebi 280 no uber" =>\n' +
+      '{"intent":"CREATE_EXPENSE","confidence":0.95}\n\n' +
+      '"abasteci 150 de gasolina" =>\n' +
+      '{"intent":"CREATE_EXPENSE","confidence":0.95}\n\n' +
+      '"oi tudo bem" =>\n' +
+      '{"intent":"UNKNOWN","confidence":0.9}\n\n' +
       'Mensagem:\n' +
       `"${originalMessage.replace(/"/g, '\\"')}"\n`;
 

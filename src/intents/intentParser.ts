@@ -179,64 +179,7 @@ export function parseIntentLocal(message: string): ParsedIntent {
     return build('CREATE_EXPENSE', 0.95, originalMessage, 'LOCAL');
   }
 
-  const status = extrairStatus(normalized);
-
-  const hasInvoiceKeyword =
-    /\bfatura(s)?\b/.test(normalized) ||
-    /\bcompras?\b/.test(normalized) ||
-    /\bproximas\b/.test(normalized) ||
-    /\bpr[oó]ximas\b/.test(normalized) ||
-    /\bcartao\b/.test(normalized) ||
-    /\bcart[aã]o\b/.test(normalized);
-
-  if (!hasInvoiceKeyword) return build('UNKNOWN', 0.1, originalMessage, 'LOCAL');
-
-  const tokensOriginal = tokenize(originalMessage);
-  const tokensNorm = tokensOriginal.map(t => normalizarMensagem(t));
-  const { month, year, consumed } = extrairMesAno(tokensNorm);
-  const cardName = extrairCardName(tokensOriginal, tokensNorm, consumed);
-
-  const isDetail =
-    normalized.startsWith('detalhar fatura') ||
-    normalized.startsWith('ver compras') ||
-    /\bmostrar\b/.test(normalized) && /\blancamentos\b/.test(normalized) && /\bfatura(s)?\b/.test(normalized) ||
-    /\bcompras\b/.test(normalized) && (/\bfatura(s)?\b/.test(normalized) || /\bcart[aã]o\b/.test(normalized));
-
-  if (isDetail) {
-    const extra: Partial<ParsedIntent> = { cardName, month, year, status };
-    const conf = normalized.startsWith('detalhar fatura') || normalized.startsWith('ver compras') ? 0.95 : 0.85;
-    return build('INVOICE_DETAIL', conf, originalMessage, 'LOCAL', extra);
-  }
-
-  const isForecast =
-    (/\bquanto vou pagar\b/.test(normalized) && /\bcart[aã]o\b/.test(normalized)) ||
-    /\bproximas faturas\b/.test(normalized) ||
-    /\bpr[oó]ximas faturas\b/.test(normalized) ||
-    /\bfaturas a pagar\b/.test(normalized) ||
-    /\bvalor dos cart(oes|ões)\b/.test(normalized);
-
-  if (isForecast) {
-    const extra: Partial<ParsedIntent> = { cardName, month, year, status };
-    return build('CARD_PAYMENT_FORECAST', 0.9, originalMessage, 'LOCAL', extra);
-  }
-
-  const isSummary =
-    normalized === 'fatura' ||
-    normalized.startsWith('fatura ') ||
-    /\bvalor\b/.test(normalized) && /\bfatura(s)?\b/.test(normalized) ||
-    /\bquanto\b/.test(normalized) && (/\bfatura\b/.test(normalized) || /\bcart[aã]o\b/.test(normalized)) ||
-    /\bqual\b/.test(normalized) && /\bfatura(s)?\b/.test(normalized);
-
-  if (isSummary) {
-    const extra: Partial<ParsedIntent> = { cardName, month, year, status };
-    const conf = normalized.startsWith('fatura') ? 0.95 : 0.85;
-    return build('INVOICE_SUMMARY', conf, originalMessage, 'LOCAL', extra);
-  }
-
-  if (status === 'CLOSED' && /\bfatura(s)?\b/.test(normalized)) {
-    const extra: Partial<ParsedIntent> = { cardName, month, year, status };
-    return build('INVOICE_SUMMARY', 0.8, originalMessage, 'LOCAL', extra);
-  }
-
-  return build('UNKNOWN', 0.2, originalMessage, 'LOCAL');
+  // Intents de cartão/fatura/parcelamento estão congeladas no beta — retornar UNKNOWN
+  // para que o messageDispatcher trate com mensagem "em breve" via rota explícita.
+  return build('UNKNOWN', 0.1, originalMessage, 'LOCAL');
 }

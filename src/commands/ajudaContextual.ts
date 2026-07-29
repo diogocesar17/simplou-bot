@@ -22,8 +22,8 @@ export async function ajudaLancamentosCommand(sock, userId) {
             'abasteci 180 de gasolina no débito',
             'paguei 12 de pedágio',
             'lava jato 40',
-            'troquei óleo 120 no crédito',
-            'troquei pneu 400 em 2x no crédito'
+            'troquei óleo 120',
+            'revisão do carro 250'
           ],
           emoji: '⛽'
         },
@@ -95,46 +95,7 @@ export async function ajudaResumoCommand(sock, userId) {
 
 export async function ajudaCartaoCommand(sock, userId) {
   await sock.sendMessage(userId, {
-    text: formatarMensagem({
-      titulo: 'Como usar cartões de crédito',
-      emojiTitulo: '💳',
-      secoes: [
-        {
-          titulo: 'Configurar cartão',
-          itens: [
-            'configurar cartao — cadastrar novo cartão',
-            'Informe: nome do cartão e dia de vencimento',
-            'cartoes — listar cartões configurados',
-            'editar cartao — alterar vencimento',
-            'excluir cartao — remover cartão'
-          ],
-          emoji: '⚙️'
-        },
-        {
-          titulo: 'Registrar gasto no cartão',
-          itens: [
-            'abasteci 200 no crédito nubank',
-            'troquei óleo 150 no crédito inter',
-            'troquei pneu 600 em 3x no crédito nubank',
-            'O gasto é lançado automaticamente na fatura correta'
-          ],
-          emoji: '💸'
-        },
-        {
-          titulo: 'Ver faturas',
-          itens: [
-            'fatura nubank — fatura atual do cartão',
-            'fatura nubank 06/2025 — fatura de mês específico',
-            'vencimentos — próximos vencimentos de todos os cartões'
-          ],
-          emoji: '📄'
-        }
-      ],
-      dicas: [
-        { texto: 'Configurar cartão', comando: 'configurar cartao' },
-        { texto: 'Ver cartões', comando: 'cartoes' }
-      ]
-    })
+    text: 'Essa função está em desenvolvimento e chegará em breve.\n\nSe precisar de ajuda, digite *ajuda* para ver o que está disponível.'
   });
 }
 
