@@ -4,9 +4,11 @@ import {
   gerarMensagemAlertas,
   buscarUsuariosPremiumExpiracao,
   listarUsuarios,
-  queryDatabase
+  queryDatabase,
+  registrarLog
 } from '../infrastructure/databaseService';
 import { logger } from '../infrastructure/logger';
+import { captureException } from '../infrastructure/sentry';
 import * as lembretesService from './lembretesService';
 import * as driverService from './driverService';
 import { IWhatsAppAdapter } from '../infrastructure/whatsapp/IWhatsAppAdapter';
@@ -506,6 +508,8 @@ async function enviarResumoSemanal(adapter: IWhatsAppAdapter, userId: string): P
     } catch (sendErr: any) {
       if (sendErr?.metaCode === 131047) {
         logger.warn({ userId }, '[ALERTAS] Janela 24h fechada — resumo semanal não entregue');
+        await registrarLog(userId, 'JANELA_24H_FECHADA', { tipo: 'resumo_semanal', metaCode: 131047 });
+        captureException(new Error('Janela 24h fechada — resumo semanal não entregue'), { userId, tipo: 'resumo_semanal', metaCode: 131047 });
       } else {
         logger.error({ userId, err: sendErr?.message || sendErr }, '[ALERTAS] Falha ao enviar resumo semanal');
       }
@@ -538,6 +542,8 @@ async function enviarResumoMensal(adapter: IWhatsAppAdapter, userId: string): Pr
     } catch (sendErr: any) {
       if (sendErr?.metaCode === 131047) {
         logger.warn({ userId }, '[ALERTAS] Janela 24h fechada — resumo mensal não entregue');
+        await registrarLog(userId, 'JANELA_24H_FECHADA', { tipo: 'resumo_mensal', metaCode: 131047 });
+        captureException(new Error('Janela 24h fechada — resumo mensal não entregue'), { userId, tipo: 'resumo_mensal', metaCode: 131047 });
       } else {
         logger.error({ userId, err: sendErr?.message || sendErr }, '[ALERTAS] Falha ao enviar resumo mensal');
       }
@@ -587,6 +593,8 @@ async function verificarEEnviarAlertasAutomaticos(adapter: IWhatsAppAdapter, eLe
             erros++;
             if (sendErr?.metaCode === 131047) {
               logger.warn({ userId: usuario.user_id, metaCode: 131047 }, '[ALERTAS] Janela 24h fechada — alerta proativo não entregue (template necessário)');
+              await registrarLog(usuario.user_id, 'JANELA_24H_FECHADA', { tipo: 'alerta_proativo', metaCode: 131047 });
+              captureException(new Error('Janela 24h fechada — alerta proativo não entregue'), { userId: usuario.user_id, tipo: 'alerta_proativo', metaCode: 131047 });
             } else {
               logger.error({ userId: usuario.user_id, metaCode: sendErr?.metaCode, err: sendErr?.message || sendErr }, '[ALERTAS] Falha ao enviar alerta proativo');
             }
