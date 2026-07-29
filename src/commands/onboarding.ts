@@ -52,9 +52,12 @@ export async function perguntarNome(sock: any, userId: string, nomeProfile?: str
   }
 }
 
+// TTL de 24h para estados de onboarding — o usuário pode interromper e retomar no dia seguinte.
+const TTL_ONBOARDING = 86400;
+
 async function salvarNomeEContinuar(sock: any, userId: string, nome: string): Promise<void> {
   await usuariosService.atualizarNomeUsuario(userId, nome);
-  await definirEstado(userId, 'onboarding_tipo_trabalho', {});
+  await definirEstado(userId, 'onboarding_tipo_trabalho', {}, TTL_ONBOARDING);
   await sock.sendMessage(userId, { text: `Olá, *${nome}*! 😊` });
   await perguntarTipoTrabalho(sock, userId);
 }
@@ -116,7 +119,7 @@ export async function handleOnboardingTipoTrabalho(sock: any, userId: string, te
 
   // Usuário fora do Brasil → pergunta a moeda antes da meta
   if (!prefixoBrasil(userId)) {
-    await definirEstado(userId, 'onboarding_moeda', {});
+    await definirEstado(userId, 'onboarding_moeda', {}, TTL_ONBOARDING);
     await perguntarMoeda(sock, userId);
     return;
   }
@@ -124,7 +127,7 @@ export async function handleOnboardingTipoTrabalho(sock: any, userId: string, te
   // Brasil: grava BRL explicitamente para limpar qualquer preferência anterior
   await setMoeda(userId, 'BRL');
 
-  await definirEstado(userId, 'onboarding_meta_diaria', {});
+  await definirEstado(userId, 'onboarding_meta_diaria', {}, TTL_ONBOARDING);
   await perguntarMetaDiaria(sock, userId, TIPO_LABELS[tipo]);
 }
 
@@ -167,7 +170,7 @@ export async function handleOnboardingMoeda(sock: any, userId: string, texto: st
   }
 
   await setMoeda(userId, moeda.codigo);
-  await definirEstado(userId, 'onboarding_meta_diaria', {});
+  await definirEstado(userId, 'onboarding_meta_diaria', {}, TTL_ONBOARDING);
 
   await sock.sendMessage(userId, {
     text: `✅ Moeda definida: *${moeda.nome}* (${moeda.simbolo})`,

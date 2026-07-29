@@ -3,6 +3,9 @@ import { logger } from '../infrastructure/logger';
 
 export const VERSAO_POLITICA_ATUAL = '1.1'; // atualizar aqui sempre que simplou.com/privacidade mudar
 
+// TTL de 24h para estados de onboarding — o usuário pode interromper e retomar no dia seguinte.
+const TTL_ONBOARDING = 86400;
+
 const MENSAGEM_BOAS_VINDAS =
   '✅ Consentimento registrado!\n\n' +
   '👋 *Bem-vindo ao Simplou Driver!*\n\n' +
@@ -103,7 +106,7 @@ export async function handleConsentimento(
     }
 
     await sock.sendMessage(userId, { text: MENSAGEM_BOAS_VINDAS });
-    await definirEstado(userId, 'onboarding_nome', { nomeProfile });
+    await definirEstado(userId, 'onboarding_nome', { nomeProfile }, TTL_ONBOARDING);
     await deps.perguntarNome(sock, userId, nomeProfile || undefined);
     return;
   }

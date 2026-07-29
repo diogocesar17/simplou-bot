@@ -1033,7 +1033,20 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
     return;
   }
 
-  // 4. Parsear mensagem — tenta driver parser primeiro (mais específico)
+  // 4. Guardar contra inputs de seleção de menu sem estado Redis ativo.
+  // Números simples (1, 2, 3...) chegam aqui quando o estado expirou enquanto o
+  // usuário estava no meio de um fluxo (ex: onboarding). Sem contexto, não há como
+  // saber o que "1" significa — gravar R$ 1,00 seria silenciosamente errado.
+  const textoTrimmed = (texto || '').trim();
+  if (/^\d{1,2}$/.test(textoTrimmed)) {
+    logger.warn({ userId, texto: textoTrimmed }, '[LANCAMENTO] Número solto sem estado ativo — abortando para evitar lançamento espúrio');
+    await sock.sendMessage(userId, {
+      text: 'Não entendi. Quer registrar um ganho, um gasto ou ver seu resumo?\n\n• _ganhei 280 no uber_\n• _abasteci 150 de gasolina_\n• _resumo_\n\nDigite *ajuda* para ver tudo que posso fazer.',
+    });
+    return;
+  }
+
+  // 5. Parsear mensagem — tenta driver parser primeiro (mais específico)
   const driverParsed = parseDriverMessage(texto);
   if (driverParsed) {
     logger.info({ tipo: driverParsed.tipo, valor: driverParsed.valor, categoria: driverParsed.categoria, platform: driverParsed.platform }, '[LANCAMENTO] Driver parser detectou frase driver-específica');
