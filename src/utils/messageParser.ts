@@ -260,12 +260,22 @@ function parseMessage(msg) {
     numParcelas = parseInt(matchParcelamento[1]);
   }
 
-  // Detecta recorrente/fixo e quantidade de meses
+  // Detecta intenção de recorrência semanal ou anual.
+  // Decisão de produto (beta): só recorrência mensal está implementada.
+  // Se detectado, o fluxo em lancamento.ts avisa o usuário e interrompe sem gravar.
+  const regexRecorrenciaSemanal = /\b(todo\s*s[aá]bado|toda\s*segunda|toda\s*ter[cç]a|toda\s*quarta|toda\s*quinta|toda\s*sexta|todo\s*domingo|toda\s*semana|semanalmente|semanal)\b/i;
+  const regexRecorrenciaAnual = /\b(todo\s*ano|anualmente|anual|todo\s*janeiro|todo\s*fevereiro|todo\s*mar[cç]o|todo\s*abril|todo\s*maio|todo\s*junho|todo\s*julho|todo\s*agosto|todo\s*setembro|todo\s*outubro|todo\s*novembro|todo\s*dezembro)\b/i;
+  const recorrenciaNaoSuportada: 'semanal' | 'anual' | null =
+    regexRecorrenciaSemanal.test(texto) ? 'semanal'
+    : regexRecorrenciaAnual.test(texto) ? 'anual'
+    : null;
+
+  // Detecta recorrente/fixo e quantidade de meses (apenas mensal suportado)
   let recorrente = false;
   let recorrenteMeses = 12; // padrão
   const regexFixo = /\b(fixo|recorrente|todo mês|mensal)\b/i;
   const regexPorMeses = /por\s*(\d{1,2})\s*mes(es)?/i;
-  
+
   // Detecta "por N meses" primeiro
   const matchMeses = texto.match(regexPorMeses);
   if (matchMeses) {
@@ -463,8 +473,8 @@ function parseMessage(msg) {
   const validacao = validarValor(valor, categoria, tipo, texto);
   if (validacao.error) {
     // Retorna o erro, mas inclui todas as informações necessárias para processar o lançamento
-    return { 
-      error: validacao.error, 
+    return {
+      error: validacao.error,
       valorExtraido: valor,
       tipo,
       categoria,
@@ -476,6 +486,7 @@ function parseMessage(msg) {
       numParcelas,
       recorrente,
       recorrenteMeses,
+      recorrenciaNaoSuportada,
       categoriaDetectada,
       confiancaCategoria,
       faltaFormaPagamento,
@@ -507,6 +518,7 @@ function parseMessage(msg) {
     numParcelas,
     recorrente,
     recorrenteMeses,
+    recorrenciaNaoSuportada,
     faltaFormaPagamento,
     faltaDataVencimento
   };

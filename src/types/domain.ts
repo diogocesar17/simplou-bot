@@ -17,6 +17,10 @@ export type FormaPagamento =
   | 'transferencia'
   | 'NÃO INFORMADO';
 
+// 'semanal' e 'anual' são usados por lembretesService, mas NÃO pelo fluxo de lançamento (lancamento.ts).
+// Decisão de produto (beta): o fluxo de registro de lançamento recorrente suporta apenas 'mensal'.
+// Intenções semanal/anual em mensagens de texto são detectadas em messageParser.ts e bloqueadas
+// com aviso ao usuário em lancamento.ts. Não remover os valores do tipo — lembretesService os usa.
 export type TipoRecorrencia = 'semanal' | 'mensal' | 'anual';
 
 export type StatusFaturaLancamento = 'pendente' | 'pago';

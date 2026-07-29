@@ -93,11 +93,6 @@ function extrairPagamento(norm: string): { pagamento: string; falta: boolean } {
   if (/\bdinheiro\b/.test(norm)) return { pagamento: 'dinheiro', falta: false };
   if (/\bcredito\b/.test(norm)) return { pagamento: 'credito', falta: false };
   if (/\bdebito\b/.test(norm)) return { pagamento: 'debito', falta: false };
-  // Métodos europeus
-  if (/\bmbway\b|\bmb way\b/.test(norm)) return { pagamento: 'mbway', falta: false };
-  if (/\bmultibanco\b/.test(norm)) return { pagamento: 'multibanco', falta: false };
-  if (/\bbizum\b/.test(norm)) return { pagamento: 'bizum', falta: false };
-  if (/\bsepa\b/.test(norm)) return { pagamento: 'sepa', falta: false };
   if (/\btransferencia\b|\btransferência\b/.test(norm)) return { pagamento: 'transferencia', falta: false };
   return { pagamento: 'NÃO INFORMADO', falta: true };
 }

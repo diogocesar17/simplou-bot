@@ -1095,7 +1095,20 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
   let parsed = parseMessage(texto);
   const parsedNormal = parsed;
   logger.info({ valor: parsed?.valor ?? 'n/a', categoria: parsed?.categoria ?? 'n/a', pagamento: parsed?.pagamento ?? 'n/a' }, '[LANCAMENTO] Parse normal resumo');
-  
+
+  // Bloqueia intenção de recorrência semanal ou anual antes de qualquer processamento.
+  // Decisão de produto (beta): só recorrência mensal está implementada em lancamento.ts.
+  // Semanal e anual existem em TipoRecorrencia (domain.ts) e em lembretesService, mas não
+  // no fluxo de lançamento — gravar silenciosamente como mensal produziria dados incorretos.
+  if (parsed?.recorrenciaNaoSuportada) {
+    const tipo = parsed.recorrenciaNaoSuportada === 'semanal' ? 'semanal' : 'anual';
+    logger.info({ userId, tipo }, '[LANCAMENTO] Recorrência não suportada detectada — interrompendo');
+    await sock.sendMessage(userId, {
+      text: `Por enquanto só consigo registrar gastos recorrentes mensais.\n\nSe quiser registrar este gasto como mensal, diga algo como:\n• _internet 120 pix todo mês_\n• _academia 80 crédito fixo_\n\nRecorrência ${tipo} chegará em breve.`,
+    });
+    return;
+  }
+
   // Se o parse normal falhou ou categoria é incerta, tentar cache e depois IA
   if (!parsed || !parsed.valor || parsed.categoria === 'Outros' || parsed.confiancaCategoria === 'nenhuma') {
     // 1. Consultar cache de padrões confirmados antes de chamar a IA
