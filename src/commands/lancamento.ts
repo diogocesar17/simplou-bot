@@ -26,6 +26,12 @@ import { definirEstado, obterEstado, limparEstado } from '../configs/stateManage
 import { formatarMensagem } from '../utils/formatMessages';
 import { logger } from '../infrastructure/logger';
 import { verificarLimiteGeminiDia, incrementarGeminiDia } from '../services/rateLimitService';
+import {
+  montarCardConfirmacaoIA,
+  interpretarRespostaConfirmacaoIA,
+  resolverCategoriaLivre,
+  CATEGORIAS_VALIDAS,
+} from '../utils/cardConfirmacaoIA';
 
 // Normaliza frase para uso como chave no parser_cache.
 // Substitui o valor monetário por X mas preserva números que são nomes de plataforma (ex: "99").
@@ -57,6 +63,19 @@ const DRIVER_CATEGORIAS = new Set([
 // Função para gerar ID único
 function gerarIdUnico() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// Extrai a sugestão original da IA (categoria/tipo/pagamento), se o lançamento veio de um
+// fluxo de fallback de IA (texto/áudio/voucher). Usado apenas para instrumentação — nunca
+// reflete correções feitas pelo usuário no card de confirmação. Ausente (undefined) quando
+// o lançamento não passou pela IA, resultando em colunas NULL no banco.
+function camposSugestaoIA(parsed: any) {
+  const sugestao = parsed?.sugestaoIA;
+  return {
+    categoria_sugerida_ia: sugestao?.categoria ?? null,
+    tipo_sugerido_ia: sugestao?.tipo ?? null,
+    pagamento_sugerido_ia: (sugestao?.pagamento && sugestao.pagamento !== 'NÃO INFORMADO') ? sugestao.pagamento : null,
+  };
 }
 
 // Função para categorização baseada em palavras-chave
@@ -420,7 +439,8 @@ async function criarParcelamento(userId, parsed, cartaoInfo: any = null) {
       ano_fatura: cartaoInfo ? (resultadoContabilizacao as any).anoFatura : null,
       dia_vencimento: cartaoInfo ? cartaoInfo.dia_vencimento : null,
       status_fatura: cartaoInfo ? 'pendente' : null,
-      data_vencimento: converterDataParaISO(parsed.dataVencimento)
+      data_vencimento: converterDataParaISO(parsed.dataVencimento),
+      ...camposSugestaoIA(parsed),
     };
 
     await lancamentosService.salvarLancamento(userId, dados as any);
@@ -467,7 +487,8 @@ async function criarRecorrente(userId, parsed, cartaoInfo: any = null) {
       ano_fatura: cartaoInfo ? (resultadoContabilizacao as any).anoFatura : null,
       dia_vencimento: cartaoInfo ? cartaoInfo.dia_vencimento : null,
       status_fatura: cartaoInfo ? 'pendente' : null,
-      data_vencimento: converterDataParaISO(parsed.dataVencimento)
+      data_vencimento: converterDataParaISO(parsed.dataVencimento),
+      ...camposSugestaoIA(parsed),
     };
 
     await lancamentosService.salvarLancamento(userId, dados as any);
@@ -589,286 +610,71 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
   const estado = await obterEstado(userId);
   if (estado?.etapa === 'aguardando_confirmacao_ia') {
     const parsed = estado.dadosParciais as any;
-    // Tratamento específico para áudio
-    if (parsed?.origem === 'audio') {
-      const resposta = texto.toLowerCase().trim();
+    const origem = parsed?.origem; // 'audio' | 'voucher' | undefined (fallback de texto)
+    const respostaInterpretada = interpretarRespostaConfirmacaoIA(texto);
 
-      // Permitir ajuste de categoria também para áudios
-      if (resposta.startsWith('categoria ')) {
-        const novaCategoria = resposta.replace('categoria ', '').trim();
-        const categoriasValidas = [
-          'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia',
-          'Lazer', 'Trabalho', 'Renda', 'Outros',
-          // Categorias driver
-          'Combustível', 'Manutenção', 'Pedágio', 'Estacionamento', 'Lavagem', 'IPVA', 'Multa', 'Taxa do App',
-        ];
-
-        if (categoriasValidas.includes(novaCategoria)) {
-          parsed.categoria = novaCategoria;
-          const pagamentoView = parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO';
-          await sock.sendInteractiveMessage(userId, {
-            type: 'button',
-            header: '🤖 Interpretação do áudio',
-            body:
-              `🗣️ _${String(parsed.transcricao || '').slice(0, 300)}_\n\n` +
-              `💰 Valor: ${formatarComMoeda(parsed.valor)}\n` +
-              `📝 Descrição: ${parsed.descricao}\n` +
-              `📂 Categoria: ${parsed.categoria}\n` +
-              `💳 Pagamento: ${pagamentoView}\n` +
-              `📅 Data: ${parsed.data}`,
-            footer: 'Para ajustar a categoria, digite: categoria [nome]',
-            buttons: [
-              { id: 'ia_confirmar', title: '✅ Confirmar' },
-              { id: 'ia_cancelar', title: '❌ Cancelar' },
-            ],
-          });
-          return;
-        } else {
-          await sock.sendMessage(userId, {
-            text: `❌ Categoria inválida. Categorias disponíveis:\n\n${categoriasValidas.map(cat => `• ${cat}`).join('\n')}\n\n💡 Digite: "categoria [nome_da_categoria]"`
-          });
-          return;
-        }
-      }
-
-      const opcaoConfirmacao = parseInt(resposta, 10);
-      const confirmou = resposta === 'ia_confirmar' || (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 1) || ['s', 'sim', 'y', 'yes'].includes(resposta);
-      const negou = resposta === 'ia_cancelar' || (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 2) || ['n', 'nao', 'não', 'no'].includes(resposta);
-
-      if (confirmou) {
-        const dataBR = (() => {
-          try {
-            const [yy, mm, dd] = String(parsed.data || '').split('-');
-            if (yy && mm && dd) return `${dd}/${mm}/${yy}`;
-          } catch {}
-          return new Date().toLocaleDateString('pt-BR');
-        })();
-
-        const parsedCompat = {
-          tipo: parsed.tipo || 'gasto',
-          valor: parsed.valor,
-          descricao: parsed.descricao,
-          categoria: parsed.categoria || 'Outros',
-          pagamento: parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO',
-          data: dataBR,
-          faltaFormaPagamento: false,
-          faltaDataVencimento: false,
-          parcelamento: parsed.parcelado || false,
-          numParcelas: parsed.parcelas || 1,
-          parcelas_totais: parsed.parcelas || 1,
-          parcela_atual: 1,
-          recorrente: false,
-        };
-
-        await limparEstado(userId);
-        return await processarLancamento(sock, userId, parsedCompat, texto);
-      }
-
-      if (negou) {
-        await limparEstado(userId);
-        await sock.sendMessage(userId, { text: '❌ Lançamento cancelado.' });
-        return;
-      }
-
-      await sock.sendMessage(userId, { text: '❌ Opção inválida. Responda com 1 (Sim) ou 2 (Não), ou "S"/"N".' });
-      return;
-    }
-    // Tratamento específico para voucher
-    if (parsed?.origem === 'voucher') {
-      const resposta = texto.toLowerCase().trim();
-
-      // Permitir ajuste de categoria também para vouchers
-      if (resposta.startsWith('categoria ')) {
-        const novaCategoria = resposta.replace('categoria ', '').trim();
-        const categoriasValidas = [
-          'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia',
-          'Lazer', 'Trabalho', 'Renda', 'Outros',
-          // Categorias driver
-          'Combustível', 'Manutenção', 'Pedágio', 'Estacionamento', 'Lavagem', 'IPVA', 'Multa', 'Taxa do App',
-        ];
-
-        if (categoriasValidas.includes(novaCategoria)) {
-          parsed.categoria = novaCategoria;
-          const pagamentoView = parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO';
-          const parceladoTexto = parsed.parcelado ? `\n🔢 Parcelado: Sim (${parsed.parcelas}x)` : '';
-          await sock.sendInteractiveMessage(userId, {
-            type: 'button',
-            header: '🤖 Análise do comprovante',
-            body:
-              `💰 Valor: ${formatarComMoeda(parsed.valor)}\n` +
-              `📝 Descrição: ${parsed.descricao}\n` +
-              `📂 Categoria: ${parsed.categoria}\n` +
-              `💳 Pagamento: ${pagamentoView}\n` +
-              `📅 Data: ${parsed.data}` +
-              parceladoTexto,
-            footer: 'Para ajustar a categoria, digite: categoria [nome]',
-            buttons: [
-              { id: 'ia_confirmar', title: '✅ Confirmar' },
-              { id: 'ia_cancelar', title: '❌ Cancelar' },
-            ],
-          });
-          return;
-        } else {
-          await sock.sendMessage(userId, {
-            text: `❌ Categoria inválida. Categorias disponíveis:\n\n${categoriasValidas.map(cat => `• ${cat}`).join('\n')}\n\n💡 Digite: "categoria [nome_da_categoria]"`
-          });
-          return;
-        }
-      }
-
-      const opcaoConfirmacao = parseInt(resposta, 10);
-      const confirmou = resposta === 'ia_confirmar' || (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 1) || ['s', 'sim', 'y', 'yes'].includes(resposta);
-      const negou = resposta === 'ia_cancelar' || (!isNaN(opcaoConfirmacao) && opcaoConfirmacao === 2) || ['n', 'nao', 'não', 'no'].includes(resposta);
-
-      if (confirmou) {
-        // Montar parsed compatível com processarLancamento para reaproveitar fluxo (cartão, parcelamento, etc.)
-        const dataBR = (() => {
-          try {
-            const [yy, mm, dd] = String(parsed.data || '').split('-');
-            if (yy && mm && dd) return `${dd}/${mm}/${yy}`;
-          } catch {}
-          return new Date().toLocaleDateString('pt-BR');
-        })();
-
-        const parsedCompat = {
-          tipo: parsed.tipo || 'gasto',
-          valor: parsed.valor,
-          descricao: parsed.descricao,
-          categoria: parsed.categoria || 'Outros',
-          pagamento: parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO',
-          data: dataBR,
-          faltaFormaPagamento: false,
-          faltaDataVencimento: false,
-          parcelamento: parsed.parcelado || false,
-          numParcelas: parsed.parcelas || 1,
-          parcelas_totais: parsed.parcelas || 1,
-          parcela_atual: 1,
-          recorrente: false,
-        };
-
-        await limparEstado(userId);
-        return await processarLancamento(sock, userId, parsedCompat, texto);
-      }
-
-      if (negou) {
-        await limparEstado(userId);
-        await sock.sendMessage(userId, { text: '❌ Lançamento cancelado.' });
-        return;
-      }
-
-      await sock.sendMessage(userId, { text: '❌ Opção inválida. Responda com 1 (Sim) ou 2 (Não), ou "S"/"N".' });
-      return;
-    }
-
-    const resposta = texto.toLowerCase().trim();
-    
-    // Verificar se quer alterar categoria
-    if (resposta.startsWith('categoria ')) {
-      const novaCategoria = resposta.replace('categoria ', '').trim();
-      const categoriasValidas = [
-        'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Moradia',
-        'Lazer', 'Trabalho', 'Renda', 'Outros',
-        // Categorias driver
-        'Combustível', 'Manutenção', 'Pedágio', 'Estacionamento', 'Lavagem', 'IPVA', 'Multa', 'Taxa do App',
-      ];
-      
-      if (categoriasValidas.includes(novaCategoria)) {
-        parsed.categoria = novaCategoria;
-        await sock.sendInteractiveMessage(userId, {
-          type: 'button',
-          header: '🤖 Análise da IA',
-          body:
-            `💰 Valor: ${formatarComMoeda(parsed.valor)}\n` +
-            `📝 Descrição: ${parsed.descricao}\n` +
-            `📂 Categoria: ${parsed.categoria}\n` +
-            `💳 Pagamento: ${parsed.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsed.pagamento}\n` +
-            `📅 Data: ${parsed.data}`,
-          footer: 'Para ajustar a categoria, digite: categoria [nome]',
-          buttons: [
-            { id: 'ia_confirmar', title: '✅ Confirmar' },
-            { id: 'ia_cancelar', title: '❌ Cancelar' },
-          ],
-        });
-        return;
-      } else {
+    // Correção de categoria (sintaxe livre ou "categoria [nome]" por compatibilidade)
+    if (respostaInterpretada.acao === 'categoria') {
+      const categoriaResolvida = resolverCategoriaLivre(respostaInterpretada.valor);
+      if (!categoriaResolvida) {
         await sock.sendMessage(userId, {
-          text: `❌ Categoria inválida. Categorias disponíveis:\n\n${categoriasValidas.map(cat => `• ${cat}`).join('\n')}\n\n💡 Digite: "categoria [nome_da_categoria]"`
+          text: `Não reconheci essa categoria. Categorias disponíveis:\n\n${CATEGORIAS_VALIDAS.map(cat => `• ${cat}`).join('\n')}\n\nDigite o nome de uma delas.`
         });
         return;
       }
-    }
-    
-    const opcaoConfirmacao = parseInt(resposta, 10);
-    if (!isNaN(opcaoConfirmacao) || resposta === 'ia_confirmar' || resposta === 'ia_cancelar') {
-      if (opcaoConfirmacao === 1 || resposta === 'ia_confirmar') {
-        // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
-        if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento)) {
-          await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
-          await sock.sendInteractiveMessage(userId, {
-            type: 'list',
-            header: '💳 Como pagou?',
-            body: 'Selecione a forma de pagamento:',
-            buttonLabel: 'Ver opções',
-            sections: [{ rows: [
-              { id: '1', title: '💠 Pix' },
-              { id: '2', title: '💵 Dinheiro' },
-              { id: '3', title: '💳 Cartão de crédito' },
-              { id: '4', title: '🏦 Débito' },
-              { id: '5', title: '📋 Boleto' },
-              { id: '6', title: '🔄 Transferência' },
-            ]}],
-          });
-          return;
-        }
-        // Forma de pagamento presente, processar lançamento
-        await limparEstado(userId);
-        return await processarLancamento(sock, userId, parsed, texto);
-      }
-      if (opcaoConfirmacao === 2 || resposta === 'ia_cancelar') {
-        await limparEstado(userId);
-        await sock.sendMessage(userId, {
-          text: '❌ Lançamento cancelado. Tente novamente com um formato mais claro.'
-        });
-        return;
-      }
-      // Opção inválida
-      await sock.sendMessage(userId, { text: '❌ Opção inválida. Digite 1 para Sim ou 2 para Não.' });
-      return;
-    }
-    // Backward compatibility: aceitar textos
-    if (resposta === 'sim' || resposta === 's' || resposta === 'yes' || resposta === 'y') {
-      // Usuário confirmou; se forma de pagamento não informada, solicitar antes de processar
-      if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento)) {
-        await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
-        await sock.sendInteractiveMessage(userId, {
-          type: 'list',
-          header: '💳 Como pagou?',
-          body: 'Selecione a forma de pagamento:',
-          buttonLabel: 'Ver opções',
-          sections: [{ rows: [
-            { id: '1', title: '💠 Pix' },
-            { id: '2', title: '💵 Dinheiro' },
-            { id: '3', title: '💳 Cartão de crédito' },
-            { id: '4', title: '🏦 Débito' },
-            { id: '5', title: '📋 Boleto' },
-            { id: '6', title: '🔄 Transferência' },
-          ]}],
-        });
-        return;
-      }
-      // Forma de pagamento presente, processar lançamento
-      await limparEstado(userId);
-      return await processarLancamento(sock, userId, parsed, texto);
-    } else if (resposta === 'não' || resposta === 'nao' || resposta === 'n' || resposta === 'no') {
-      await limparEstado(userId);
-      await sock.sendMessage(userId, { 
-        text: '❌ Lançamento cancelado. Tente novamente com um formato mais claro.' 
+      parsed.categoria = categoriaResolvida;
+      // Persiste a correção no Redis antes de reenviar o card (senão a próxima resposta
+      // do usuário voltaria a ver a categoria antiga)
+      await definirEstado(userId, 'aguardando_confirmacao_ia', parsed);
+      const cardAtualizado = montarCardConfirmacaoIA({
+        tipo: parsed.tipo || 'gasto',
+        valor: parsed.valor,
+        descricao: parsed.descricao,
+        categoria: parsed.categoria,
+        data: parsed.data,
+        transcricao: origem === 'audio' ? parsed.transcricao : undefined,
+        linhasExtras: origem === 'voucher' && parsed.parcelado ? [`Parcelado: Sim (${parsed.parcelas}x)`] : undefined,
       });
-      return;
-    } else {
-      await sock.sendMessage(userId, { text: '❌ Opção inválida. Digite 1 para Sim ou 2 para Não.' });
+      await sock.sendMessage(userId, { text: cardAtualizado });
       return;
     }
+
+    // Opção 2 inverte o tipo (gasto ↔ receita), mantendo valor/categoria/data
+    if (respostaInterpretada.acao === 'inverter_tipo') {
+      parsed.tipo = String(parsed.tipo || '').toLowerCase() === 'receita' ? 'gasto' : 'receita';
+    }
+
+    // Normaliza para o formato esperado por processarLancamento (áudio/voucher usam
+    // campos/formatos próprios vindos direto da IA; o fallback de texto já está compatível)
+    let parsedCompat: any = parsed;
+    if (origem === 'audio' || origem === 'voucher') {
+      const dataBR = (() => {
+        try {
+          const [yy, mm, dd] = String(parsed.data || '').split('-');
+          if (yy && mm && dd) return `${dd}/${mm}/${yy}`;
+        } catch {}
+        return new Date().toLocaleDateString('pt-BR');
+      })();
+
+      parsedCompat = {
+        tipo: parsed.tipo || 'gasto',
+        valor: parsed.valor,
+        descricao: parsed.descricao,
+        categoria: parsed.categoria || 'Outros',
+        pagamento: parsed.formaPagamento || parsed.pagamento || 'NÃO INFORMADO',
+        data: dataBR,
+        faltaFormaPagamento: false,
+        faltaDataVencimento: false,
+        parcelamento: parsed.parcelado || false,
+        numParcelas: parsed.parcelas || 1,
+        parcelas_totais: parsed.parcelas || 1,
+        parcela_atual: 1,
+        recorrente: false,
+        sugestaoIA: parsed.sugestaoIA,
+      };
+    }
+
+    return await finalizarConfirmacaoIA(sock, userId, parsedCompat, texto);
   }
 
   // 2. Fluxo aguardando forma de pagamento
@@ -1023,6 +829,7 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
       status_fatura: 'pendente',
       data_vencimento: converterDataParaISO(parsed.dataVencimento),
       mensagemOriginal: texto,
+      ...camposSugestaoIA(parsed),
     };
   logger.info({ tipo: dados.tipo, valor: dados.valor, categoria: dados.categoria, pagamento: dados.pagamento, cartao: dados.cartao_nome }, '🔔 Dados do lançamento (resumo)');
     const novoIdEscolhido = await lancamentosService.salvarLancamento(userId, dados as any);
@@ -1183,29 +990,30 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
     if (parsedIA && parsedIA.valor) {
   logger.info('[LANCAMENTO] ✅ IA fallback retornou um parsed válido.');
 
+      // Sugestão original da IA, antes de qualquer correção do usuário — usada só para
+      // instrumentação (categoria_sugerida_ia / tipo_sugerido_ia / pagamento_sugerido_ia)
+      const sugestaoIA = {
+        categoria: parsedIA.categoria,
+        tipo: parsedIA.tipo,
+        pagamento: parsedIA.pagamento,
+      };
+
       // Confirmar com o usuário se a IA entendeu corretamente
       const avisoConfianca = (parsedIA as any).confianca < 0.6
-        ? '\n\n⚠️ _Não tenho certeza sobre este lançamento — revise os dados antes de confirmar._'
-        : '';
-      await sock.sendInteractiveMessage(userId, {
-        type: 'button',
-        header: '🤖 Análise da IA',
-        body:
-          `💰 Valor: ${formatarComMoeda(parsedIA.valor)}\n` +
-          `📝 Descrição: ${parsedIA.descricao}\n` +
-          `📂 Categoria: ${parsedIA.categoria}\n` +
-          `💳 Pagamento: ${parsedIA.pagamento === 'NÃO INFORMADO' ? 'Não informado' : parsedIA.pagamento}\n` +
-          `📅 Data: ${parsedIA.data}` +
-          avisoConfianca,
-        footer: 'Para ajustar a categoria, digite: categoria [nome]',
-        buttons: [
-          { id: 'ia_confirmar', title: '✅ Confirmar' },
-          { id: 'ia_cancelar', title: '❌ Cancelar' },
-        ],
+        ? '⚠️ _Não tenho certeza sobre este lançamento — revise os dados antes de confirmar._'
+        : undefined;
+      const card = montarCardConfirmacaoIA({
+        tipo: parsedIA.tipo,
+        valor: parsedIA.valor,
+        descricao: parsedIA.descricao,
+        categoria: parsedIA.categoria,
+        data: parsedIA.data,
+        avisoConfianca,
       });
+      await sock.sendMessage(userId, { text: card });
 
-      // Salva texto original no estado para gravar no cache ao confirmar
-      await definirEstado(userId, 'aguardando_confirmacao_ia', { ...parsedIA, textoOriginal: texto });
+      // Salva texto original e sugestão da IA no estado (usado ao confirmar/corrigir)
+      await definirEstado(userId, 'aguardando_confirmacao_ia', { ...parsedIA, textoOriginal: texto, sugestaoIA });
       return;
     } else {
   logger.warn('[LANCAMENTO] ❌ IA falhou ou atingiu timeout. Comunicando usuário e seguindo padrão.');
@@ -1263,6 +1071,31 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
   await processarLancamento(sock, userId, parsed, texto);
 }
 
+// Fecha o fluxo de confirmação da IA (confirmar ou inverter tipo): se for um gasto sem forma
+// de pagamento conhecida, pede a forma de pagamento antes; senão processa o lançamento direto.
+async function finalizarConfirmacaoIA(sock, userId, parsed: any, textoOriginal: string) {
+  if (String(parsed.tipo || '').toLowerCase() === 'gasto' && (!parsed.pagamento || parsed.pagamento === 'NÃO INFORMADO' || parsed.faltaFormaPagamento)) {
+    await definirEstado(userId, 'aguardando_forma_pagamento', parsed);
+    await sock.sendInteractiveMessage(userId, {
+      type: 'list',
+      header: '💳 Como pagou?',
+      body: 'Selecione a forma de pagamento:',
+      buttonLabel: 'Ver opções',
+      sections: [{ rows: [
+        { id: '1', title: '💠 Pix' },
+        { id: '2', title: '💵 Dinheiro' },
+        { id: '3', title: '💳 Cartão de crédito' },
+        { id: '4', title: '🏦 Débito' },
+        { id: '5', title: '📋 Boleto' },
+        { id: '6', title: '🔄 Transferência' },
+      ]}],
+    });
+    return;
+  }
+  await limparEstado(userId);
+  return await processarLancamento(sock, userId, parsed, textoOriginal);
+}
+
 async function processarLancamento(sock, userId, parsed, mensagemOriginal?: string) {
   // Se veio de confirmação da IA e tem texto original, gravar padrão no cache
   if (parsed.textoOriginal && parsed.categoria && parsed.tipo) {
@@ -1299,6 +1132,7 @@ async function processarLancamento(sock, userId, parsed, mensagemOriginal?: stri
         pagamento: parsed.pagamento,
         data_vencimento: converterDataParaISO(parsed.dataVencimento),
         mensagemOriginal: mensagemOriginal ?? parsed.textoOriginal,
+        ...camposSugestaoIA(parsed),
       };
 
       const novoIdSemCartao = await lancamentosService.salvarLancamento(userId, dados);
@@ -1368,6 +1202,7 @@ async function processarLancamento(sock, userId, parsed, mensagemOriginal?: stri
         status_fatura: 'pendente',
         data_vencimento: converterDataParaISO(parsed.dataVencimento),
         mensagemOriginal: mensagemOriginal ?? parsed.textoOriginal,
+        ...camposSugestaoIA(parsed),
       };
 
       const novoIdCartao = await lancamentosService.salvarLancamento(userId, dados);
@@ -1449,6 +1284,7 @@ async function processarLancamento(sock, userId, parsed, mensagemOriginal?: stri
     platform: parsed.platform || null,
     business_context: parsed.business_context || null,
     mensagemOriginal: mensagemOriginal ?? parsed.textoOriginal,
+    ...camposSugestaoIA(parsed),
   };
 
   const novoId = await lancamentosService.salvarLancamento(userId, dados);

@@ -93,6 +93,12 @@ export interface Lancamento {
 
   // Boleto
   data_vencimento: string | null;      // DATE as ISO string
+
+  // Instrumentação: sugestão original da IA (fallback de texto/áudio/voucher), antes de
+  // qualquer correção do usuário. NULL quando o lançamento não passou pelo fallback de IA.
+  categoria_sugerida_ia: string | null;
+  tipo_sugerido_ia: TipoLancamento | null;
+  pagamento_sugerido_ia: string | null;
 }
 
 export interface CartaoConfig {
@@ -182,6 +188,9 @@ export interface DadosLancamento {
   dia_vencimento?: number | null;
   status_fatura?: StatusFaturaLancamento | null;
   data_vencimento?: string | null;      // YYYY-MM-DD
+  categoria_sugerida_ia?: string | null;
+  tipo_sugerido_ia?: TipoLancamento | null;
+  pagamento_sugerido_ia?: string | null;
 }
 
 export interface AnaliseTransacao {

@@ -28,6 +28,10 @@ interface DadosLancamento {
   platform?: string | null;
   business_context?: string | null;
   mensagemOriginal?: string;
+  // Instrumentação: sugestão original da IA (nullable — só populado quando veio de fallback de IA)
+  categoria_sugerida_ia?: string | null;
+  tipo_sugerido_ia?: string | null;
+  pagamento_sugerido_ia?: string | null;
 }
 
 interface ResumoFinanceiro {
@@ -113,7 +117,10 @@ export async function salvarLancamento(userId: string, dados: DadosLancamento): 
     dados.status_fatura || null,   // $20
     dados.data_vencimento || null, // $21
     dados.platform || null,        // $22 (driver)
-    dados.business_context || null // $23 (driver)
+    dados.business_context || null, // $23 (driver)
+    dados.categoria_sugerida_ia || null, // $24 (sugestão original da IA)
+    dados.tipo_sugerido_ia || null,      // $25 (sugestão original da IA)
+    dados.pagamento_sugerido_ia || null, // $26 (sugestão original da IA)
   ];
   
   const resultado = await databaseService.appendRowToDatabase(userId, values, dados.mensagemOriginal);

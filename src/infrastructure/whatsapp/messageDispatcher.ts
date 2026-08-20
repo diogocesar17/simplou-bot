@@ -2,9 +2,9 @@ import { IWhatsAppAdapter } from './IWhatsAppAdapter'
 import { handleMessage } from '../../index'
 import { isPremium, MSG_UPGRADE } from '../../services/planoService'
 import { definirEstado } from '../../configs/stateManager'
-import { formatarValor, formatarComMoeda } from '../../utils/formatUtils'
 import { logger } from '../logger'
 import { verificarLimiteGeminiDia, incrementarGeminiDia } from '../../services/rateLimitService'
+import { montarCardConfirmacaoIA } from '../../utils/cardConfirmacaoIA'
 
 const geminiService = require('../../services/geminiService')
 
@@ -49,26 +49,20 @@ export async function dispatchWhatsAppMessage(
         return
       }
 
-      await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'audio', ...analise })
+      // Sugestão original da IA, antes de qualquer correção do usuário — usada só para
+      // instrumentação (categoria_sugerida_ia / tipo_sugerido_ia / pagamento_sugerido_ia)
+      const sugestaoIA = { categoria: analise.categoria, tipo: analise.tipo, pagamento: analise.formaPagamento }
+      await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'audio', ...analise, sugestaoIA })
 
-      const valorFmt = formatarValor(analise.valor)
-      const transcricao = String(analise.transcricao || '').slice(0, 300)
-      await adapter.sendInteractiveMessage(userId, {
-        type: 'button',
-        header: '🤖 Interpretação do áudio',
-        body:
-          `🗣️ _${transcricao}_\n\n` +
-          `📅 Data: ${analise.data}\n` +
-          `💰 Valor: ${formatarComMoeda(valorFmt)}\n` +
-          `📂 Categoria: ${analise.categoria}\n` +
-          `💳 Pagamento: ${analise.formaPagamento}\n` +
-          `📝 Descrição: ${analise.descricao}`,
-        footer: 'Para ajustar a categoria, digite: categoria [nome]',
-        buttons: [
-          { id: '1', title: '✅ Confirmar' },
-          { id: '2', title: '❌ Cancelar' },
-        ],
+      const card = montarCardConfirmacaoIA({
+        tipo: analise.tipo,
+        valor: analise.valor,
+        descricao: analise.descricao,
+        categoria: analise.categoria,
+        data: analise.data,
+        transcricao: analise.transcricao,
       })
+      await adapter.sendMessage(userId, { text: card })
     } catch (err) {
       logger.error({ err: (err as any)?.message || err }, '[AUDIO] Erro ao processar áudio')
       await adapter.sendMessage(userId, {
@@ -108,26 +102,20 @@ export async function dispatchWhatsAppMessage(
         return
       }
 
-      await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'voucher', ...analise })
+      // Sugestão original da IA, antes de qualquer correção do usuário — usada só para
+      // instrumentação (categoria_sugerida_ia / tipo_sugerido_ia / pagamento_sugerido_ia)
+      const sugestaoIA = { categoria: analise.categoria, tipo: analise.tipo, pagamento: analise.formaPagamento }
+      await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'voucher', ...analise, sugestaoIA })
 
-      const valorFmt = formatarValor(analise.valor)
-      const parcelado = analise.parcelado ? `\n🔢 Parcelado: Sim (${analise.parcelas}x)` : ''
-      await adapter.sendInteractiveMessage(userId, {
-        type: 'button',
-        header: '🤖 Análise do comprovante',
-        body:
-          `📅 Data: ${analise.data}\n` +
-          `💰 Valor: ${formatarComMoeda(valorFmt)}\n` +
-          `📂 Categoria: ${analise.categoria}\n` +
-          `💳 Pagamento: ${analise.formaPagamento}\n` +
-          `📝 Descrição: ${analise.descricao}` +
-          parcelado,
-        footer: 'Para ajustar a categoria, digite: categoria [nome]',
-        buttons: [
-          { id: '1', title: '✅ Confirmar' },
-          { id: '2', title: '❌ Cancelar' },
-        ],
+      const card = montarCardConfirmacaoIA({
+        tipo: analise.tipo,
+        valor: analise.valor,
+        descricao: analise.descricao,
+        categoria: analise.categoria,
+        data: analise.data,
+        linhasExtras: analise.parcelado ? [`Parcelado: Sim (${analise.parcelas}x)`] : undefined,
       })
+      await adapter.sendMessage(userId, { text: card })
     } catch (err) {
       logger.error({ err: (err as any)?.message || err }, '[VOUCHER] Erro ao processar comprovante')
       await adapter.sendMessage(userId, {

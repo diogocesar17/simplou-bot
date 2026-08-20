@@ -367,6 +367,9 @@ async function initializeDatabase() {
     // Migrações Driver (additive — não afeta dados existentes)
     await migrateDriverTables(client);
 
+    // Colunas de instrumentação da sugestão original da IA (additive — nullable)
+    await migrateSugestaoIAColumns(client);
+
     client.release();
     logger.info('✅ Banco de dados inicializado com sucesso');
   } catch (error: any) {
@@ -806,8 +809,12 @@ async function appendRowToDatabase(userId, values, mensagemOriginal?: string) {
     // values[0..19] = colunas originais ($2..$21)
     // values[20] = platform (opcional, nullable)
     // values[21] = business_context (opcional, nullable)
+    // values[22..24] = sugestão original da IA — categoria/tipo/pagamento (opcional, nullable)
     const platform = values[20] !== undefined ? values[20] : null;
     const businessContext = values[21] !== undefined ? values[21] : null;
+    const categoriaSugeridaIA = values[22] !== undefined ? values[22] : null;
+    const tipoSugeridoIA = values[23] !== undefined ? values[23] : null;
+    const pagamentoSugeridoIA = values[24] !== undefined ? values[24] : null;
     const query = `
       INSERT INTO lancamentos (
         user_id, data, tipo, descricao, valor, categoria, pagamento,
@@ -815,12 +822,21 @@ async function appendRowToDatabase(userId, values, mensagemOriginal?: string) {
         recorrente, recorrente_fim, recorrente_id,
         cartao_nome, data_lancamento, data_contabilizacao,
         mes_fatura, ano_fatura, dia_vencimento, status_fatura, data_vencimento,
-        platform, business_context
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+        platform, business_context,
+        categoria_sugerida_ia, tipo_sugerido_ia, pagamento_sugerido_ia
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
       RETURNING id
     `;
 
-    const result = await queryDatabase(query, [userId, ...values.slice(0, 20), platform, businessContext]);
+    const result = await queryDatabase(query, [
+      userId,
+      ...values.slice(0, 20),
+      platform,
+      businessContext,
+      categoriaSugeridaIA,
+      tipoSugeridoIA,
+      pagamentoSugeridoIA,
+    ]);
     const lancamentoId = result.rows[0].id;
 
     // Registrar log de auditoria
@@ -3225,6 +3241,24 @@ async function migrateDriverTables(client: any): Promise<void> {
   } catch (err: any) {
     logger.error({ err: err?.message || err }, '[DB] Erro nas migrações driver');
     // Não re-throw — migrações driver não devem impedir boot do bot
+  }
+}
+
+// ===== SUGESTÃO IA (instrumentação) =====
+
+async function migrateSugestaoIAColumns(client: any): Promise<void> {
+  try {
+    logger.info('[DB] Aplicando migração de colunas de sugestão da IA...');
+    await client.query(`
+      ALTER TABLE lancamentos
+        ADD COLUMN IF NOT EXISTS categoria_sugerida_ia VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS tipo_sugerido_ia      VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS pagamento_sugerido_ia VARCHAR(20)
+    `);
+    logger.info('[DB] Migração de colunas de sugestão da IA aplicada com sucesso');
+  } catch (err: any) {
+    logger.error({ err: err?.message || err }, '[DB] Erro na migração de colunas de sugestão da IA');
+    // Não re-throw — migração aditiva não deve impedir boot do bot
   }
 }
 

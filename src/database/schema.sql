@@ -88,7 +88,13 @@ CREATE TABLE IF NOT EXISTS lancamentos (
   data_vencimento     DATE,                                   -- vencimento do boleto
 
   -- Status
-  status_fatura       VARCHAR(20)             DEFAULT 'pendente'
+  status_fatura       VARCHAR(20)             DEFAULT 'pendente',
+
+  -- Instrumentação: sugestão original da IA (fallback de texto/áudio/voucher), antes de
+  -- qualquer correção do usuário. NULL quando o lançamento não passou pelo fallback de IA.
+  categoria_sugerida_ia VARCHAR(50),
+  tipo_sugerido_ia      VARCHAR(20),
+  pagamento_sugerido_ia VARCHAR(20)
 );
 
 CREATE INDEX IF NOT EXISTS idx_lancamentos_user_id         ON lancamentos (user_id);
