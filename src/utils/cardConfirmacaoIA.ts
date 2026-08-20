@@ -7,6 +7,14 @@
 
 import type { WhatsAppButtonMessage } from '../infrastructure/whatsapp/IWhatsAppAdapter';
 
+// Mensagem de reenvio quando a IA não consegue interpretar a mensagem (texto, áudio ou
+// comprovante). É a cauda de dupla falha: o parser local já tentou e desistiu, e a IA também
+// falhou — nesse ponto não vale a pena tentar reaplicar heurísticas locais (algumas foram
+// deliberadamente enfraquecidas por classificarem com confiança falsa). Compartilhada pelos
+// três fluxos (texto em lancamento.ts; áudio/voucher em messageDispatcher.ts) para manter a
+// cópia idêntica.
+export const MSG_REENVIAR_SEM_VALOR = 'Não consegui entender sua mensagem agora.\n\nPode mandar de novo, assim?\n• recebi 254,75 na uber\n• gastei 80 de gasolina';
+
 // Categorias reconhecidas para correção livre — espelha exatamente as categorias que a IA
 // pode sugerir (ver prompt em analisarLancamentoComIA, commands/lancamento.ts).
 export const CATEGORIAS_VALIDAS = [

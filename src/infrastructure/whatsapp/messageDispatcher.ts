@@ -4,18 +4,12 @@ import { isPremium, MSG_UPGRADE } from '../../services/planoService'
 import { definirEstado } from '../../configs/stateManager'
 import { logger } from '../logger'
 import { verificarLimiteGeminiDia, incrementarGeminiDia } from '../../services/rateLimitService'
-import { montarCardConfirmacaoIA } from '../../utils/cardConfirmacaoIA'
+import { montarCardConfirmacaoIA, MSG_REENVIAR_SEM_VALOR } from '../../utils/cardConfirmacaoIA'
 
 const geminiService = require('../../services/geminiService')
 
 const MAX_MEDIA_BYTES = 5 * 1024 * 1024 // 5 MB
 const MSG_LIMITE_GEMINI = '⚠️ *Limite diário de IA atingido*\n\nVocê atingiu o limite de análises por IA hoje. Tente novamente amanhã ou envie o lançamento em texto.\n\nEx: _mercado 50 pix_'
-
-// Mensagem de reenvio quando a IA não consegue interpretar áudio/comprovante. Sem "parser
-// local" viável para esses formatos (o texto vem de transcrição/OCR da própria IA que já
-// falhou) — mantemos o fallback de pedir reenvio em texto, só com a cópia melhorada alinhada
-// à mensagem de reenvio do fluxo de texto (ver lancamento.ts).
-const MSG_REENVIAR_SEM_VALOR = 'Não consegui pegar o valor aí. Me manda de novo assim:\n\n"recebi 254 na uber" ou "gastei 80 de gasolina"'
 
 // Ponto único de despacho de mensagens — funciona com qualquer adapter (Baileys ou Meta Cloud).
 // mediaRaw: objeto de mídia já extraído pelo adapter específico (audioMessage do Baileys,

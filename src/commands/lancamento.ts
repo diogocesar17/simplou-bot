@@ -31,6 +31,7 @@ import {
   interpretarRespostaConfirmacaoIA,
   resolverCategoriaLivre,
   CATEGORIAS_VALIDAS,
+  MSG_REENVIAR_SEM_VALOR,
 } from '../utils/cardConfirmacaoIA';
 
 // Normaliza frase para uso como chave no parser_cache.
@@ -632,10 +633,9 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
         descricao: parsed.descricao,
         categoria: parsed.categoria,
         data: parsed.data,
-        transcricao: origem === 'audio' ? parsed.transcricao : undefined,
         linhasExtras: origem === 'voucher' && parsed.parcelado ? [`Parcelado: Sim (${parsed.parcelas}x)`] : undefined,
       });
-      await sock.sendMessage(userId, { text: cardAtualizado });
+      await sock.sendInteractiveMessage(userId, cardAtualizado);
       return;
     }
 
@@ -1010,23 +1010,21 @@ async function _lancamentoCommandImpl(sock, userId, texto) {
         data: parsedIA.data,
         avisoConfianca,
       });
-      await sock.sendMessage(userId, { text: card });
+      await sock.sendInteractiveMessage(userId, card);
 
       // Salva texto original e sugestão da IA no estado (usado ao confirmar/corrigir)
       await definirEstado(userId, 'aguardando_confirmacao_ia', { ...parsedIA, textoOriginal: texto, sugestaoIA });
       return;
     } else {
-  logger.warn('[LANCAMENTO] ❌ IA falhou ou atingiu timeout. Comunicando usuário e seguindo padrão.');
-      // Resposta amigável ao usuário (evitar duplicidade posteriormente)
-      await sock.sendMessage(userId, { 
-        text: '⏱️ A análise inteligente demorou demais ou não foi possível entender.\n\nTente um formato mais simples, por exemplo:\n• "mercado 50 pix"\n• "gasto 100 com uber credito"\n• "receita 5000 salario"' 
-      });
-      parsed = parsedNormal;
-      // Se o parse normal também não tiver valor, encerrar aqui para não duplicar mensagens
-      if (!parsed || !parsed.valor) {
-        return;
-      }
-      // Caso contrário, prossegue para o fluxo normal abaixo
+  logger.warn('[LANCAMENTO] ❌ IA falhou ou atingiu timeout. Comunicando usuário e encerrando fluxo.');
+
+      // Cauda de dupla falha: o parser local já tentou e desistiu (parsedNormal não teve
+      // valor), e a IA também falhou. Reaplicar heurísticas locais aqui seria andar em
+      // círculo — algumas foram deliberadamente enfraquecidas por classificar com confiança
+      // falsa (ver categorizarPorPalavrasChave). Não diferenciamos cenários: sempre a mesma
+      // mensagem, sem estado novo no Redis.
+      await sock.sendMessage(userId, { text: MSG_REENVIAR_SEM_VALOR });
+      return;
     }
   }
   
