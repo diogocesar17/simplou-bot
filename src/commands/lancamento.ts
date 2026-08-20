@@ -103,13 +103,18 @@ function categorizarPorPalavrasChave(texto) {
 
   // ── Mapeamento genérico (comportamento original) ──
   const categorias = {
+    // 'uber', '99', 'ifood', 'rappi', 'uber eats' removidos de 'Alimentação' e 'Transporte':
+    // são plataformas ambíguas com tratamento dedicado no bloco "driver com contexto" acima
+    // (linhas ~68-81). Sem verbo de receita, cair aqui retornava categoria com confiança implícita
+    // "alta" e a linha ~332 sobrescrevia incondicionalmente a categoria decidida pelo Gemini —
+    // causando o bug de registrar ganho de motorista/entregador como gasto de Transporte/Alimentação.
     'Alimentação': [
-      'mercado', 'supermercado', 'restaurante', 'lanche', 'delivery', 'ifood', 'rappi', 'uber eats',
+      'mercado', 'supermercado', 'restaurante', 'lanche', 'delivery',
       'comida', 'almoco', 'almocei', 'jantar', 'jantei', 'cafe', 'padaria', 'acougue', 'hortifruti', 'feira', 'pizza', 'hamburguer'
     ],
     'Transporte': [
-      'uber', '99', 'taxi', 'combustivel', 'gasolina', 'etanol', 'onibus', 'metro', 'trem',
-      'transporte publico', 'estacionamento', 'pedagio', 'uber eats', 'rappi'
+      'taxi', 'combustivel', 'gasolina', 'etanol', 'onibus', 'metro', 'trem',
+      'transporte publico', 'estacionamento', 'pedagio'
     ],
     'Saúde': [
       'medico', 'farmacia', 'plano de saude', 'consulta', 'exame', 'laboratorio', 'hospital',

@@ -2,7 +2,10 @@ import { formatarComMoeda } from '../utils/formatUtils';
 // Categorias principais fixas com palavras-chave expandidas
 const categoriasPrincipais = {
   'Alimentação': [
-    'mercado', 'supermercado', 'padaria', 'restaurante', 'ifood', 'rappi', 'lanche', 'almoço', 'jantar', 'pizza', 'hamburguer', 'comida', 'bebida', 'bar', 'café', 'cafe', 'lanchonete', 'delivery',
+    // 'ifood'/'rappi' removidos: plataformas ambíguas (podem ser ganho de entregador sem verbo
+    // reconhecido) — ver 'Transporte' abaixo. Deixar essas keywords aqui reintroduz o bug de
+    // classificar ganho de motorista/entregador como gasto com confiança "alta".
+    'mercado', 'supermercado', 'padaria', 'restaurante', 'lanche', 'almoço', 'jantar', 'pizza', 'hamburguer', 'comida', 'bebida', 'bar', 'café', 'cafe', 'lanchonete', 'delivery',
     'pizzaria', 'fast food', 'fastfood', 'sorvete', 'picolé', 'picole', 'doces', 'chocolate', 'refrigerante', 'suco', 'água', 'agua', 'cerveja', 'vinho', 'whisky', 'vodka', 'gin', 'tequila',
     'feira', 'hortifruti', 'açougue', 'acougue', 'peixaria', 'queijaria', 'doceria', 'confeitaria', 'panificadora', 'salgados', 'bolos', 'tortas', 'sanduíches', 'sanduiches', 'cafeteria', 'cafeteria'
   ],
@@ -17,7 +20,10 @@ const categoriasPrincipais = {
     'móveis', 'moveis', 'eletrodomésticos', 'eletrodomesticos', 'geladeira', 'fogão', 'fogao', 'microondas', 'lavadora', 'secadora', 'ar condicionado', 'ventilador', 'lâmpada', 'lampada'
   ],
   'Transporte': [
-    'uber', '99', 'ônibus', 'onibus', 'metrô', 'metro', 'combustível', 'combustivel', 'gasolina', 'etanol', 'diesel', 'passagem', 'carro', 'moto', 'bicicleta', 'bike', 'trem', 'taxi', 'estacionamento',
+    // 'uber'/'99' removidos: plataformas ambíguas (podem ser ganho de motorista, não só gasto de
+    // passageiro). Bater essa keyword aqui retornava confiança "alta" e bloqueava o fallback de IA
+    // (que já sabe diferenciar receita de motorista vs. gasto de transporte pessoal).
+    'ônibus', 'onibus', 'metrô', 'metro', 'combustível', 'combustivel', 'gasolina', 'etanol', 'diesel', 'passagem', 'carro', 'moto', 'bicicleta', 'bike', 'trem', 'taxi', 'estacionamento',
     'pedágio', 'pedagio', 'multa', 'ipva', 'seguro', 'manutenção', 'manutencao', 'oficina', 'pneu', 'óleo', 'oleo', 'filtro', 'freio', 'bateria', 'correia', 'vela', 'radiador',
     'lavagem', 'polimento', 'cambio', 'câmbio', 'embreagem', 'suspensão', 'suspensao', 'direção', 'direcao', 'ar condicionado', 'som', 'alarme', 'ronda', 'rastreador'
   ],
