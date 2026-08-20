@@ -11,6 +11,12 @@ const geminiService = require('../../services/geminiService')
 const MAX_MEDIA_BYTES = 5 * 1024 * 1024 // 5 MB
 const MSG_LIMITE_GEMINI = '⚠️ *Limite diário de IA atingido*\n\nVocê atingiu o limite de análises por IA hoje. Tente novamente amanhã ou envie o lançamento em texto.\n\nEx: _mercado 50 pix_'
 
+// Mensagem de reenvio quando a IA não consegue interpretar áudio/comprovante. Sem "parser
+// local" viável para esses formatos (o texto vem de transcrição/OCR da própria IA que já
+// falhou) — mantemos o fallback de pedir reenvio em texto, só com a cópia melhorada alinhada
+// à mensagem de reenvio do fluxo de texto (ver lancamento.ts).
+const MSG_REENVIAR_SEM_VALOR = 'Não consegui pegar o valor aí. Me manda de novo assim:\n\n"recebi 254 na uber" ou "gastei 80 de gasolina"'
+
 // Ponto único de despacho de mensagens — funciona com qualquer adapter (Baileys ou Meta Cloud).
 // mediaRaw: objeto de mídia já extraído pelo adapter específico (audioMessage do Baileys,
 // rawMessage.audio da Meta, etc.)
@@ -43,9 +49,7 @@ export async function dispatchWhatsAppMessage(
       const analise = await geminiService.transcreverAudioFinanceiro(buffer, mimeType, userId)
 
       if (!analise) {
-        await adapter.sendMessage(userId, {
-          text: '❌ Não consegui entender o áudio. Você pode enviar o lançamento em texto? Ex.: "mercado 50 pix"',
-        })
+        await adapter.sendMessage(userId, { text: MSG_REENVIAR_SEM_VALOR })
         return
       }
 
@@ -54,15 +58,20 @@ export async function dispatchWhatsAppMessage(
       const sugestaoIA = { categoria: analise.categoria, tipo: analise.tipo, pagamento: analise.formaPagamento }
       await definirEstado(userId, 'aguardando_confirmacao_ia', { origem: 'audio', ...analise, sugestaoIA })
 
+      // A transcrição não cabe estruturalmente no card de botões nativos (header/body/footer
+      // têm papéis fixos) — enviada como mensagem de texto separada, antes do card.
+      if (analise.transcricao) {
+        await adapter.sendMessage(userId, { text: `_"${String(analise.transcricao).slice(0, 300)}"_` })
+      }
+
       const card = montarCardConfirmacaoIA({
         tipo: analise.tipo,
         valor: analise.valor,
         descricao: analise.descricao,
         categoria: analise.categoria,
         data: analise.data,
-        transcricao: analise.transcricao,
       })
-      await adapter.sendMessage(userId, { text: card })
+      await adapter.sendInteractiveMessage(userId, card)
     } catch (err) {
       logger.error({ err: (err as any)?.message || err }, '[AUDIO] Erro ao processar áudio')
       await adapter.sendMessage(userId, {
@@ -96,9 +105,7 @@ export async function dispatchWhatsAppMessage(
       const analise = await geminiService.analisarVoucherFinanceiro(buffer, mimeType, userId)
 
       if (!analise) {
-        await adapter.sendMessage(userId, {
-          text: '❌ Não consegui interpretar o comprovante. Você pode enviar o lançamento em texto? Ex.: "mercado 50 pix"',
-        })
+        await adapter.sendMessage(userId, { text: MSG_REENVIAR_SEM_VALOR })
         return
       }
 
@@ -115,7 +122,7 @@ export async function dispatchWhatsAppMessage(
         data: analise.data,
         linhasExtras: analise.parcelado ? [`Parcelado: Sim (${analise.parcelas}x)`] : undefined,
       })
-      await adapter.sendMessage(userId, { text: card })
+      await adapter.sendInteractiveMessage(userId, card)
     } catch (err) {
       logger.error({ err: (err as any)?.message || err }, '[VOUCHER] Erro ao processar comprovante')
       await adapter.sendMessage(userId, {

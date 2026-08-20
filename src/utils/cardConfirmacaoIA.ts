@@ -1,6 +1,11 @@
 // Card de confirmação exibido ao usuário após a IA (Gemini) analisar um lançamento
 // vindo de texto, áudio ou comprovante (voucher). Fonte única da cópia e da lógica de
 // interpretação de resposta para manter os três fluxos consistentes entre si.
+//
+// Renderizado como mensagem de botões nativos do WhatsApp (Meta Cloud API) — ver
+// WhatsAppButtonMessage em infrastructure/whatsapp/IWhatsAppAdapter.ts.
+
+import type { WhatsAppButtonMessage } from '../infrastructure/whatsapp/IWhatsAppAdapter';
 
 // Categorias reconhecidas para correção livre — espelha exatamente as categorias que a IA
 // pode sugerir (ver prompt em analisarLancamentoComIA, commands/lancamento.ts).
@@ -14,7 +19,7 @@ export const CATEGORIAS_VALIDAS = [
 ];
 
 // Locais com preposição própria — usados na frase de confirmação ("na Uber", "no iFood"...).
-// Fora desse mapa, a frase cai no genérico "com {descrição}".
+// Fora desse mapa, a frase cai no genérico "com {categoria}" (em minúsculas).
 const PREPOSICAO_PLATAFORMA: Record<string, string> = {
   'Uber': 'na Uber',
   '99Pop': 'na 99',
@@ -22,6 +27,14 @@ const PREPOSICAO_PLATAFORMA: Record<string, string> = {
   'Rappi': 'na Rappi',
   'Loggi': 'na Loggi',
 };
+
+// Monta a preposição + local para uma categoria — plataformas conhecidas usam "na"/"no" com o
+// nome próprio; qualquer outra categoria cai no genérico "com {categoria em minúsculas}".
+// Reaproveitado tanto pelo card de confirmação quanto pelas mensagens de fallback do parser
+// local (ver lancamento.ts) para manter a mesma frase em todos os pontos do fluxo.
+export function prepararCategoriaLocal(categoria: string): string {
+  return PREPOSICAO_PLATAFORMA[categoria] || `com ${String(categoria || '').toLowerCase()}`;
+}
 
 function normalizarTexto(texto: string): string {
   return (texto || '')
@@ -39,9 +52,19 @@ export function resolverCategoriaLivre(textoLivre: string): string | null {
   return CATEGORIAS_VALIDAS.find(c => normalizarTexto(c) === alvo) || null;
 }
 
-function formatarValorCard(valor: number): string {
+// Formato "R$254,75" (sem espaço, decimal com vírgula) — usado no card de confirmação e
+// reaproveitado nas mensagens de fallback do parser local para manter o mesmo padrão visual.
+export function formatarValorCard(valor: number): string {
   const num = Number(valor) || 0;
   return `R$${num.toFixed(2).replace('.', ',')}`;
+}
+
+// Trunca com reticências, respeitando os limites de campo da Meta Cloud API
+// (header ≤60, body ≤1024, footer ≤60, botão ≤20). Rede de segurança apenas —
+// os textos padrão já foram validados para caber nesses limites nos casos comuns.
+function limitarTexto(texto: string, max: number): string {
+  if (!texto) return texto;
+  return texto.length > max ? `${texto.slice(0, max - 1).trimEnd()}…` : texto;
 }
 
 // Aceita data em ISO (YYYY-MM-DD) ou BR (DD/MM/AAAA) e devolve ISO — ou null se não reconhecer.
@@ -85,41 +108,48 @@ export interface DadosCardConfirmacaoIA {
   descricao: string;
   categoria: string;
   data: string;                // ISO ou BR
-  transcricao?: string;        // áudio: o que a IA entendeu ter sido dito
   linhasExtras?: string[];     // ex.: indicação de parcelamento (voucher)
   avisoConfianca?: string;     // ex.: aviso de baixa confiança da IA
 }
 
-// Texto da opção 2, conforme o tipo sugerido pela IA (inverte gasto↔receita).
+// Texto do botão dinâmico, conforme o tipo sugerido (inverte gasto↔receita).
 export function textoOpcaoInverterTipo(tipo: string): string {
   return String(tipo).toLowerCase() === 'receita' ? 'Não, foi um GASTO' : 'Não, foi um GANHO';
 }
 
-export function montarCardConfirmacaoIA(dados: DadosCardConfirmacaoIA): string {
+// Estrutura pronta para IWhatsAppAdapter.sendInteractiveMessage(userId, { type: 'button', ... }).
+export function montarCardConfirmacaoIA(dados: DadosCardConfirmacaoIA): WhatsAppButtonMessage {
   const isReceita = String(dados.tipo).toLowerCase() === 'receita';
   const verbo = isReceita ? 'GANHOU' : 'GASTOU';
-  const local = PREPOSICAO_PLATAFORMA[dados.categoria] || `com ${dados.descricao}`;
+  const local = prepararCategoriaLocal(dados.categoria);
   const quando = descreverQuando(dados.data);
 
-  let corpo = dados.transcricao
-    ? `_"${String(dados.transcricao).slice(0, 300)}"_\n\n`
-    : '';
+  const header = limitarTexto(
+    `Você ${verbo} ${formatarValorCard(dados.valor)} ${local} ${quando}. Certo?`,
+    60
+  );
 
-  corpo += `Entendi: você ${verbo} ${formatarValorCard(dados.valor)} ${local} ${quando}. Certo?\n\n`;
-  corpo += `Categoria: ${dados.categoria}\n`;
-  corpo += `Data: ${formatarDataCurta(dados.data)}`;
-
+  let body = `Categoria: ${dados.categoria}\nData: ${formatarDataCurta(dados.data)}`;
   if (dados.linhasExtras?.length) {
-    corpo += `\n${dados.linhasExtras.join('\n')}`;
+    body += `\n${dados.linhasExtras.join('\n')}`;
   }
   if (dados.avisoConfianca) {
-    corpo += `\n\n${dados.avisoConfianca}`;
+    body += `\n\n${dados.avisoConfianca}`;
   }
+  body = limitarTexto(body, 1024);
 
-  corpo += `\n\n1 - Confirmar\n2 - ${textoOpcaoInverterTipo(dados.tipo)}`;
-  corpo += `\n\nSe a categoria estiver errada, é só me dizer a certa.`;
+  const footer = limitarTexto('Se a categoria estiver errada, é só me dizer a certa.', 60);
 
-  return corpo;
+  return {
+    type: 'button',
+    header,
+    body,
+    footer,
+    buttons: [
+      { id: 'ia_confirmar', title: limitarTexto('Confirmar', 20) },
+      { id: 'ia_inverter_tipo', title: limitarTexto(textoOpcaoInverterTipo(dados.tipo), 20) },
+    ],
+  };
 }
 
 export type RespostaConfirmacaoIA =
@@ -128,7 +158,9 @@ export type RespostaConfirmacaoIA =
   | { acao: 'categoria'; valor: string };
 
 const RESPOSTAS_CONFIRMAR = new Set(['1', 'ia_confirmar', 'sim', 's', 'yes', 'y']);
-const RESPOSTAS_INVERTER = new Set(['2', 'ia_cancelar', 'não', 'nao', 'n', 'no']);
+// 'ia_cancelar' mantido por compatibilidade com estados em voo no Redis de antes da migração
+// para o id 'ia_inverter_tipo' (botão nativo).
+const RESPOSTAS_INVERTER = new Set(['2', 'ia_inverter_tipo', 'ia_cancelar', 'não', 'nao', 'n', 'no']);
 
 // Interpreta a resposta do usuário no card de confirmação da IA.
 // Qualquer texto que não seja "1"/"2" (ou variações reconhecidas de sim/não) é tratado
