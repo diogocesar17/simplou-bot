@@ -141,7 +141,9 @@ export async function getFixedCosts(userId: string): Promise<FixedCost[]> {
       'SELECT * FROM fixed_costs WHERE user_id = $1 AND active = true ORDER BY category, description',
       [userId],
     );
-    return result.rows;
+    // amount vem como string do Postgres (coluna DECIMAL) — normaliza na borda,
+    // pra nenhum consumidor somar string e virar NaN silenciosamente.
+    return result.rows.map((row: any) => ({ ...row, amount: parseFloat(row.amount) }));
   } catch (err) {
     logger.error({ err }, '[DRIVER] Erro ao buscar custos fixos');
     return [];
@@ -201,6 +203,15 @@ async function getTotalFixoMensal(userId: string): Promise<number> {
   }, 0);
 }
 
+// Rateio diário do custo fixo mensal, usando os dias reais do mês de referência —
+// única fonte de verdade pra esse cálculo (antes divergia: getLucroDia usava /30
+// fixo enquanto queryResumo usava dias reais, mostrando números diferentes pro
+// mesmo usuário no mesmo dia).
+function calcularRateioDiario(totalFixoMensal: number, dataReferencia: Date): number {
+  const diasNoMes = new Date(dataReferencia.getFullYear(), dataReferencia.getMonth() + 1, 0).getDate();
+  return totalFixoMensal / diasNoMes;
+}
+
 async function queryResumo(
   userId: string,
   inicio: Date,
@@ -251,8 +262,7 @@ async function queryResumo(
 
   const totalFixoMensal = await getTotalFixoMensal(userId);
   const diasPeriodo = Math.round((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
-  const diasNoMes = new Date(inicio.getFullYear(), inicio.getMonth() + 1, 0).getDate();
-  const custosFixosRateados = (totalFixoMensal / diasNoMes) * diasPeriodo;
+  const custosFixosRateados = calcularRateioDiario(totalFixoMensal, inicio) * diasPeriodo;
   const lucro = receitas - despesas;
 
   return {
@@ -310,7 +320,7 @@ export async function getLucroDia(userId: string): Promise<number> {
     else despesas = parseFloat(row.total);
   }
   const totalFixoMensal = await getTotalFixoMensal(userId);
-  const custoFixoDiario = totalFixoMensal / 30;
+  const custoFixoDiario = calcularRateioDiario(totalFixoMensal, inicio);
   return receitas - despesas - custoFixoDiario;
 }
 
