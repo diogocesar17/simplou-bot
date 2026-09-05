@@ -4,16 +4,16 @@ import { setMoeda, MOEDAS } from '../services/preferencesService';
 import { definirEstado, limparEstado } from '../configs/stateManager';
 import { formatarComMoeda } from '../utils/formatUtils';
 
-const TIPO_LABELS: Record<string, string> = {
-  MOTORISTA_APP: 'Motorista de app (Uber, 99)',
-  DELIVERY: 'Entregador/Delivery (iFood, Rappi, Loggi)',
-  AMBOS: 'Motorista e entregador',
+const TIPO_LABELS: Record<'DRIVER' | 'OUTROS', string> = {
+  DRIVER: 'Motorista/entregador',
+  OUTROS: 'Outro trabalho',
 };
 
+// Títulos com no máximo 20 caracteres (limite de botão da Meta Cloud API — mesma
+// restrição documentada em perguntarNome).
 const BOTOES_TIPO_TRABALHO = [
-  { id: '1', title: '🚗 Motorista App' },
-  { id: '2', title: '🛵 Entregador' },
-  { id: '3', title: '⚡ Os dois' },
+  { id: 'trab_driver', title: '🚗 Motorista/app' },
+  { id: 'trab_outros', title: '💼 Outro trabalho' },
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -23,11 +23,22 @@ function prefixoBrasil(userId: string): boolean {
   return numero.startsWith('55');
 }
 
-function detectarTipoTrabalho(texto: string): 'MOTORISTA_APP' | 'DELIVERY' | 'AMBOS' | null {
+async function ehDriver(userId: string): Promise<boolean> {
+  return (await driverService.getDriverProfile(userId)) !== null;
+}
+
+function detectarPerfilTrabalho(texto: string): 'DRIVER' | 'OUTROS' | null {
   const norm = texto.toLowerCase().trim();
-  if (norm === '1' || /motorista|app|\buber\b|\b99\b/.test(norm)) return 'MOTORISTA_APP';
-  if (norm === '2' || /delivery|entregador|\bifood\b|\brappi\b|\bloggi\b/.test(norm)) return 'DELIVERY';
-  if (norm === '3' || /\bambos\b|\bdois\b|\btudo\b/.test(norm)) return 'AMBOS';
+  // ids antigos ('1' | '2' | '3') mantidos por compatibilidade — alguém pode ter
+  // a tela de onboarding anterior aberta no momento do deploy desta mudança.
+  if (norm === 'trab_driver' || norm === '1' || norm === '2' || norm === '3' ||
+    /motorista|entregador|\buber\b|\b99\b|\bifood\b|\brappi\b|\bloggi\b|delivery|ambos|dois/.test(norm)) {
+    return 'DRIVER';
+  }
+  if (norm === 'trab_outros' ||
+    /\bnenhum\b|nao sou|não sou|autonomo|autônomo|conta propria|conta própria|\boutros?\b/.test(norm)) {
+    return 'OUTROS';
+  }
   return null;
 }
 
@@ -97,15 +108,18 @@ export async function perguntarTipoTrabalho(sock: any, userId: string): Promise<
   await sock.sendInteractiveMessage(userId, {
     type: 'button',
     header: '🚗 Qual é o seu trabalho principal?',
-    body: 'Isso me ajuda a reconhecer automaticamente suas corridas, entregas e custos operacionais.',
+    body:
+      'Isso me ajuda a reconhecer automaticamente seus ganhos e custos.\n\n' +
+      '🚗 *Motorista/app* — motorista ou entregador de aplicativo\n' +
+      '💼 *Outro trabalho* — qualquer outra atividade autônoma',
     buttons: BOTOES_TIPO_TRABALHO,
   });
 }
 
 export async function handleOnboardingTipoTrabalho(sock: any, userId: string, texto: string): Promise<void> {
-  const tipo = detectarTipoTrabalho(texto);
+  const perfil = detectarPerfilTrabalho(texto);
 
-  if (!tipo) {
+  if (!perfil) {
     await sock.sendInteractiveMessage(userId, {
       type: 'button',
       header: '🚗 Qual é o seu trabalho principal?',
@@ -115,7 +129,11 @@ export async function handleOnboardingTipoTrabalho(sock: any, userId: string, te
     return;
   }
 
-  await driverService.upsertDriverProfile(userId, { tipo });
+  if (perfil === 'DRIVER') {
+    await driverService.upsertDriverProfile(userId, { tipo: 'AMBOS' });
+  } else {
+    await driverService.deleteDriverProfile(userId);
+  }
 
   // Usuário fora do Brasil → pergunta a moeda antes da meta
   if (!prefixoBrasil(userId)) {
@@ -128,7 +146,7 @@ export async function handleOnboardingTipoTrabalho(sock: any, userId: string, te
   await setMoeda(userId, 'BRL');
 
   await definirEstado(userId, 'onboarding_meta_diaria', {}, TTL_ONBOARDING);
-  await perguntarMetaDiaria(sock, userId, TIPO_LABELS[tipo]);
+  await perguntarMetaDiaria(sock, userId, TIPO_LABELS[perfil], perfil === 'DRIVER');
 }
 
 // ─── Step 3 (opcional): Moeda ─────────────────────────────────────────────────
@@ -175,20 +193,21 @@ export async function handleOnboardingMoeda(sock: any, userId: string, texto: st
   await sock.sendMessage(userId, {
     text: `✅ Moeda definida: *${moeda.nome}* (${moeda.simbolo})`,
   });
-  await perguntarMetaDiaria(sock, userId);
+  await perguntarMetaDiaria(sock, userId, undefined, await ehDriver(userId));
 }
 
 // ─── Step 4: Meta diária ──────────────────────────────────────────────────────
 
-async function perguntarMetaDiaria(sock: any, userId: string, tipoLabel?: string): Promise<void> {
+async function perguntarMetaDiaria(sock: any, userId: string, tipoLabel: string | undefined, driver: boolean): Promise<void> {
   if (tipoLabel) {
     await sock.sendMessage(userId, { text: `✅ ${tipoLabel}` });
   }
+  const frase = driver ? 'A cada corrida ou entrega registrada' : 'A cada registro';
   await sock.sendInteractiveMessage(userId, {
     type: 'button',
     header: '🎯 Quer definir uma meta diária de ganhos?',
     body:
-      'A cada corrida ou entrega registrada, vou mostrar quanto você já lucrou e quanto falta para bater a meta.\n\n' +
+      `${frase}, vou mostrar quanto você já lucrou e quanto falta para bater a meta.\n\n` +
       'Se sim, responda com o valor desejado (ex: _300_ para ganhar 300/dia).',
     buttons: [
       { id: 'pular', title: '⏭️ Definir depois' },
@@ -196,8 +215,16 @@ async function perguntarMetaDiaria(sock: any, userId: string, tipoLabel?: string
   });
 }
 
+const EXEMPLOS_DRIVER = '• _ganhei 280 no uber_ → corrida\n• _abasteci 150 de gasolina_ → custo';
+const EXEMPLOS_GENERICO = '• _recebi 200 de um cliente_ → receita\n• _gastei 50 com material_ → custo';
+
+function blocoExemplos(driver: boolean): string {
+  return driver ? EXEMPLOS_DRIVER : EXEMPLOS_GENERICO;
+}
+
 export async function handleOnboardingMetaDiaria(sock: any, userId: string, texto: string): Promise<void> {
   const norm = texto.toLowerCase().trim();
+  const driver = await ehDriver(userId);
 
   const pulou = ['pular', 'nao', 'não', 'agora nao', 'agora não', 'depois', 'skip', 'definir depois'].includes(norm);
   if (pulou) {
@@ -206,8 +233,7 @@ export async function handleOnboardingMetaDiaria(sock: any, userId: string, text
       text:
         '✅ Tudo pronto! Pode definir sua meta depois com _meta diária 300_.\n\n' +
         '🚀 *Comece registrando agora:*\n' +
-        '• _ganhei 280 no uber_ → corrida\n' +
-        '• _abasteci 150 de gasolina_ → custo\n' +
+        `${blocoExemplos(driver)}\n` +
         '• _lucro hoje_ → ver seu lucro do dia\n\n' +
         'Digite *ajuda* para ver tudo que posso fazer.',
     });
@@ -243,8 +269,7 @@ export async function handleOnboardingMetaDiaria(sock: any, userId: string, text
       `🎯 Meta diária definida: *${formatarComMoeda(valor)}*\n\n` +
       '✅ Tudo pronto! A cada lançamento vou mostrar seu lucro acumulado e quanto falta para a meta.\n\n' +
       '🚀 *Vamos começar:*\n' +
-      '• _ganhei 280 no uber_ → corrida\n' +
-      '• _abasteci 150 de gasolina_ → custo\n' +
+      `${blocoExemplos(driver)}\n` +
       '• _lucro hoje_ → ver seu lucro do dia\n\n' +
       'Digite *ajuda* para ver todos os comandos.',
   });

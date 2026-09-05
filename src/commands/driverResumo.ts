@@ -35,16 +35,21 @@ function formatarMeta(resumo: driverService.DriverResumo, referencia: string): s
   return '';
 }
 
+const EXEMPLOS_DRIVER = '"ganhei 200 no uber" ou "abasteci 100"';
+const EXEMPLOS_GENERICO = '"recebi 200 de um cliente" ou "gastei 100 com material"';
+
 function montarMensagem(
   titulo: string,
   resumo: driverService.DriverResumo,
   tipoMeta: string,
+  ehDriver: boolean,
 ): string {
   const { receitas, despesas, lucro, lucroReal, custosFixosRateados, porPlataforma, porCategoriaDespesa, totalLancamentos } = resumo;
 
   const emojiLucro = lucroReal >= 0 ? '🟢' : '🔴';
+  const emojiTitulo = ehDriver ? '🚗' : '📊';
 
-  let msg = `🚗 *${titulo}*\n\n`;
+  let msg = `${emojiTitulo} *${titulo}*\n\n`;
   msg += `💰 Receitas: ${formatarComMoeda(receitas)}\n`;
   msg += `💸 Custos registrados: ${formatarComMoeda(despesas)}\n`;
   if (custosFixosRateados > 0) {
@@ -55,7 +60,7 @@ function montarMensagem(
   msg += formatarMeta(resumo, tipoMeta);
 
   if (porPlataforma.length > 0) {
-    msg += '\n📊 *Por plataforma:*\n';
+    msg += `\n${ehDriver ? '📊 *Por plataforma:*' : '💰 *Receitas por origem:*'}\n`;
     for (const p of porPlataforma) {
       msg += `• ${p.plataforma}: ${formatarComMoeda(p.total)}\n`;
     }
@@ -70,17 +75,29 @@ function montarMensagem(
 
   if (totalLancamentos === 0) {
     msg += '\n📭 Nenhum lançamento encontrado neste período.\n';
-    msg += 'Registre: "ganhei 200 no uber" ou "abasteci 100"';
+    msg += `Registre: ${ehDriver ? EXEMPLOS_DRIVER : EXEMPLOS_GENERICO}`;
   }
 
   return msg.trim();
 }
 
+async function enviarResumo(
+  sock: any,
+  userId: string,
+  titulo: string,
+  resumo: driverService.DriverResumo,
+  tipoMeta: string,
+): Promise<void> {
+  const perfil = await driverService.getDriverProfile(userId);
+  const ehDriver = perfil !== null;
+  const msg = montarMensagem(titulo, resumo, tipoMeta, ehDriver);
+  await sock.sendMessage(userId, { text: msg });
+}
+
 export async function driverResumoDiaCommand(sock: any, userId: string): Promise<void> {
   try {
     const resumo = await driverService.getResumoDia(userId);
-    const msg = montarMensagem(`Resumo do dia — ${dataHoje()}`, resumo, 'diária');
-    await sock.sendMessage(userId, { text: msg });
+    await enviarResumo(sock, userId, `Resumo do dia — ${dataHoje()}`, resumo, 'diária');
   } catch (err) {
     logger.error({ err }, '[DRIVER_RESUMO] Erro no resumo do dia');
     await sock.sendMessage(userId, { text: '❌ Erro ao gerar resumo. Tente novamente.' });
@@ -90,8 +107,7 @@ export async function driverResumoDiaCommand(sock: any, userId: string): Promise
 export async function driverResumoSemanaCommand(sock: any, userId: string): Promise<void> {
   try {
     const resumo = await driverService.getResumoSemana(userId);
-    const msg = montarMensagem('Resumo da semana', resumo, 'semanal');
-    await sock.sendMessage(userId, { text: msg });
+    await enviarResumo(sock, userId, 'Resumo da semana', resumo, 'semanal');
   } catch (err) {
     logger.error({ err }, '[DRIVER_RESUMO] Erro no resumo da semana');
     await sock.sendMessage(userId, { text: '❌ Erro ao gerar resumo. Tente novamente.' });
@@ -103,8 +119,7 @@ export async function driverResumoMesCommand(sock: any, userId: string): Promise
     const resumo = await driverService.getResumoMes(userId);
     const d = new Date();
     const nomeMes = d.toLocaleString('pt-BR', { month: 'long' });
-    const msg = montarMensagem(`Resumo de ${nomeMes}`, resumo, 'mensal');
-    await sock.sendMessage(userId, { text: msg });
+    await enviarResumo(sock, userId, `Resumo de ${nomeMes}`, resumo, 'mensal');
   } catch (err) {
     logger.error({ err }, '[DRIVER_RESUMO] Erro no resumo do mês');
     await sock.sendMessage(userId, { text: '❌ Erro ao gerar resumo. Tente novamente.' });
@@ -116,8 +131,7 @@ export async function driverResumoMesEspecificoCommand(sock: any, userId: string
     const resumo = await driverService.getResumoPorMesAno(userId, mes, ano);
     const nomeMes = new Date(ano, mes - 1, 1).toLocaleString('pt-BR', { month: 'long' });
     const titulo = `Resumo de ${nomeMes}/${ano}`;
-    const msg = montarMensagem(titulo, resumo, 'mensal');
-    await sock.sendMessage(userId, { text: msg });
+    await enviarResumo(sock, userId, titulo, resumo, 'mensal');
   } catch (err) {
     logger.error({ err }, '[DRIVER_RESUMO] Erro no resumo do mês específico');
     await sock.sendMessage(userId, { text: '❌ Erro ao gerar resumo. Tente novamente.' });

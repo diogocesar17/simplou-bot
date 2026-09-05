@@ -88,6 +88,18 @@ export async function upsertDriverProfile(userId: string, dados: Partial<DriverP
   }
 }
 
+export async function deleteDriverProfile(userId: string): Promise<void> {
+  try {
+    await (db as any).queryDatabase(
+      'DELETE FROM driver_profiles WHERE user_id = $1',
+      [userId],
+    );
+  } catch (err) {
+    logger.error({ err }, '[DRIVER] Erro ao remover perfil');
+    throw err;
+  }
+}
+
 // ─── Financial Goals ───────────────────────────────────────────────────────
 
 export async function getGoals(userId: string): Promise<FinancialGoal[]> {

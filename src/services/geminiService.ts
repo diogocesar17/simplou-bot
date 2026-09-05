@@ -187,10 +187,16 @@ export async function analisarPadroesGastos(
 
   const t0 = Date.now();
   try {
+    // driverContext só é preenchido quando o usuário tem driver_profile (ver
+    // driverService.buildDriverContext) — reaproveitamos esse sinal em vez de
+    // consultar o perfil de novo.
+    const abertura = driverContext
+      ? 'Você é um assistente financeiro especializado em motoristas e entregadores de aplicativo.'
+      : 'Você é um assistente financeiro para autônomos e trabalhadores independentes.';
     const prompt = `
-Você é um assistente financeiro especializado em motoristas e entregadores de aplicativo.
+${abertura}
 ${driverContext ? `\nPERFIL DO USUÁRIO:\n${driverContext}\n` : ''}
-Analise os dados de ganhos e custos operacionais do motorista e forneça insights relevantes para o nicho:
+Analise os dados de ganhos e custos operacionais ${driverContext ? 'do motorista' : 'do usuário'} e forneça insights relevantes${driverContext ? ' para o nicho' : ''}:
 
 Dados dos últimos 3 meses (colunas: id, data, tipo, descricao, valor, categoria, pagamento):
 ${JSON.stringify(dados, null, 2)}
@@ -228,10 +234,16 @@ export async function gerarSugestoesEconomia(
 
   const t0 = Date.now();
   try {
+    // driverContext só é preenchido quando o usuário tem driver_profile (ver
+    // driverService.buildDriverContext) — reaproveitamos esse sinal em vez de
+    // consultar o perfil de novo.
+    const abertura = driverContext
+      ? 'Você é um consultor financeiro especializado em motoristas e entregadores de aplicativo.'
+      : 'Você é um consultor financeiro para autônomos e trabalhadores independentes.';
     const prompt = `
-Você é um consultor financeiro especializado em motoristas e entregadores de aplicativo.
+${abertura}
 ${driverContext ? `\nPERFIL DO USUÁRIO:\n${driverContext}\n` : ''}
-Com base nos ganhos e custos operacionais do motorista, gere sugestões práticas para aumentar sua rentabilidade:
+Com base nos ganhos e custos operacionais ${driverContext ? 'do motorista' : 'do usuário'}, gere sugestões práticas para aumentar sua rentabilidade:
 
 Dados (colunas: id, data, tipo, descricao, valor, categoria, pagamento):
 ${JSON.stringify(dados, null, 2)}
@@ -268,10 +280,16 @@ export async function preverGastosFuturos(
 
   const t0 = Date.now();
   try {
+    // driverContext só é preenchido quando o usuário tem driver_profile (ver
+    // driverService.buildDriverContext) — reaproveitamos esse sinal em vez de
+    // consultar o perfil de novo.
+    const abertura = driverContext
+      ? 'Você é um analista financeiro especializado em motoristas e entregadores de aplicativo.'
+      : 'Você é um analista financeiro para autônomos e trabalhadores independentes.';
     const prompt = `
-Você é um analista financeiro especializado em motoristas e entregadores de aplicativo.
+${abertura}
 ${driverContext ? `\nPERFIL DO USUÁRIO:\n${driverContext}\n` : ''}
-Analise o histórico de ganhos e custos do motorista e faça projeções para os próximos meses:
+Analise o histórico de ganhos e custos ${driverContext ? 'do motorista' : 'do usuário'} e faça projeções para os próximos meses:
 
 Histórico dos últimos 6 meses (colunas: id, data, tipo, descricao, valor, categoria, pagamento):
 ${JSON.stringify(dados, null, 2)}
@@ -310,9 +328,15 @@ export async function responderPerguntaFinanceira(
 
   const t0 = Date.now();
   try {
-    let prompt = `Você é um assistente financeiro especializado em motoristas e entregadores de aplicativo no Brasil.
+    // driverContext só é preenchido quando o usuário tem driver_profile (ver
+    // driverService.buildDriverContext) — reaproveitamos esse sinal em vez de
+    // consultar o perfil de novo.
+    const abertura = driverContext
+      ? 'Você é um assistente financeiro especializado em motoristas e entregadores de aplicativo no Brasil.'
+      : 'Você é um assistente financeiro para autônomos e trabalhadores independentes no Brasil.';
+    let prompt = `${abertura}
 ${driverContext ? `\nPERFIL DO USUÁRIO:\n${driverContext}\n` : ''}
-Responda à seguinte pergunta de forma clara e objetiva, sempre considerando a realidade de quem trabalha com Uber, iFood, 99, Rappi ou delivery:
+Responda à seguinte pergunta de forma clara e objetiva${driverContext ? ', sempre considerando a realidade de quem trabalha com Uber, iFood, 99, Rappi ou delivery' : ''}:
 
 Pergunta: "${pergunta}"`;
 
@@ -320,7 +344,7 @@ Pergunta: "${pergunta}"`;
       prompt += `\n\nHistórico financeiro do usuário (colunas: id, data, tipo, descricao, valor, categoria, pagamento):\n${JSON.stringify(contexto, null, 2)}`;
     }
 
-    prompt += `\n\nResponda de forma prática e útil para um motorista/entregador, usando linguagem simples e emojis. Máximo 20 linhas.`;
+    prompt += `\n\nResponda de forma prática e útil${driverContext ? ' para um motorista/entregador' : ''}, usando linguagem simples e emojis. Máximo 20 linhas.`;
 
     const result = await comRetry(() => model.generateContent(prompt), 'responderPergunta');
     const response = await result.response;

@@ -27,7 +27,8 @@ async function perfilCommand(sock: any, userId: string) {
     msg += `⚠️ Usuário não encontrado no sistema.\n`;
   }
 
-  // Perfil driver
+  // Perfil driver — sem perfil é o estado normal de quem escolheu "Outro trabalho"
+  // no onboarding, não uma configuração pendente. Nesse caso o bloco é omitido.
   if (driverProfile) {
     const tipos: Record<string, string> = {
       MOTORISTA_APP: 'Motorista de app (Uber, 99)',
@@ -42,9 +43,6 @@ async function perfilCommand(sock: any, userId: string) {
     if (driverProfile.combustivel_preferido && driverProfile.custo_combustivel_litro) {
       msg += `Combustível: ${driverProfile.combustivel_preferido} a ${formatarComMoeda(driverProfile.custo_combustivel_litro)}/L\n`;
     }
-  } else {
-    msg += `\n🚗 *Perfil Driver:* não configurado\n`;
-    msg += `_Digite "sou motorista de app" ou "trabalho com delivery" para configurar._\n`;
   }
 
   // Metas ativas
