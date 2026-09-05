@@ -2872,33 +2872,51 @@ async function promoverParaPremium(userId, diasExpiracao = null, promovidoPor) {
 
 // Função para remover usuário
 async function removerUsuario(userId, removidoPor) {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     // Verificar se usuário existe
-    const checkResult = await queryDatabase('SELECT * FROM usuarios WHERE user_id = $1', [userId]);
+    const checkResult = await client.query('SELECT * FROM usuarios WHERE user_id = $1', [userId]);
     if (checkResult.rows.length === 0) {
       throw new Error('Usuário não encontrado');
     }
-    
+
     const usuario = checkResult.rows[0];
-    
-    // Deletar usuário
-    const result = await queryDatabase(`
-      DELETE FROM usuarios WHERE user_id = $1
-    `, [userId]);
-    
-    // Registrar log de auditoria
+
+    // Tabelas sem FK para usuarios — não são limpas pelo DELETE de usuarios abaixo,
+    // então precisam de exclusão explícita aqui. Toda tabela nova por usuário
+    // precisa entrar nesta lista ou fica órfã numa exclusão de conta.
+    // (lancamentos, cartoes_config, lembretes e orcamentos já têm
+    // ON DELETE CASCADE e são limpas automaticamente.)
+    await client.query('DELETE FROM driver_profiles WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM financial_goals WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM fixed_costs WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM ia_fallback_log WHERE user_id = $1', [userId]);
+    await client.query('DELETE FROM user_preferences WHERE user_id = $1', [userId]);
+
+    // Deletar usuário — dispara o CASCADE das tabelas com FK
+    await client.query('DELETE FROM usuarios WHERE user_id = $1', [userId]);
+
+    await client.query('COMMIT');
+
+    // logs_auditoria fica de fora de propósito: não tem FK pra usuarios
+    // porque precisa sobreviver à exclusão (é o próprio registro do evento).
     await registrarLog(removidoPor || 'sistema', 'EXCLUSAO_USUARIO', {
       usuario_removido: userId,
       nome: usuario.nome,
       plano: usuario.plano,
       is_admin: usuario.is_admin
     });
-    
+
     logger.info(`✅ Usuário removido: ${userId}`);
     return usuario;
   } catch (error) {
+    await client.query('ROLLBACK');
     logger.error('❌ Erro ao remover usuário:', error);
     throw error;
+  } finally {
+    client.release();
   }
 }
 

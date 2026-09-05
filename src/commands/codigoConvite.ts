@@ -49,7 +49,7 @@ export async function validarPrimeiraMensagem(
   }
 
   // Código ausente ou errado — nunca logar o código correto, apenas a tentativa
-  const tentativa = texto.trim().slice(0, 100) // limita tamanho no log
+  const tentativa = texto.trim().slice(0, 500) // limita tamanho no log
   logger.info({ userId }, '[CONVITE] Código de convite não encontrado na primeira mensagem')
   await databaseService.registrarLog(userId, 'CODIGO_CONVITE_INVALIDO', { codigo_tentado: tentativa })
   await adapter.sendMessage(userId, { text: MSG_CODIGO_INVALIDO })
@@ -94,7 +94,7 @@ export async function handleCodigoConvite(
     return true
   }
 
-  const tentativa = texto.trim().slice(0, 100)
+  const tentativa = texto.trim().slice(0, 500)
   logger.info({ userId }, '[CONVITE] Código de convite inválido (fallback)')
   await databaseService.registrarLog(userId, 'CODIGO_CONVITE_INVALIDO', { codigo_tentado: tentativa })
   await adapter.sendMessage(userId, { text: MSG_CODIGO_INVALIDO })
